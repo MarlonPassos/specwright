@@ -5,6 +5,16 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.1.3] - 2026-08-30
+
+### Documentação
+
+- **docs: exige `--install-links` na instalação a partir do git**
+  - Sem a opção, o npm instala o clone preparado como link simbólico para um diretório
+    temporário do cache, apaga esse diretório logo depois e a instalação termina sem erro
+    com o comando `specs` inexistente
+  - Comandos de instalação atualizados e o motivo documentado
+
 ## [0.1.2] - 2026-08-30
 
 ### Correções

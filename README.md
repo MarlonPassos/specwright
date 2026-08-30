@@ -24,14 +24,19 @@ Enquanto o pacote não está no npm, quem tem acesso ao repositório instala dir
 principal:
 
 ```bash
-npm install --global git+ssh://git@github.com/MarlonPassos/specwright.git#main
+npm install --global --install-links git+ssh://git@github.com/MarlonPassos/specwright.git#main
 # alternativa para ambientes sem chave SSH:
-npm install --global git+https://github.com/MarlonPassos/specwright.git#main
+npm install --global --install-links git+https://github.com/MarlonPassos/specwright.git#main
 ```
 
-O npm clona o repositório, instala as dependências de desenvolvimento e roda o script
-`prepare`, que compila o TypeScript antes de publicar o binário — por isso o `dist/` não
-precisa estar versionado. Troque `#main` por `#<tag>` ou `#<commit>` para fixar uma versão.
+O npm clona o repositório e roda o script `prepare`, que compila o TypeScript antes de
+publicar o binário — por isso o `dist/` não precisa estar versionado. Troque `#main` por
+`#<tag>` ou `#<commit>` para fixar uma versão.
+
+O `--install-links` é obrigatório aqui. Sem ele, o npm instala o clone preparado como um
+link simbólico para um diretório temporário do cache, que ele apaga em seguida: a
+instalação termina sem erro e o comando `specs` não existe. Com a opção, o pacote é
+copiado de verdade para o diretório global.
 
 Confira a instalação com:
 
