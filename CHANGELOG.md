@@ -5,6 +5,17 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.1.2] - 2026-08-30
+
+### Correções
+
+- **fix(build): faz a instalação a partir do git compilar o pacote**
+  - `npm install --global git+...` vaza a própria configuração (`global`, `prefix`) por
+    variáveis de ambiente para o install que o npm roda ao preparar o clone, então o clone
+    ficava sem as devDependencies e o `prepare` falhava com `sh: tsc: command not found`
+  - O `prepare` agora é o `scripts/prepare.mjs`: resolve o compilador e, quando precisa
+    buscá-lo, roda o install com a configuração herdada do npm removida do ambiente
+
 ## [0.1.1] - 2026-08-30
 
 ### Manutenção

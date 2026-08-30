@@ -1,6 +1,6 @@
 {
   "name": "specwright",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Spec-driven development workflow for AI coding harnesses",
   "keywords": [
     "spec-driven",
@@ -41,7 +41,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "prepare": "npm run build",
+    "prepare": "node scripts/prepare.mjs",
     "dev": "tsc -p tsconfig.json --watch",
     "test": "vitest run",
     "test:watch": "vitest",
