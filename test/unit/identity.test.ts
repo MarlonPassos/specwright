@@ -75,6 +75,14 @@ describe('project identity', () => {
     }
   });
 
+  it('documents explore as an optional mode outside the delivery cycle', async () => {
+    const workflow = await readText('docs/workflow.md');
+
+    expect(workflow).toContain('## /spec-explore');
+    expect(workflow).toContain('O modo `/spec-explore` é opcional');
+    expect(workflow).toContain('Exploração não implementa código.');
+  });
+
   it('keeps shipped documents free of absolute paths from a developer machine', async () => {
     for (const file of await shippedDocs()) {
       const content = await fs.readFile(file, 'utf8');

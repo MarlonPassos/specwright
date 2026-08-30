@@ -1,11 +1,26 @@
 # O workflow
 
-Cinco comandos, em ordem. Cada um tem um único trabalho e para quando esse trabalho
-termina, então uma revisão pode acontecer entre quaisquer duas etapas.
+O ciclo de entrega tem cinco comandos, em ordem. Cada um tem um único trabalho e para
+quando esse trabalho termina, então uma revisão pode acontecer entre quaisquer duas etapas.
+O modo `/spec-explore` é opcional e pode ser usado antes de abrir uma change ou entre
+quaisquer etapas para investigar, comparar opções e esclarecer requisitos.
 
 ```
+/spec-explore (opcional, antes ou entre etapas)
+
 /spec-propose  ->  /spec-plan  ->  /spec-implement  ->  /spec-verify  ->  /spec-archive
 ```
+
+## /spec-explore
+
+Entra em modo de exploração, como parceiro de pensamento. O agente pode ler arquivos,
+buscar no código, investigar o repositório, comparar abordagens e usar diagramas ASCII.
+Não há passos fixos nem saída obrigatória.
+
+Exploração não implementa código. Se surgir um pedido de implementação, o agente deve
+encerrar a exploração e abrir ou continuar uma change pelo fluxo normal. O agente pode
+registrar decisões em artefatos de uma change, mas somente dentro de um escopo confirmado
+explicitamente antes da primeira escrita.
 
 ## /spec-propose
 

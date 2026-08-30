@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { allHarnesses, getHarness, harnessIds, resolveHarnesses } from '../../src/core/harness/registry.js';
 import { renderHarness, renderHarnesses } from '../../src/core/harness/writer.js';
-import { commandName, invocation, workflowCommands } from '../../src/core/workflows/index.js';
+import { commandName, invocation, workflowCommand, workflowCommands } from '../../src/core/workflows/index.js';
 
 const EXPECTED_HARNESSES = ['claude', 'codex', 'opencode', 'kiro'];
-const EXPECTED_COMMANDS = ['propose', 'plan', 'implement', 'verify', 'archive'];
+const EXPECTED_COMMANDS = ['explore', 'propose', 'plan', 'implement', 'verify', 'archive'];
 
 describe('harness registry', () => {
   it('supports exactly the four target harnesses', () => {
@@ -23,8 +23,23 @@ describe('harness registry', () => {
 });
 
 describe('generated commands', () => {
-  it('exposes the five workflow commands', () => {
+  it('exposes the six workflow commands', () => {
     expect(workflowCommands().map((command) => command.id)).toEqual(EXPECTED_COMMANDS);
+  });
+
+  it('defines explore as an optional, read-only thinking mode', () => {
+    const explore = workflowCommand('explore');
+
+    expect(explore).toMatchObject({
+      id: 'explore',
+      name: 'Spec Explore',
+      argumentHint: '[o que você quer pensar]',
+    });
+    expect(explore?.description).toContain('modo exploração');
+    expect(explore?.body).toContain('não para implementar');
+    expect(explore?.body).toContain('Antes da primeira ação que escreve');
+    expect(explore?.body).toContain('specs list --json');
+    expect(explore?.body).toContain('/spec-propose');
   });
 
   it('names every command with the spec- prefix in every harness', () => {
@@ -71,6 +86,26 @@ describe('generated commands', () => {
     const file = renderHarness(getHarness('opencode')!).find((entry) => entry.command === 'propose')!;
     expect(file.content).toContain('$ARGUMENTS');
     const claude = renderHarness(getHarness('claude')!).find((entry) => entry.command === 'propose')!;
+    expect(claude.content).not.toContain('$ARGUMENTS');
+  });
+
+  it('renders explore for every harness with its safety instructions', () => {
+    const files = renderHarnesses(allHarnesses()).filter((file) => file.command === 'explore');
+
+    expect(files).toHaveLength(EXPECTED_HARNESSES.length);
+    expect(files.map((file) => file.harness)).toEqual(EXPECTED_HARNESSES);
+    for (const file of files) {
+      expect(file.content).toContain('Modo exploração é para pensar, não para implementar.');
+      expect(file.content).toContain('Antes da primeira ação que escreve');
+      expect(file.content).toContain('/spec-explore');
+    }
+  });
+
+  it('passes explore input through OpenCode and keeps it implicit elsewhere', () => {
+    const opencode = renderHarness(getHarness('opencode')!).find((entry) => entry.command === 'explore')!;
+    const claude = renderHarness(getHarness('claude')!).find((entry) => entry.command === 'explore')!;
+
+    expect(opencode.content).toContain('**Input** ([o que você quer pensar]): $ARGUMENTS');
     expect(claude.content).not.toContain('$ARGUMENTS');
   });
 

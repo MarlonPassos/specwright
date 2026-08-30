@@ -9,6 +9,11 @@ versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ### Funcionalidades
 
+- **feat(harness): adiciona o modo `/spec-explore`**
+  - Gera o comando para Claude Code, Codex, OpenCode e Kiro
+  - Permite investigar ideias, problemas e changes sem implementar código
+  - Mantém a escrita de artefatos condicionada a um escopo confirmado explicitamente
+
 - **feat(cli): adiciona o painel do projeto ao `specs status`**
   - Sem argumentos, `specs status` desenha o painel: wordmark, resumo com barra de
     tarefas, changes agrupadas pela fase do workflow, capacidades e arquivo

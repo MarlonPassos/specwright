@@ -29,6 +29,7 @@ describe('spec CLI', () => {
       'kiro',
     ]);
     expect(payload.commands.map((command: any) => command.invocation)).toEqual([
+      '/spec-explore',
       '/spec-propose',
       '/spec-plan',
       '/spec-implement',
@@ -42,7 +43,7 @@ describe('spec CLI', () => {
     const listing = parseJson((await runCli(['init', '.', '--json'], dir)).stdout);
 
     expect(listing.created).toBe(false);
-    expect(listing.files).toHaveLength(20);
+    expect(listing.files).toHaveLength(24);
     for (const file of listing.files) {
       await expect(fs.stat(path.join(dir, file))).resolves.toBeTruthy();
     }

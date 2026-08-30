@@ -5,10 +5,11 @@ Desenvolvimento orientado a especificações para harnesses de código com IA.
 O Specwright mantém as **specs** de um projeto (o que o sistema faz hoje) separadas das
 suas **changes** (o que um trabalho vai fazer o sistema passar a fazer). Um harness de IA
 conduz uma change por cinco etapas — propor, planejar, implementar, verificar, arquivar —
-e a CLI mantém os artefatos, a ordem de dependência e a validação em dia no caminho.
+e oferece `/spec-explore` para investigar ideias e problemas antes ou durante esse ciclo.
+A CLI mantém os artefatos, a ordem de dependência e a validação em dia no caminho.
 
 Harnesses suportados: **Claude Code**, **Codex**, **OpenCode** e **Kiro**. Os quatro
-recebem os mesmos cinco comandos, com os mesmos nomes e o mesmo comportamento.
+recebem os mesmos comandos, com os mesmos nomes e o mesmo comportamento.
 
 ## Instalação
 
@@ -75,6 +76,7 @@ Depois, no seu harness:
 
 | Comando | O que faz |
 | --- | --- |
+| `/spec-explore` | Pensa junto, sem escrever código: investiga, compara opções e desenha |
 | `/spec-propose` | Abre uma change e escreve a proposta: por que a change existe e o que ela cobre |
 | `/spec-plan` | Escreve os artefatos de planejamento restantes até a implementação poder começar |
 | `/spec-implement` | Percorre o checklist de tarefas, marcando os itens conforme as verificações passam |
@@ -168,7 +170,7 @@ aponte o `config.yaml` para ele. Veja [docs/schemas.md](docs/schemas.md).
 
 ## Documentação
 
-- [Workflow](docs/workflow.md) — os cinco comandos, passo a passo
+- [Workflow](docs/workflow.md) — os comandos, passo a passo
 - [Referência da CLI](docs/cli.md)
 - [Harnesses](docs/harnesses.md) — onde ficam os arquivos de comando de cada um
 - [Schemas de workflow](docs/schemas.md)
