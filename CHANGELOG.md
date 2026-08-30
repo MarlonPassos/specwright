@@ -5,6 +5,17 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.3.1] - 2026-08-30
+
+### Correções
+
+- **fix(harness): gera os comandos do Codex como skills**
+  - O Codex só carrega prompts customizados de `$CODEX_HOME/prompts`, um diretório por
+    usuário fora do projeto, então os arquivos escritos em `.codex/prompts/` nunca
+    apareciam na lista de comandos
+  - Agora cada comando é uma skill em `.agents/skills/spec-<id>/SKILL.md`, com frontmatter
+    `name` e `description`, que o Codex lê a partir do repositório
+
 ## [0.3.0] - 2026-08-30
 
 ### Funcionalidades

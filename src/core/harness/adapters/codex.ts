@@ -2,19 +2,25 @@ import path from 'node:path';
 import { commandName } from '../../workflows/types.js';
 import { yamlScalar, type HarnessAdapter } from '../types.js';
 
+/**
+ * Codex reads project-scoped instructions as skills, one directory per skill with a
+ * SKILL.md inside. Custom prompts, its other mechanism, are loaded only from
+ * `$CODEX_HOME/prompts` - a per-user directory outside the project - so a project
+ * cannot ship them.
+ */
 export const codexAdapter: HarnessAdapter = {
   id: 'codex',
   name: 'Codex',
-  directory: path.join('.codex', 'prompts'),
+  directory: path.join('.agents', 'skills'),
 
   filePath(commandId) {
-    return path.join('.codex', 'prompts', `${commandName(commandId)}.md`);
+    return path.join('.agents', 'skills', commandName(commandId), 'SKILL.md');
   },
 
   format(command) {
     return `---
+name: ${yamlScalar(commandName(command.id))}
 description: ${yamlScalar(command.description)}
-argument-hint: ${yamlScalar(command.argumentHint)}
 ---
 
 ${command.body}

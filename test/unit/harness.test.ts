@@ -42,7 +42,7 @@ describe('generated commands', () => {
       allHarnesses().map((adapter) => [adapter.id, adapter.filePath('propose')])
     );
     expect(paths.claude).toBe('.claude/commands/spec-propose.md');
-    expect(paths.codex).toBe('.codex/prompts/spec-propose.md');
+    expect(paths.codex).toBe('.agents/skills/spec-propose/SKILL.md');
     expect(paths.opencode).toBe('.opencode/commands/spec-propose.md');
     expect(paths.kiro).toBe('.kiro/prompts/spec-propose.prompt.md');
   });

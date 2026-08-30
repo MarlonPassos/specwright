@@ -1,13 +1,13 @@
 # Harnesses
 
 Quatro harnesses são suportados. Todos recebem os mesmos cinco comandos, gerados a partir
-dos mesmos corpos de instrução, então `/spec-plan` significa a mesma coisa onde quer que
-seja digitado.
+dos mesmos corpos de instrução, então `spec-plan` significa a mesma coisa em qualquer um
+deles.
 
 | Harness | Arquivos de comando | Invocado como |
 | --- | --- | --- |
 | Claude Code | `.claude/commands/spec-<id>.md` | `/spec-<id>` |
-| Codex | `.codex/prompts/spec-<id>.md` | `/spec-<id>` |
+| Codex | `.agents/skills/spec-<id>/SKILL.md` | skill `spec-<id>` |
 | OpenCode | `.opencode/commands/spec-<id>.md` | `/spec-<id>` |
 | Kiro | `.kiro/prompts/spec-<id>.prompt.md` | `/spec-<id>` |
 
@@ -20,7 +20,10 @@ Só o envelope do arquivo:
 - Arquivos do **Claude Code** carregam `name`, `description`, `argument-hint` e
   `allowed-tools: Bash(specs:*)`, o que deixa um comando rodar a CLI sem um novo prompt a
   cada chamada, mantendo todo o resto sob permissão.
-- Arquivos do **Codex** carregam `description` e `argument-hint`.
+- Arquivos do **Codex** são skills: carregam `name` e `description`, e ficam num diretório
+  por comando, com o nome fixo `SKILL.md`. O Codex só lê prompts customizados de
+  `$CODEX_HOME/prompts`, um diretório por usuário fora do projeto, então um projeto não
+  consegue distribuí-los; skills ele lê do repositório.
 - Arquivos do **Kiro** carregam `description` e usam a extensão `.prompt.md` dele.
 - Arquivos do **OpenCode** carregam `description`, e o corpo termina com um placeholder
   `$ARGUMENTS` explícito — o OpenCode passa o texto do usuário só por um.

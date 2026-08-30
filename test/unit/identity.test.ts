@@ -41,7 +41,11 @@ describe('project identity', () => {
 
   it('generates only spec-prefixed commands', () => {
     for (const file of renderHarnesses(allHarnesses())) {
-      expect(path.basename(file.path).startsWith(COMMAND_PREFIX)).toBe(true);
+      // A harness names either the file after the command, or the directory holding it.
+      const prefixed =
+        path.basename(file.path).startsWith(COMMAND_PREFIX) ||
+        path.basename(path.dirname(file.path)).startsWith(COMMAND_PREFIX);
+      expect(prefixed, file.path).toBe(true);
     }
   });
 
