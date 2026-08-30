@@ -1,0 +1,67 @@
+import { SpecError } from '../../util/errors.js';
+import { ensureDir, isDirectory } from '../../util/fs.js';
+import { localDateStamp } from '../../util/date.js';
+import { loadConfig } from '../config.js';
+import { loadSchema } from '../schema/loader.js';
+import { changeDir, type Workspace } from '../workspace.js';
+import { writeChangeMetadata } from './metadata.js';
+
+const CHANGE_ID = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
+
+export function assertValidChangeId(id: string): string {
+  if (!CHANGE_ID.test(id)) {
+    throw new SpecError(
+      `"${id}" is not a valid change name. Use kebab-case: lowercase letters, digits and hyphens.`,
+      { code: 'invalid_change_name' }
+    );
+  }
+  return id;
+}
+
+export interface CreateChangeOptions {
+  schema?: string;
+  goal?: string;
+  skipSpecs?: boolean;
+}
+
+export interface CreatedChange {
+  id: string;
+  dir: string;
+  schema: string;
+  /** Artifacts that can be written immediately, in build order. */
+  next: string[];
+}
+
+export async function createChange(
+  workspace: Workspace,
+  id: string,
+  options: CreateChangeOptions = {}
+): Promise<CreatedChange> {
+  assertValidChangeId(id);
+
+  const dir = changeDir(workspace, id);
+  if (await isDirectory(dir)) {
+    throw new SpecError(`Change "${id}" already exists at ${dir}`, {
+      code: 'change_exists',
+      fix: `specs status --change ${id}`,
+    });
+  }
+
+  const config = await loadConfig(workspace);
+  const schema = await loadSchema(options.schema ?? config.schema, workspace);
+
+  await ensureDir(dir);
+  await writeChangeMetadata(dir, {
+    schema: schema.name,
+    created: localDateStamp(),
+    ...(options.goal ? { goal: options.goal } : {}),
+    ...(options.skipSpecs ? { skip_specs: true } : {}),
+  });
+
+  return {
+    id,
+    dir,
+    schema: schema.name,
+    next: schema.graph.ready(new Set()),
+  };
+}

@@ -1,0 +1,48 @@
+# Changelog
+
+Todas as mudanças relevantes deste projeto são registradas aqui.
+
+O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
+versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
+
+## [0.1.0] - 2026-08-30
+
+### Funcionalidades
+
+- **feat: adiciona o workflow de desenvolvimento orientado a specs**
+  - Separa as specs do projeto (comportamento atual) das changes (trabalho em andamento)
+  - Cinco etapas: propor, planejar, implementar, verificar, arquivar
+  - Deltas `ADDED` / `MODIFIED` / `REMOVED` / `RENAMED` aplicados nas specs ao arquivar
+
+- **feat(cli): adiciona a CLI `specs`**
+  - `init`, `update`, `harnesses` para preparar o workspace e gerar os comandos
+  - `new change`, `status`, `instructions`, `archive` para conduzir uma change
+  - `list`, `show`, `validate`, `schemas`, `templates` para inspeção
+  - `--json` em todo comando, com objeto `error` contendo `code` e `fix` nas falhas
+
+- **feat(harness): gera os comandos para Claude Code, Codex, OpenCode e Kiro**
+  - Mesmos cinco comandos `/spec-*` nos quatro, a partir do mesmo corpo de instrução
+  - Apenas o envelope do arquivo difere entre os adaptadores
+
+- **feat(schema): torna o workflow declarado por schema**
+  - Artefatos, dependências, templates e instruções vêm do `schema.yaml`
+  - Schema embutido `spec-driven`; schemas do workspace sombreiam os embutidos
+  - Ordem de construção, conjunto pronto e bloqueado derivados do grafo
+
+- **feat(validate): adiciona validação em três níveis**
+  - `ERROR`, `WARNING` e `INFO`, com `--strict` reprovando em warnings
+  - Regras para changes, requisitos, specs e changes arquivadas
+
+### Documentação
+
+- **docs: adiciona README e documentação em português**
+  - README com instalação, primeiros passos, modelo, CLI e validação
+  - `docs/` com workflow, referência da CLI, harnesses, schemas e regras de validação
+  - Crédito ao [OpenSpec](https://github.com/Fission-AI/OpenSpec) como base do projeto
+
+### Manutenção
+
+- **chore: configura build, testes e empacotamento**
+  - TypeScript ESM com saída em `dist/`, Node.js 20.19 ou mais novo
+  - Vitest com 102 testes entre unitários e de integração
+  - Binário `specs` publicado via campo `bin` do pacote

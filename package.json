@@ -1,0 +1,49 @@
+{
+  "name": "specwright",
+  "version": "0.1.0",
+  "description": "Spec-driven development workflow for AI coding harnesses",
+  "keywords": [
+    "spec-driven",
+    "specs",
+    "cli",
+    "ai",
+    "workflow"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "bin": {
+    "specs": "./bin/specs.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "bin",
+    "schemas"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pretest": "npm run build"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "yaml": "^2.5.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.4",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.2"
+  }
+}

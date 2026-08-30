@@ -1,0 +1,192 @@
+name: spec-driven
+version: 1
+description: Default workflow - proposal -> specs -> design -> tasks
+artifacts:
+  - id: proposal
+    generates: proposal.md
+    description: States the problem, the scope of the change, and the capabilities it touches
+    template: proposal.md
+    requires: []
+    instruction: |
+      Write the document that answers WHY this change exists and WHAT it covers.
+
+      Required sections:
+      - **Why**: one or two sentences naming the problem or the opportunity, and why it matters now.
+      - **What Changes**: a bullet list of concrete changes. Name new behavior, changed behavior and removals. Prefix a bullet with **BREAKING** when it breaks an existing contract.
+      - **Capabilities**: the specs this change will touch.
+        - **New Capabilities**: capabilities being introduced. Each one becomes `specs/<capability-path>/spec.md` inside the change. Use kebab-case for any path segment you introduce and follow the layout the project already uses.
+        - **Modified Capabilities**: existing capabilities whose requirements change. List one only when observable behavior changes, not when the implementation alone changes. Use the exact existing path under the workspace `specs/` directory.
+      - **Impact**: code, interfaces, data or dependencies affected.
+
+      The Capabilities section is the contract between this artifact and the spec
+      deltas. Read the existing specs before filling it in - every capability listed
+      here needs a matching delta file.
+
+      A change must declare at least one capability or opt out of specs explicitly:
+      validation rejects a change with zero deltas unless its `.change.yaml` sets
+      `skip_specs: true`. Use that marker only when no observable behavior changes
+      (refactor, tooling, docs). Never invent a requirement to satisfy validation.
+
+      Keep it short. How the change is built belongs in design.md.
+
+  - id: specs
+    generates: "specs/**/*.md"
+    description: Delta specs describing the behavior the system must have after the change
+    template: spec.md
+    requires:
+      - proposal
+    instruction: |
+      Write the behavior contracts for this change. A spec states WHAT the system
+      does, never HOW it is built.
+
+      Belongs in a spec:
+      - behavior an outside caller or a user can observe
+      - inputs, outputs and error conditions
+      - constraints the product must honor (security, privacy, compatibility, reliability)
+      - scenarios that can be checked
+
+      Does not belong in a spec: internal names, library choices, step-by-step
+      implementation. Rule of thumb - if the implementation can change without
+      changing anything observable, it is not spec material.
+
+      Write one file per capability listed in the proposal, at
+      `specs/<capability-path>/spec.md` inside the change directory.
+      `<capability-path>` is the directory relative to `specs/`, for example
+      `user-auth` or `identity/user-auth`.
+      - New capability: use the exact path the proposal declared.
+      - Modified capability: use the exact existing path from the workspace
+        `specs/` directory. Never move or rename a capability in a delta.
+
+      There must be at least one delta file unless the change's `.change.yaml`
+      sets `skip_specs: true`. If the proposal listed no capabilities and the
+      marker is absent, fix the proposal first.
+
+      Delta sections (level-2 headers):
+      - `## ADDED Requirements` - requirements that did not exist
+      - `## MODIFIED Requirements` - changed requirements, carrying their FULL updated text
+      - `## REMOVED Requirements` - each one needs **Reason** and **Migration** lines
+      - `## RENAMED Requirements` - name changes only, in FROM:/TO: form
+
+      Format rules:
+      - a requirement is `### Requirement: <name>` followed by its text
+      - normative text uses SHALL or MUST
+      - a scenario is `#### Scenario: <name>` with WHEN/THEN bullets
+      - scenarios need exactly four hashes; three hashes or a bullet list is not parsed
+      - every requirement needs at least one scenario
+
+      A delta for a NEW capability starts with a `## Purpose` section: one or two
+      sentences (50 characters or more) saying what the capability is for. Archiving
+      copies that Purpose into the main spec it creates; without it the new main spec
+      is left with a placeholder to fill in by hand. Do NOT add `## Purpose` to a delta
+      for an existing capability - that spec already has one and the delta's copy is
+      ignored. To change an existing Purpose, edit the main spec at
+      `<workspace>/specs/<capability-path>/spec.md` directly. Take `<workspace>` from
+      the `workspace` field of `specs instructions ... --json`; never assume a path.
+
+      Modifying a requirement:
+      1. find it in `<workspace>/specs/<capability-path>/spec.md`
+      2. copy the WHOLE block, from `### Requirement:` through its last scenario
+      3. paste it under `## MODIFIED Requirements` and edit it
+      4. keep the header text identical to the original
+
+      A MODIFIED block with partial content loses the rest at archive time. When you
+      are adding a concern rather than changing existing behavior, use ADDED.
+
+      Example of a new capability delta:
+      ```
+      ## Purpose
+
+      Lets people take their data out of the product in a portable format.
+
+      ## ADDED Requirements
+
+      ### Requirement: Data export
+      The system SHALL let a signed-in user export their data as CSV.
+
+      #### Scenario: Export succeeds
+      - **WHEN** the user requests an export
+      - **THEN** the system returns a CSV file containing their data
+
+      ## REMOVED Requirements
+
+      ### Requirement: Legacy export
+      **Reason**: Replaced by the CSV export above
+      **Migration**: Call the v2 export endpoint instead
+      ```
+
+  - id: design
+    generates: design.md
+    description: Technical approach and the decisions behind it
+    template: design.md
+    requires:
+      - proposal
+    instruction: |
+      Write the document that answers HOW the change is built.
+
+      Write it only when at least one applies:
+      - the change spans several modules or services, or introduces a new pattern
+      - it adds an external dependency or changes the data model
+      - it carries security, performance or migration risk
+      - there is ambiguity worth settling before code is written
+
+      If none apply, skip this artifact and say so.
+
+      Sections:
+      - **Context**: only the current state and constraints needed to follow the approach. Point at proposal.md for motivation instead of repeating it.
+      - **Goals / Non-Goals**: what the design achieves and what it deliberately leaves out.
+      - **Decisions**: each key choice with its rationale and the alternatives weighed.
+      - **Risks / Trade-offs**: what can go wrong, each with its mitigation.
+      - **Migration Plan**: rollout and rollback steps, when relevant.
+      - **Open Questions**: unknowns that can safely be answered later. Omit the section when there are none.
+
+      An open question is a genuinely deferrable unknown, not a decision you skipped.
+      If the answer would change the specs, the approach or the task breakdown, settle
+      it now - ask rather than guess.
+
+  - id: tasks
+    generates: tasks.md
+    description: Ordered implementation checklist
+    template: tasks.md
+    requires:
+      - specs
+      - design
+    instruction: |
+      Break the work into an ordered checklist.
+
+      Before writing it, read the Open Questions in design.md. Resolve with the user
+      any that would change what gets built.
+
+      Follow the template exactly. The implementation phase reads the checkbox syntax
+      to track progress, so a line that is not `- [ ] X.Y ...` is not tracked.
+
+      Rules:
+      - group related tasks under numbered `## N. <group>` headers
+      - number tasks `X.Y` inside their group, in order
+      - order by dependency: what must exist first comes first
+      - keep each task small enough to finish in one sitting
+      - every task states how it is verified - a test, a command, an observable
+        outcome or a delivered artifact - inside its own checkbox text. Add a
+        separate verification task only for behavior spanning several tasks
+
+      Example:
+      ```
+      ## 1. Setup
+
+      - [ ] 1.1 Create the module skeleton and confirm the expected files exist
+      - [ ] 1.2 Add the dependency and confirm the install succeeds
+
+      ## 2. Export
+
+      - [ ] 2.1 Implement the CSV writer and confirm its unit tests pass
+      - [ ] 2.2 Wire the export endpoint and confirm the integration test passes
+      ```
+
+      Use the specs for what to build and the design for how to build it.
+
+apply:
+  requires: [tasks]
+  tracks: tasks.md
+  instruction: |
+    Read the change artifacts, work through the unchecked tasks in order, and tick
+    each box as its verification passes. Stop and ask when you hit a blocker or an
+    unstated decision.
