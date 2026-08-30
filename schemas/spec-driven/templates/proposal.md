@@ -1,10 +1,10 @@
 ## Why
 
-<!-- The problem or opportunity, and why it matters now. At least 50 characters. -->
+<!-- O problema ou a oportunidade, e por que importa agora. Pelo menos 50 caracteres. -->
 
 ## What Changes
 
-<!-- Bullet list of concrete changes. Mark breaking ones with **BREAKING**. -->
+<!-- Lista de mudanças concretas. Marque as que quebram contrato com **BREAKING**. -->
 
 - 
 
@@ -12,12 +12,12 @@
 
 ### New Capabilities
 
-<!-- Capabilities introduced by this change, one per line. Write "None." if there are none. -->
+<!-- Capacidades introduzidas por esta change, uma por linha. Escreva "Nenhuma." se não houver. -->
 
 ### Modified Capabilities
 
-<!-- Existing capabilities whose requirements change. Write "None." if there are none. -->
+<!-- Capacidades existentes cujos requisitos mudam. Escreva "Nenhuma." se não houver. -->
 
 ## Impact
 
-<!-- Code, interfaces, data or dependencies affected. -->
+<!-- Código, interfaces, dados ou dependências afetados. -->

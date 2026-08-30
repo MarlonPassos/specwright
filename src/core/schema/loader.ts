@@ -44,7 +44,7 @@ export function workspaceSchemasDir(workspace: Workspace): string {
 export function validateSchemaName(name: string): string {
   if (!/^[a-z0-9][a-z0-9-]*$/.test(name)) {
     throw new SpecError(
-      `"${name}" is not a valid schema name. Use lowercase letters, digits and hyphens.`,
+      `"${name}" não é um nome de schema válido. Use letras minúsculas, dígitos e hifens.`,
       { code: 'invalid_schema_name' }
     );
   }
@@ -56,7 +56,7 @@ export async function parseSchemaFile(content: string, origin: string): Promise<
   try {
     parsed = parseYaml(content);
   } catch (error) {
-    throw new SpecError(`${origin} is not valid YAML: ${(error as Error).message}`, {
+    throw new SpecError(`${origin} não é YAML válido: ${(error as Error).message}`, {
       code: 'invalid_schema',
     });
   }
@@ -66,7 +66,7 @@ export async function parseSchemaFile(content: string, origin: string): Promise<
     const detail = result.error.issues
       .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
       .join('; ');
-    throw new SpecError(`${origin} is not a valid schema: ${detail}`, { code: 'invalid_schema' });
+    throw new SpecError(`${origin} não é um schema válido: ${detail}`, { code: 'invalid_schema' });
   }
 
   return result.data;
@@ -92,7 +92,7 @@ export async function loadSchema(
     const file = await parseSchemaFile(content, schemaPath);
     if (file.name !== name) {
       throw new SpecError(
-        `${schemaPath} declares name "${file.name}" but lives in directory "${name}"`,
+        `${schemaPath} declara o nome "${file.name}" mas está no diretório "${name}"`,
         { code: 'invalid_schema' }
       );
     }
@@ -101,7 +101,7 @@ export async function loadSchema(
 
   const available = (await listSchemas(workspace)).map((entry) => entry.name);
   throw new SpecError(
-    `Unknown schema "${name}". Available: ${available.join(', ') || 'none'}`,
+    `Schema desconhecido: "${name}". Disponíveis: ${available.join(', ') || 'nenhum'}`,
     { code: 'schema_not_found', fix: 'specs schemas' }
   );
 }
@@ -151,7 +151,7 @@ export async function readTemplate(schema: LoadedSchema, template: string): Prom
   try {
     return await fs.readFile(target, 'utf8');
   } catch {
-    throw new SpecError(`Template "${template}" is missing from schema "${schema.name}" (${target})`, {
+    throw new SpecError(`O template "${template}" não existe no schema "${schema.name}" (${target})`, {
       code: 'template_not_found',
     });
   }

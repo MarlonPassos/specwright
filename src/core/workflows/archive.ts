@@ -5,65 +5,65 @@ export function archiveCommand(): WorkflowCommand {
   return {
     id: 'archive',
     name: 'Spec Archive',
-    description: 'Fold a finished change into the workspace specs and archive it',
-    argumentHint: '[change-name]',
-    body: `Close out a finished change: fold its deltas into the workspace specs and archive it.
+    description: 'Aplica uma change concluída nas specs do workspace e a arquiva',
+    argumentHint: '[nome-da-change]',
+    body: `Encerre uma change concluída: aplique os deltas dela nas specs do workspace e arquive-a.
 
 ${CLI_NOTE}
 
 ${RESOLVE_CHANGE}
 
-**Steps**
+**Passos**
 
-1. **Confirm the change is finished**
+1. **Confirme que a change está concluída**
 
    \`\`\`bash
    specs status --change "<change>" --json
    specs validate "<change>" --strict --json
    \`\`\`
-   Every task must be ticked and validation must pass. If either does not hold, stop and
-   say what is outstanding. Unchecked tasks mean the work is not done - do not archive
-   around them.
+   Toda tarefa precisa estar marcada e a validação precisa passar. Se qualquer um dos dois não
+   valer, pare e diga o que está pendente. Tarefas não marcadas significam que o trabalho não
+   acabou - não arquive por cima delas.
 
-   If the change has not been verified yet, run \`/spec-verify\` first.
+   Se a change ainda não foi verificada, rode \`/spec-verify\` antes.
 
-2. **Read what archiving will change**
+2. **Leia o que o arquivamento vai mudar**
 
    \`\`\`bash
    specs instructions archive --change "<change>" --json
    specs show "<change>" --json --deltas-only
    \`\`\`
-   Each ADDED requirement is appended to its capability's spec, each MODIFIED replaces the
-   existing block wholesale, each REMOVED deletes it, each RENAMED changes its header. A
-   MODIFIED block carrying partial text loses the rest - check the deltas before running
-   the archive, not after.
+   Cada requisito ADDED é acrescentado à spec da capacidade dele, cada MODIFIED substitui o
+   bloco existente por inteiro, cada REMOVED o apaga, cada RENAMED troca o cabeçalho. Um bloco
+   MODIFIED com texto parcial perde o resto - confira os deltas antes de rodar o arquivamento,
+   não depois.
 
-3. **Archive**
+3. **Arquive**
 
    \`\`\`bash
    specs archive "<change>" --json
    \`\`\`
-   Add \`--skip-specs\` only for a change that declares no spec deltas. The command refuses
-   to run while validation fails or tasks are unchecked; \`--force\` overrides the task check
-   and is for exceptional cases the user has approved.
+   Acrescente \`--skip-specs\` apenas para uma change que não declara nenhum delta de spec. O
+   comando se recusa a rodar enquanto a validação falha ou há tarefas não marcadas; \`--force\`
+   ignora a checagem de tarefas e é para casos excepcionais que o usuário aprovou.
 
-4. **Confirm the result**
+4. **Confirme o resultado**
 
    \`\`\`bash
    specs validate --specs --strict --json
    \`\`\`
-   The merged specs must still be valid. If a newly created capability spec kept a
-   placeholder purpose, replace it now by editing the workspace spec directly.
+   As specs resultantes precisam continuar válidas. Se uma spec de capacidade recém-criada
+   ficou com um propósito placeholder, substitua agora editando a spec do workspace direto.
 
-**Output**
+**Saída**
 
-- where the change was archived;
-- capabilities created, updated and retired;
-- anything left to do by hand, such as a placeholder purpose to replace.
+- onde a change foi arquivada;
+- capacidades criadas, atualizadas e aposentadas;
+- qualquer coisa que reste para fazer à mão, como um propósito placeholder a substituir.
 
 **Guardrails**
-- Archiving rewrites the workspace specs. Never run it on a change that is not implemented.
-- Do not hand-edit a delta to make the merge succeed; fix the underlying mismatch.
-- The archived change directory is a record. Do not edit it afterwards.`,
+- O arquivamento reescreve as specs do workspace. Nunca o rode numa change não implementada.
+- Não edite um delta à mão para o merge dar certo; corrija a divergência de raiz.
+- O diretório da change arquivada é um registro. Não o edite depois.`,
   };
 }

@@ -39,7 +39,7 @@ describe('splitSpec / joinSpec', () => {
   });
 
   it('rejects a spec with no requirements section', () => {
-    expect(() => splitSpec('## Purpose\n\ntext')).toThrow(/no "## Requirements" section/);
+    expect(() => splitSpec('## Purpose\n\ntext')).toThrow(/não tem uma seção "## Requirements"/);
   });
 
   it('preserves content that follows the requirements section', () => {
@@ -134,7 +134,7 @@ describe('mergeCapability', () => {
         entries('## MODIFIED Requirements\n\n### Requirement: Ghost\nThe system SHALL ghost.\n\n#### Scenario: S\n- **WHEN** x\n- **THEN** y'),
         { existing: MAIN, changeId: 'c' }
       )
-    ).toThrow(/does not declare/);
+    ).toThrow(/não declara/);
   });
 
   it('matches requirement names whitespace-insensitively', () => {

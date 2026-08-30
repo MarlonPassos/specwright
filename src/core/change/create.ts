@@ -11,7 +11,7 @@ const CHANGE_ID = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 export function assertValidChangeId(id: string): string {
   if (!CHANGE_ID.test(id)) {
     throw new SpecError(
-      `"${id}" is not a valid change name. Use kebab-case: lowercase letters, digits and hyphens.`,
+      `"${id}" não é um nome de change válido. Use kebab-case: letras minúsculas, dígitos e hifens.`,
       { code: 'invalid_change_name' }
     );
   }
@@ -41,7 +41,7 @@ export async function createChange(
 
   const dir = changeDir(workspace, id);
   if (await isDirectory(dir)) {
-    throw new SpecError(`Change "${id}" already exists at ${dir}`, {
+    throw new SpecError(`A change "${id}" já existe em ${dir}`, {
       code: 'change_exists',
       fix: `specs status --change ${id}`,
     });

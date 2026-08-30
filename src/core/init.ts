@@ -22,31 +22,30 @@ export interface InitResult {
   projectFileCreated: boolean;
 }
 
-const PROJECT_TEMPLATE = `# Project Context
+const PROJECT_TEMPLATE = `# Contexto do projeto
 
 <!--
-Background every change inherits. The workflow injects this file's companion
-settings from spec/config.yaml; keep this document for the human-readable
-picture of the project.
+Pano de fundo que toda change herda. O workflow injeta os ajustes que acompanham
+este arquivo a partir de spec/config.yaml; mantenha este documento como o retrato
+legível do projeto.
 -->
 
 ## Purpose
 
-<!-- What this project is and who it serves. -->
+<!-- O que este projeto é e a quem ele serve. -->
 
 ## Stack
 
-<!-- Languages, frameworks, datastores, package manager. -->
+<!-- Linguagens, frameworks, bancos de dados, gerenciador de pacotes. -->
 
 ## Conventions
 
-<!-- Naming, layout, testing and review conventions a change must respect. -->
+<!-- Convenções de nomes, layout, testes e revisão que uma change precisa respeitar. -->
 
 ## Constraints
 
-<!-- Platforms, compatibility promises, performance or compliance limits. -->
+<!-- Plataformas, promessas de compatibilidade, limites de performance ou de conformidade. -->
 `;
-
 export async function initWorkspace(
   projectRoot: string,
   options: InitOptions = {}
@@ -104,7 +103,7 @@ async function assertUsableDirectory(target: string): Promise<void> {
   try {
     const stats = await fs.stat(target);
     if (!stats.isDirectory()) {
-      throw new SpecError(`"${target}" is not a directory`, { code: 'not_a_directory' });
+      throw new SpecError(`"${target}" não é um diretório`, { code: 'not_a_directory' });
     }
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
@@ -124,7 +123,7 @@ export async function updateWorkspace(
   const selection = options.harnesses ?? config.harnesses?.join(',');
 
   if (!selection) {
-    throw new SpecError('No harness is configured for this workspace', {
+    throw new SpecError('Nenhum harness configurado neste workspace', {
       code: 'no_harness',
       fix: `specs init --harnesses ${allHarnesses().map((a) => a.id).join(',')}`,
     });

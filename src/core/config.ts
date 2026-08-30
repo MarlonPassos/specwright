@@ -33,7 +33,7 @@ export async function loadConfig(workspace: Workspace): Promise<WorkspaceConfig>
   try {
     parsed = parseYaml(raw);
   } catch (error) {
-    throw new SpecError(`${workspace.configPath} is not valid YAML: ${(error as Error).message}`, {
+    throw new SpecError(`${workspace.configPath} não é YAML válido: ${(error as Error).message}`, {
       code: 'invalid_config',
     });
   }
@@ -47,7 +47,7 @@ export async function loadConfig(workspace: Workspace): Promise<WorkspaceConfig>
     const detail = result.error.issues
       .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
       .join('; ');
-    throw new SpecError(`${workspace.configPath} is not valid configuration: ${detail}`, {
+    throw new SpecError(`${workspace.configPath} não é uma configuração válida: ${detail}`, {
       code: 'invalid_config',
     });
   }

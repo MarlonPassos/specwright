@@ -64,7 +64,7 @@ export async function requireWorkspace(startDir: string = process.cwd()): Promis
   const workspace = await findWorkspace(startDir);
   if (!workspace) {
     throw new SpecError(
-      `No workspace found. Looked for ${WORKSPACE_DIR}/${CONFIG_FILE} in this directory and its parents.`,
+      `Nenhum workspace encontrado. Procurei por ${WORKSPACE_DIR}/${CONFIG_FILE} neste diretório e nos pais.`,
       { code: 'workspace_not_found', fix: 'specs init' }
     );
   }

@@ -5,69 +5,69 @@ export function implementCommand(): WorkflowCommand {
   return {
     id: 'implement',
     name: 'Spec Implement',
-    description: 'Implement a planned change, working through its task checklist',
-    argumentHint: '[change-name]',
-    body: `Implement a change that has been planned.
+    description: 'Implementa uma change já planejada, percorrendo o checklist de tarefas dela',
+    argumentHint: '[nome-da-change]',
+    body: `Implemente uma change que já foi planejada.
 
 ${CLI_NOTE}
 
 ${RESOLVE_CHANGE}
 
-**Steps**
+**Passos**
 
-1. **Confirm the change is ready**
+1. **Confirme que a change está pronta**
 
    \`\`\`bash
    specs status --change "<change>" --json
    \`\`\`
-   If \`applyBlockedBy\` is not empty, stop and tell the user to run \`/spec-plan\` first.
+   Se \`applyBlockedBy\` não estiver vazio, pare e diga ao usuário para rodar \`/spec-plan\` antes.
 
-2. **Load the phase instructions**
+2. **Carregue as instruções da fase**
 
    \`\`\`bash
    specs instructions implement --change "<change>" --json
    \`\`\`
-   The response carries the schema's implementation guidance, the file whose checkboxes
-   track progress (\`tracks\`), the current task counts, and the resolved \`changeRoot\`.
+   A resposta carrega a orientação de implementação do schema, o arquivo cujos checkboxes
+   acompanham o progresso (\`tracks\`), a contagem atual de tarefas e o \`changeRoot\` resolvido.
 
-3. **Read the plan**
+3. **Leia o plano**
 
-   Read the change's artifacts from disk: the proposal for intent, the delta specs for
-   the behavior contract, the design for the approach, the checklist for the order.
-   The delta specs are the acceptance criteria - each scenario is a test worth having.
+   Leia os artefatos da change do disco: a proposta para a intenção, as delta specs para o
+   contrato de comportamento, o design para a abordagem, o checklist para a ordem.
+   As delta specs são os critérios de aceite - cada cenário é um teste que vale ter.
 
-4. **Work the checklist**
+4. **Trabalhe o checklist**
 
-   For each unchecked task, in order:
-   - implement it;
-   - run the verification the task names (a test, a command, an observable outcome);
-   - only when it passes, tick its checkbox in the tracked file;
-   - keep going.
+   Para cada tarefa não marcada, em ordem:
+   - implemente;
+   - rode a verificação que a tarefa nomeia (um teste, um comando, um resultado observável);
+   - só quando passar, marque o checkbox dela no arquivo acompanhado;
+   - siga em frente.
 
-   Do not tick a box for work that is not verified. Do not batch the ticks at the end -
-   the checklist is the progress record, and a crash mid-run should not lose it.
+   Não marque um box para trabalho que não foi verificado. Não deixe as marcações para o fim -
+   o checklist é o registro de progresso, e uma queda no meio do caminho não deve perdê-lo.
 
-5. **Stop and ask** when you hit a blocker, a decision the plan did not make, or work
-   that would go beyond the change's stated scope. Widening the scope silently is worse
-   than pausing.
+5. **Pare e pergunte** quando bater num impedimento, numa decisão que o plano não tomou, ou
+   em trabalho que passaria do escopo declarado da change. Ampliar o escopo em silêncio é pior
+   do que pausar.
 
-6. **Report**
+6. **Reporte**
 
    \`\`\`bash
    specs status --change "<change>"
    \`\`\`
 
-**Output**
+**Saída**
 
-- tasks completed this session, and what remains;
-- deviations from the plan, with the reason;
-- anything that surfaced and belongs in a separate change;
-- next step: "Run \`/spec-verify\` to check the change against its specs."
+- tarefas concluídas nesta sessão, e o que resta;
+- desvios do plano, com o motivo;
+- qualquer coisa que apareceu e pertence a uma change separada;
+- próximo passo: "Rode \`/spec-verify\` para conferir a change contra as specs dela."
 
 **Guardrails**
-- Build what the specs describe. If reality contradicts a spec, stop and update the spec
-  with the user rather than building something the specs do not describe.
-- If a task turns out to be wrong, fix the checklist as part of the work and say so.
-- Never archive from here; that is \`/spec-archive\`.`,
+- Construa o que as specs descrevem. Se a realidade contradiz uma spec, pare e atualize a spec
+  junto com o usuário, em vez de construir algo que as specs não descrevem.
+- Se uma tarefa se mostrar errada, corrija o checklist como parte do trabalho e diga isso.
+- Nunca arquive daqui; isso é o \`/spec-archive\`.`,
   };
 }

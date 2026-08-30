@@ -30,9 +30,9 @@ export function fail(
       },
     });
   } else {
-    console.error(`Error: ${errorMessage(error)}`);
+    console.error(`Erro: ${errorMessage(error)}`);
     const fix = errorFix(error);
-    if (fix) console.error(`Fix: ${fix}`);
+    if (fix) console.error(`Correção: ${fix}`);
   }
 
   process.exitCode = 1;

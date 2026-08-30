@@ -130,7 +130,7 @@ function assertUniqueIds(artifacts: ArtifactDefinition[]): void {
   const seen = new Set<string>();
   for (const artifact of artifacts) {
     if (seen.has(artifact.id)) {
-      throw new SpecError(`Schema declares artifact "${artifact.id}" twice`, {
+      throw new SpecError(`O schema declara o artefato "${artifact.id}" duas vezes`, {
         code: 'invalid_schema',
       });
     }
@@ -144,7 +144,7 @@ function assertKnownDependencies(file: WorkflowSchemaFile): void {
     for (const dependency of artifact.requires) {
       if (!ids.has(dependency)) {
         throw new SpecError(
-          `Artifact "${artifact.id}" requires "${dependency}", which the schema does not declare`,
+          `O artefato "${artifact.id}" requer "${dependency}", que o schema não declara`,
           { code: 'invalid_schema' }
         );
       }
@@ -153,7 +153,7 @@ function assertKnownDependencies(file: WorkflowSchemaFile): void {
   for (const required of file.apply?.requires ?? []) {
     if (!ids.has(required)) {
       throw new SpecError(
-        `apply.requires names "${required}", which the schema does not declare`,
+        `apply.requires nomeia "${required}", que o schema não declara`,
         { code: 'invalid_schema' }
       );
     }
@@ -169,7 +169,7 @@ function assertAcyclic(artifacts: ArtifactDefinition[]): void {
   const visit = (id: string): void => {
     if (onStack.has(id)) {
       const cycle = [...stack.slice(stack.indexOf(id)), id].join(' -> ');
-      throw new SpecError(`Schema has a dependency cycle: ${cycle}`, { code: 'invalid_schema' });
+      throw new SpecError(`O schema tem um ciclo de dependências: ${cycle}`, { code: 'invalid_schema' });
     }
     if (visited.has(id)) return;
 

@@ -132,8 +132,8 @@ async function validateDeltaSpec(
         level: 'WARNING',
         path: location,
         message:
-          'New capability delta has no "## Purpose" section. Without it the main spec created at ' +
-          'archive time carries a placeholder',
+          'O delta de capacidade nova não tem seção "## Purpose". Sem ela, a spec principal criada ' +
+          'no arquivamento fica com um placeholder',
       });
     } else if (isPurposePlaceholder(spec.purpose)) {
       issues.push({ level: 'WARNING', path: location, message: MESSAGES.SPEC_PURPOSE_PLACEHOLDER });

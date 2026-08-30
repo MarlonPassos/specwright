@@ -58,7 +58,7 @@ describe('ArtifactGraph', () => {
       ArtifactGraph.from(
         schema([{ id: 'a', generates: 'a.md', template: 'a.md', requires: ['ghost'] }])
       )
-    ).toThrow(/requires "ghost"/);
+    ).toThrow(/requer "ghost"/);
   });
 
   it('rejects a duplicated artifact id', () => {
@@ -69,7 +69,7 @@ describe('ArtifactGraph', () => {
           { id: 'a', generates: 'b.md', template: 'b.md' },
         ])
       )
-    ).toThrow(/twice/);
+    ).toThrow(/duas vezes/);
   });
 
   it('rejects a dependency cycle and names it', () => {
@@ -80,7 +80,7 @@ describe('ArtifactGraph', () => {
           { id: 'b', generates: 'b.md', template: 'b.md', requires: ['a'] },
         ])
       )
-    ).toThrow(/cycle: a -> b -> a/);
+    ).toThrow(/ciclo de dependências: a -> b -> a/);
   });
 
   it('rejects an apply phase that requires an unknown artifact', () => {
@@ -88,7 +88,7 @@ describe('ArtifactGraph', () => {
       ArtifactGraph.from(
         schema([{ id: 'a', generates: 'a.md', template: 'a.md' }], { requires: ['ghost'] })
       )
-    ).toThrow(/apply.requires names "ghost"/);
+    ).toThrow(/apply.requires nomeia "ghost"/);
   });
 });
 

@@ -59,7 +59,7 @@ export async function resolveChangeContext(
 ): Promise<StatusContext> {
   const dir = changeDir(workspace, changeId);
   if (!(await isDirectory(dir))) {
-    throw new SpecError(`Change "${changeId}" does not exist`, {
+    throw new SpecError(`A change "${changeId}" não existe`, {
       code: 'change_not_found',
       fix: 'specs list',
     });
@@ -68,7 +68,7 @@ export async function resolveChangeContext(
   const config = await loadConfig(workspace);
   const metadata = await readChangeMetadata(dir);
   if (metadata.malformed) {
-    throw new SpecError(`${path.join(dir, '.change.yaml')} is not valid change metadata`, {
+    throw new SpecError(`${path.join(dir, '.change.yaml')} não é um metadado de change válido`, {
       code: 'invalid_change_metadata',
     });
   }

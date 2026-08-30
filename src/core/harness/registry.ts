@@ -32,7 +32,7 @@ export function resolveHarnesses(value: string): HarnessAdapter[] {
     .filter(Boolean);
 
   if (requested.length === 0) {
-    throw new SpecError('No harness selected', {
+    throw new SpecError('Nenhum harness selecionado', {
       code: 'no_harness',
       fix: `specs init --harnesses ${harnessIds().join(',')}`,
     });
@@ -43,7 +43,7 @@ export function resolveHarnesses(value: string): HarnessAdapter[] {
   const unknown = requested.filter((id) => !getHarness(id));
   if (unknown.length > 0) {
     throw new SpecError(
-      `Unknown harness: ${unknown.join(', ')}. Supported: ${harnessIds().join(', ')}`,
+      `Harness desconhecido: ${unknown.join(', ')}. Suportados: ${harnessIds().join(', ')}`,
       { code: 'unknown_harness' }
     );
   }

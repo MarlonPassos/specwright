@@ -106,13 +106,13 @@ describe('change lifecycle', () => {
   it('refuses to archive a change that does not validate', async () => {
     const workspace = await makeWorkspace();
     await seedChange(workspace, 'c', { proposal: '## Why\n\ntoo short\n\n## What Changes\n\n- x\n' });
-    await expect(archiveChange(workspace, 'c')).rejects.toThrow(/is not valid/);
+    await expect(archiveChange(workspace, 'c')).rejects.toThrow(/não está válida/);
   });
 
   it('refuses to archive while tasks are unchecked, unless forced', async () => {
     const workspace = await makeWorkspace();
     await seedChange(workspace, 'c');
-    await expect(archiveChange(workspace, 'c')).rejects.toThrow(/unchecked task/);
+    await expect(archiveChange(workspace, 'c')).rejects.toThrow(/tarefa\(s\) não marcada/);
     await expect(archiveChange(workspace, 'c', { force: true })).resolves.toBeTruthy();
   });
 
@@ -151,7 +151,7 @@ describe('change lifecycle', () => {
       tasks: '## 1. W\n\n- [x] 1.1 done\n',
     });
 
-    await expect(archiveChange(workspace, 'c', { validate: false })).rejects.toThrow(/does not declare/);
+    await expect(archiveChange(workspace, 'c', { validate: false })).rejects.toThrow(/não declara/);
     expect(await fs.readFile(path.join(workspace.specsPath, 'data-export', 'spec.md'), 'utf8')).toBe(before);
     await expect(fs.stat(path.join(workspace.changesPath, 'c'))).resolves.toBeTruthy();
   });
@@ -226,6 +226,6 @@ describe('instructions', () => {
     const workspace = await makeWorkspace();
     await createChange(workspace, 'c');
     const context = await resolveChangeContext(workspace, 'c');
-    await expect(buildInstructions(context, 'ghost')).rejects.toThrow(/no artifact "ghost"/);
+    await expect(buildInstructions(context, 'ghost')).rejects.toThrow(/não tem o artefato "ghost"/);
   });
 });

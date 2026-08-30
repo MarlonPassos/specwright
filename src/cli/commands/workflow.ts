@@ -20,10 +20,10 @@ async function resolveChangeId(
   const active = await listChanges(workspace);
   if (active.length === 1) return active[0];
   if (active.length === 0) {
-    throw new SpecError('No active change', { code: 'no_active_change', fix: 'specs new change <name>' });
+    throw new SpecError('Nenhuma change ativa', { code: 'no_active_change', fix: 'specs new change <nome>' });
   }
   throw new SpecError(
-    `Several active changes: ${active.join(', ')}. Name the one you mean.`,
+    `Várias changes ativas: ${active.join(', ')}. Diga qual delas.`,
     { code: 'ambiguous_change' }
   );
 }
@@ -59,10 +59,10 @@ export function registerWorkflowCommands(program: Command): void {
         }
 
         printLines([
-          `Created change "${created.id}" (schema: ${created.schema})`,
+          `Change "${created.id}" criada (schema: ${created.schema})`,
           `  ${created.dir}`,
-          `Next artifact${created.next.length === 1 ? '' : 's'}: ${created.next.join(', ')}`,
-          `Run: specs instructions ${created.next[0] ?? '<artifact>'} --change ${created.id} --json`,
+          `Próximo${created.next.length === 1 ? ' artefato' : 's artefatos'}: ${created.next.join(', ')}`,
+          `Rode: specs instructions ${created.next[0] ?? '<artefato>'} --change ${created.id} --json`,
         ]);
       } catch (error) {
         fail(error, { json: options.json, payload: { change: null } });
@@ -93,14 +93,14 @@ export function registerWorkflowCommands(program: Command): void {
             return;
           }
           if (reports.length === 0) {
-            printLines(['No active changes.']);
+            printLines(['Nenhuma change ativa.']);
             return;
           }
           printLines(
             reports.map(
               (report) =>
-                `${report.change.padEnd(28)} ${report.ready ? 'ready' : `blocked by ${report.applyBlockedBy.join(', ')}`}` +
-                (report.tasks ? `  tasks ${report.tasks.completed}/${report.tasks.total}` : '')
+                `${report.change.padEnd(28)} ${report.ready ? 'pronta' : `bloqueada por ${report.applyBlockedBy.join(', ')}`}` +
+                (report.tasks ? `  tarefas ${report.tasks.completed}/${report.tasks.total}` : '')
             )
           );
           return;
@@ -117,18 +117,20 @@ export function registerWorkflowCommands(program: Command): void {
 
         printLines([
           `Change: ${status.change}   Schema: ${status.schema}`,
-          `Location: ${status.changeRoot}`,
+          `Local: ${status.changeRoot}`,
           '',
           ...status.artifacts.map(
             (artifact) =>
               `  ${symbolFor(artifact.state)} ${artifact.id.padEnd(12)} ${artifact.state.padEnd(8)}` +
-              (artifact.missing.length > 0 ? ` needs ${artifact.missing.join(', ')}` : '')
+              (artifact.missing.length > 0 ? ` precisa de ${artifact.missing.join(', ')}` : '')
           ),
           '',
-          status.tasks ? `Tasks: ${status.tasks.completed}/${status.tasks.total} complete` : 'Tasks: not written yet',
+          status.tasks
+            ? `Tarefas: ${status.tasks.completed}/${status.tasks.total} concluídas`
+            : 'Tarefas: ainda não escritas',
           status.ready
-            ? `Ready to implement. Run /${commandName('implement')}.`
-            : `Blocked by: ${status.applyBlockedBy.join(', ')}`,
+            ? `Pronta para implementar. Rode /${commandName('implement')}.`
+            : `Bloqueada por: ${status.applyBlockedBy.join(', ')}`,
         ]);
       } catch (error) {
         fail(error, { json: options.json, payload: options.all ? { changes: [] } : { change: null } });
@@ -168,10 +170,10 @@ export function registerWorkflowCommands(program: Command): void {
 
         if (instructions.kind === 'phase') {
           printLines([
-            `Phase: ${instructions.phase}   Change: ${instructions.change}`,
+            `Fase: ${instructions.phase}   Change: ${instructions.change}`,
             instructions.blockedBy.length > 0
-              ? `Blocked by: ${instructions.blockedBy.join(', ')}`
-              : 'All required artifacts are in place.',
+              ? `Bloqueada por: ${instructions.blockedBy.join(', ')}`
+              : 'Todos os artefatos necessários estão prontos.',
             '',
             instructions.instruction,
           ]);
@@ -179,13 +181,13 @@ export function registerWorkflowCommands(program: Command): void {
         }
 
         printLines([
-          `Artifact: ${instructions.artifact}   Change: ${instructions.change}`,
-          `Output: ${instructions.outputPath}${instructions.outputIsPattern ? '  (pattern)' : ''}`,
-          ...(instructions.warning ? ['', `WARNING: ${instructions.warning}`] : []),
+          `Artefato: ${instructions.artifact}   Change: ${instructions.change}`,
+          `Saída: ${instructions.outputPath}${instructions.outputIsPattern ? '  (padrão de caminho)' : ''}`,
+          ...(instructions.warning ? ['', `ATENÇÃO: ${instructions.warning}`] : []),
           '',
           instructions.instruction,
           ...(instructions.rules.length > 0
-            ? ['', 'Project rules:', ...instructions.rules.map((rule) => `  - ${rule}`)]
+            ? ['', 'Regras do projeto:', ...instructions.rules.map((rule) => `  - ${rule}`)]
             : []),
           '',
           'Template:',
@@ -219,13 +221,13 @@ export function registerWorkflowCommands(program: Command): void {
         }
 
         printLines([
-          `Archived "${result.change}" as ${result.archivedAs}`,
+          `"${result.change}" arquivada como ${result.archivedAs}`,
           ...(result.specsSkipped
-            ? ['  Spec merge skipped.']
+            ? ['  Aplicação dos deltas pulada.']
             : [
-                `  Created: ${result.createdSpecs.join(', ') || 'none'}`,
-                `  Updated: ${result.updatedSpecs.join(', ') || 'none'}`,
-                `  Retired: ${result.retiredSpecs.join(', ') || 'none'}`,
+                `  Criadas:     ${result.createdSpecs.join(', ') || 'nenhuma'}`,
+                `  Atualizadas: ${result.updatedSpecs.join(', ') || 'nenhuma'}`,
+                `  Aposentadas: ${result.retiredSpecs.join(', ') || 'nenhuma'}`,
               ]),
         ]);
       } catch (error) {

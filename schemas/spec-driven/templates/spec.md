@@ -1,11 +1,11 @@
 ## Purpose
-<!-- New capabilities only: one or two sentences (50+ characters) on what this capability is for. Delete this section when the capability already exists. -->
+<!-- Só para capacidades novas: uma ou duas frases (50+ caracteres) sobre para que serve esta capacidade. Apague esta seção quando a capacidade já existir. -->
 
 ## ADDED Requirements
 
-### Requirement: <!-- requirement name -->
+### Requirement: <!-- nome do requisito -->
 <!-- The system SHALL ... -->
 
-#### Scenario: <!-- scenario name -->
-- **WHEN** <!-- condition -->
-- **THEN** <!-- observable outcome -->
+#### Scenario: <!-- nome do cenário -->
+- **WHEN** <!-- condição -->
+- **THEN** <!-- resultado observável -->

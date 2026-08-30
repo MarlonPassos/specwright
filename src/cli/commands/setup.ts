@@ -36,24 +36,24 @@ export function registerSetupCommands(program: Command): void {
         }
 
         printLines([
-          result.created ? 'Workspace created.' : 'Workspace updated.',
-          `  Location: ${result.workspace.root}`,
-          `  Schema:   ${result.schema}`,
+          result.created ? 'Workspace criado.' : 'Workspace atualizado.',
+          `  Local:     ${result.workspace.root}`,
+          `  Schema:    ${result.schema}`,
           `  Harnesses: ${result.harnesses.join(', ')}`,
           '',
-          `Generated ${result.files.length} command files:`,
+          `${result.files.length} arquivos de comando gerados:`,
           ...allHarnesses()
             .filter((adapter) => result.harnesses.includes(adapter.id))
             .map((adapter) => `  ${adapter.name.padEnd(12)} ${adapter.directory}`),
           '',
-          'Available in every harness:',
+          'Disponíveis em todos os harnesses:',
           ...workflowCommands().map(
             (command) => `  /${commandName(command.id).padEnd(16)} ${command.description}`
           ),
           '',
           result.projectFileCreated
-            ? 'Next: describe the project in spec/project.md, then run /spec-propose.'
-            : 'Next: run /spec-propose to open a change.',
+            ? 'Próximo passo: descreva o projeto em spec/project.md e rode /spec-propose.'
+            : 'Próximo passo: rode /spec-propose para abrir uma change.',
         ]);
       } catch (error) {
         fail(error, { json: options.json, payload: { workspace: null } });
@@ -81,7 +81,7 @@ export function registerSetupCommands(program: Command): void {
         }
 
         printLines([
-          `Regenerated ${result.files.length} command files for: ${result.harnesses.join(', ')}`,
+          `${result.files.length} arquivos de comando regerados para: ${result.harnesses.join(', ')}`,
           ...result.files.map((file) => `  ${file.path}`),
         ]);
       } catch (error) {
@@ -114,10 +114,10 @@ export function registerSetupCommands(program: Command): void {
       }
 
       printLines([
-        'Supported harnesses:',
+        'Harnesses suportados:',
         ...allHarnesses().map((adapter) => `  ${adapter.id.padEnd(10)} ${adapter.name.padEnd(14)} ${adapter.directory}`),
         '',
-        'Commands (identical in every harness):',
+        'Comandos (idênticos em todos os harnesses):',
         ...commands.map((command) => `  /${commandName(command.id).padEnd(16)} ${command.description}`),
       ]);
     });

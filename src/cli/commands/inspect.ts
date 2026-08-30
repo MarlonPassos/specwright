@@ -31,9 +31,9 @@ export function registerInspectCommands(program: Command): void {
           }
           printLines(
             specs.length === 0
-              ? ['No specs yet.']
+              ? ['Nenhuma spec ainda.']
               : specs.map(
-                  (spec) => `  ${spec.capability.padEnd(32)} ${String(spec.requirements).padStart(3)} requirement(s)`
+                  (spec) => `  ${spec.capability.padEnd(32)} ${String(spec.requirements).padStart(3)} requisito(s)`
                 )
           );
           return;
@@ -49,10 +49,10 @@ export function registerInspectCommands(program: Command): void {
 
         printLines(
           changes.length === 0
-            ? ['No active changes.']
+            ? ['Nenhuma change ativa.']
             : changes.map((change) => {
                 const tasks = change.tasks ? `${change.tasks.completed}/${change.tasks.total}` : '-';
-                return `  ${change.id.padEnd(32)} deltas ${String(change.deltas).padStart(2)}  tasks ${tasks}`;
+                return `  ${change.id.padEnd(32)} deltas ${String(change.deltas).padStart(2)}  tarefas ${tasks}`;
               })
         );
       } catch (error) {
@@ -84,8 +84,8 @@ export function registerInspectCommands(program: Command): void {
           printLines([
             `Spec: ${spec.capability}`,
             '',
-            'Purpose:',
-            `  ${spec.purpose || '(none)'}`,
+            'Propósito:',
+            `  ${spec.purpose || '(vazio)'}`,
             '',
             ...spec.requirements.flatMap((requirement) => [
               `  ${requirement.name}`,
@@ -103,12 +103,12 @@ export function registerInspectCommands(program: Command): void {
 
         printLines([
           `Change: ${change.id}${change.schema ? `   Schema: ${change.schema}` : ''}`,
-          ...(change.proposal ? ['', 'Why:', `  ${change.proposal.why.split('\n').join('\n  ')}`] : []),
+          ...(change.proposal ? ['', 'Por quê:', `  ${change.proposal.why.split('\n').join('\n  ')}`] : []),
           '',
           `Deltas (${change.deltas.length}):`,
           ...change.deltas.map((delta) => `  ${delta.operation.padEnd(9)} ${delta.capability}: ${delta.requirement ?? delta.rename?.from ?? ''}`),
           ...(change.tasks
-            ? ['', `Tasks: ${change.tasks.completed}/${change.tasks.total} complete`, ...change.tasks.pending.map((task) => `  [ ] ${task}`)]
+            ? ['', `Tarefas: ${change.tasks.completed}/${change.tasks.total} concluídas`, ...change.tasks.pending.map((task) => `  [ ] ${task}`)]
             : []),
         ]);
       } catch (error) {
@@ -192,18 +192,18 @@ export function registerInspectCommands(program: Command): void {
 }
 
 function formatReports(reports: ValidationReport[], valid: boolean): string[] {
-  if (reports.length === 0) return ['Nothing to validate.'];
+  if (reports.length === 0) return ['Nada a validar.'];
 
   const lines: string[] = [];
   for (const report of reports) {
-    const verdict = report.valid ? 'ok' : 'FAILED';
+    const verdict = report.valid ? 'ok' : 'FALHOU';
     lines.push(`${report.type} ${report.item}: ${verdict}`);
     for (const issue of report.issues) {
       const where = issue.line ? `${issue.path}:${issue.line}` : issue.path;
       lines.push(`  ${issue.level.padEnd(7)} ${where} - ${issue.message}`);
     }
   }
-  lines.push('', valid ? 'All checks passed.' : 'Validation failed.');
+  lines.push('', valid ? 'Todas as checagens passaram.' : 'Validação falhou.');
   return lines;
 }
 
@@ -211,9 +211,9 @@ async function onlyActiveChange(workspace: Workspace): Promise<string> {
   const active = await listChanges(workspace);
   if (active.length === 1) return active[0];
   if (active.length === 0) {
-    throw new SpecError('No active change', { code: 'no_active_change', fix: 'specs new change <name>' });
+    throw new SpecError('Nenhuma change ativa', { code: 'no_active_change', fix: 'specs new change <nome>' });
   }
-  throw new SpecError(`Several active changes: ${active.join(', ')}. Name the one you mean.`, {
+  throw new SpecError(`Várias changes ativas: ${active.join(', ')}. Diga qual delas.`, {
     code: 'ambiguous_change',
   });
 }

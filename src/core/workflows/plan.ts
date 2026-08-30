@@ -5,9 +5,9 @@ export function planCommand(): WorkflowCommand {
   return {
     id: 'plan',
     name: 'Spec Plan',
-    description: 'Complete the planning artifacts of a change until it is ready to implement',
-    argumentHint: '[change-name]',
-    body: `Complete a change's planning artifacts until implementation can start.
+    description: 'Completa os artefatos de planejamento de uma change até ela poder ser implementada',
+    argumentHint: '[nome-da-change]',
+    body: `Complete os artefatos de planejamento de uma change até a implementação poder começar.
 
 ${PLANNING_BOUNDARY}
 
@@ -15,64 +15,64 @@ ${CLI_NOTE}
 
 ${RESOLVE_CHANGE}
 
-**Steps**
+**Passos**
 
-1. **Read the current state**
+1. **Leia o estado atual**
 
    \`\`\`bash
    specs status --change "<change>" --json
    \`\`\`
-   The response carries:
-   - \`artifacts\` - every artifact with its \`state\` (\`done\`, \`ready\`, \`blocked\`,
-     \`skipped\`), what it \`generates\`, the files that satisfy it, and its \`requires\` edges;
-   - \`applyRequires\` - the artifacts implementation depends on, transitively;
-   - \`applyBlockedBy\` - the ones still missing;
-   - \`next\` - the artifacts that can be written right now;
-   - \`workspace\` and \`changeRoot\` - resolved paths. Use them; do not assume any path.
+   A resposta carrega:
+   - \`artifacts\` - cada artefato com seu \`state\` (\`done\`, \`ready\`, \`blocked\`,
+     \`skipped\`), o que ele \`generates\`, os arquivos que o satisfazem e suas arestas \`requires\`;
+   - \`applyRequires\` - os artefatos de que a implementação depende, transitivamente;
+   - \`applyBlockedBy\` - os que ainda faltam;
+   - \`next\` - os artefatos que podem ser escritos agora;
+   - \`workspace\` e \`changeRoot\` - caminhos resolvidos. Use-os; não presuma nenhum caminho.
 
-2. **Write the missing artifacts**
+2. **Escreva os artefatos que faltam**
 
-   Track them with a todo list. Loop:
+   Acompanhe com uma lista de tarefas. Em loop:
 
-   a. Take an artifact from \`next\`.
+   a. Pegue um artefato de \`next\`.
 
 ${ARTIFACT_RULES.split('\n').map((line) => (line ? `      ${line}` : '')).join('\n')}
 
-   b. Re-run \`specs status --change "<change>" --json\` after each artifact: finishing one
-      unblocks others.
+   b. Rode \`specs status --change "<change>" --json\` de novo depois de cada artefato:
+      terminar um desbloqueia outros.
 
-   c. Stop when \`applyBlockedBy\` is empty.
+   c. Pare quando \`applyBlockedBy\` estiver vazio.
 
-   Use \`applyRequires\`, not the states alone, to decide what is still owed: \`state\` only
-   reports whether a file exists, so writing \`tasks.md\` early marks \`tasks\` done while its
-   dependencies were never written.
+   Use \`applyRequires\`, e não os estados sozinhos, para decidir o que ainda está devendo:
+   \`state\` só reporta se um arquivo existe, então escrever \`tasks.md\` cedo marca \`tasks\`
+   como done enquanto as dependências dele nunca foram escritas.
 
-   An artifact reading \`skipped\` is satisfied - the change opted out of it. Never create it.
+   Um artefato com \`skipped\` está satisfeito - a change abriu mão dele. Nunca o crie.
 
-   Skip an artifact only when its own \`instruction\` marks it conditional (the design
-   document is the usual case). Say which one you skipped and why. A conditional artifact
-   you skipped does not block its dependents: write those anyway.
+   Pule um artefato apenas quando a \`instruction\` dele o marca como condicional (o documento
+   de design é o caso usual). Diga qual você pulou e por quê. Um artefato condicional que você
+   pulou não bloqueia os que dependem dele: escreva esses mesmo assim.
 
-3. **Validate before handing over**
+3. **Valide antes de entregar**
 
    \`\`\`bash
    specs validate "<change>" --strict --json
    \`\`\`
-   Fix what it reports and re-run until it passes. If a requirement is missing a scenario
-   or a delta targets a requirement that does not exist, correct the artifact - never
-   loosen the requirement to make the check pass.
+   Corrija o que for reportado e rode de novo até passar. Se um requisito estiver sem cenário
+   ou um delta apontar para um requisito que não existe, corrija o artefato - nunca afrouxe o
+   requisito para a checagem passar.
 
-**Output**
+**Saída**
 
-- artifacts written, one line each, plus any conditional artifact you skipped and why;
-- the capabilities the deltas add or modify;
-- validation result;
-- next step: "Run \`/spec-implement\` when you are ready to build."
+- artefatos escritos, uma linha cada, mais qualquer artefato condicional que você pulou e por quê;
+- as capacidades que os deltas adicionam ou modificam;
+- resultado da validação;
+- próximo passo: "Rode \`/spec-implement\` quando estiver pronto para construir."
 
 **Guardrails**
-- Planning only. Do not edit project code and do not start implementing.
-- Re-read dependency files from disk before writing an artifact that depends on them.
-- Ask about ambiguities that would change scope, observable behavior or acceptance
-  criteria; record minor assumptions in the artifacts.`,
+- Apenas planejamento. Não edite o código do projeto e não comece a implementar.
+- Releia os arquivos de dependência do disco antes de escrever um artefato que dependa deles.
+- Pergunte sobre ambiguidades que mudariam escopo, comportamento observável ou critérios de
+  aceite; registre suposições menores nos artefatos.`,
   };
 }

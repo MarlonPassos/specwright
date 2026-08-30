@@ -61,19 +61,19 @@ export interface PhaseInstructions {
 export type Instructions = ArtifactInstructions | PhaseInstructions;
 
 const IMPLEMENT_FALLBACK =
-  'Work through the change artifacts and complete the outstanding tasks in order.';
+  'Percorra os artefatos da change e conclua as tarefas pendentes em ordem.';
 
 const ARCHIVE_INSTRUCTION = [
-  'Close out a change that has been implemented and verified.',
+  'Encerre uma change que já foi implementada e verificada.',
   '',
-  'Steps:',
-  '1. Confirm every task in the tracked checklist is checked.',
-  '2. Run `specs validate <change> --strict` and fix what it reports.',
-  '3. Run `specs archive <change>` to fold the delta specs into the workspace specs',
-  '   and move the change directory into the archive.',
+  'Passos:',
+  '1. Confirme que toda tarefa do checklist acompanhado está marcada.',
+  '2. Rode `specs validate <change> --strict` e corrija o que for reportado.',
+  '3. Rode `specs archive <change>` para aplicar as delta specs nas specs do workspace',
+  '   e mover o diretório da change para o arquivo.',
   '',
-  'Archiving rewrites the workspace specs, so it runs only after implementation is',
-  'complete. Use `--skip-specs` only for a change that declared no spec deltas.',
+  'O arquivamento reescreve as specs do workspace, então só roda depois que a implementação',
+  'está concluída. Use `--skip-specs` apenas para uma change que não declarou deltas de spec.',
 ].join('\n');
 
 export async function buildInstructions(
@@ -110,7 +110,7 @@ export async function buildInstructions(
       ...RESERVED_INSTRUCTION_IDS,
     ].join(', ');
     throw new SpecError(
-      `Schema "${context.schema.name}" has no artifact "${artifactId}". Known ids: ${known}`,
+      `O schema "${context.schema.name}" não tem o artefato "${artifactId}". Ids conhecidos: ${known}`,
       { code: 'artifact_not_found' }
     );
   }

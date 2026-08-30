@@ -37,7 +37,7 @@ export async function archiveChange(
 ): Promise<ArchiveResult> {
   const dir = changeDir(workspace, changeId);
   if (!(await pathExists(dir))) {
-    throw new SpecError(`Change "${changeId}" does not exist`, {
+    throw new SpecError(`A change "${changeId}" não existe`, {
       code: 'change_not_found',
       fix: 'specs list',
     });
@@ -50,7 +50,7 @@ export async function archiveChange(
         .filter((issue) => issue.level === 'ERROR')
         .map((issue) => `  - ${issue.path}: ${issue.message}`)
         .join('\n');
-      throw new SpecError(`Change "${changeId}" is not valid, so it was not archived:\n${errors}`, {
+      throw new SpecError(`A change "${changeId}" não está válida, então não foi arquivada:\n${errors}`, {
         code: 'change_invalid',
         fix: `specs validate ${changeId}`,
       });
@@ -60,7 +60,7 @@ export async function archiveChange(
   const tasks = await readTaskProgress(dir);
   if (tasks && tasks.completed < tasks.total && options.force !== true) {
     throw new SpecError(
-      `Change "${changeId}" still has ${tasks.total - tasks.completed} unchecked task(s)`,
+      `A change "${changeId}" ainda tem ${tasks.total - tasks.completed} tarefa(s) não marcada(s)`,
       { code: 'tasks_incomplete', fix: `specs archive ${changeId} --force` }
     );
   }

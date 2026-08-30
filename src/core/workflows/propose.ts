@@ -5,70 +5,72 @@ export function proposeCommand(): WorkflowCommand {
   return {
     id: 'propose',
     name: 'Spec Propose',
-    description: 'Open a new change and write its proposal',
-    argumentHint: '<what you want to build or fix>',
-    body: `Open a new change and write the proposal that states why it exists.
+    description: 'Abre uma change nova e escreve a proposta dela',
+    argumentHint: '<o que você quer construir ou corrigir>',
+    body: `Abra uma change nova e escreva a proposta que diz por que ela existe.
 
 ${PLANNING_BOUNDARY}
 
 ${CLI_NOTE}
 
-**Input**: a change name in kebab-case, or a description of what the user wants.
+**Entrada**: um nome de change em kebab-case, ou uma descrição do que o usuário quer.
 
-**Steps**
+**Passos**
 
-1. **Understand the request**
+1. **Entenda o pedido**
 
-   If nothing usable was provided, ask - open-ended, no preset options:
-   > "What change do you want to work on? Describe what you want to build or fix."
+   Se nada de aproveitável foi passado, pergunte - aberto, sem opções prontas:
+   > "Em que change você quer trabalhar? Descreva o que quer construir ou corrigir."
 
-   Derive a kebab-case name from the description ("add user authentication" ->
-   \`add-user-auth\`). Do not proceed without understanding what is being asked.
+   Derive um nome em kebab-case da descrição ("adicionar autenticação de usuário" ->
+   \`add-user-auth\`). Não siga adiante sem entender o que está sendo pedido.
 
-   If an ambiguity would materially change scope, observable behavior, compatibility
-   or acceptance criteria, ask before creating the change. Record minor assumptions in
-   the proposal instead of asking.
+   Se uma ambiguidade mudaria materialmente o escopo, o comportamento observável, a
+   compatibilidade ou os critérios de aceite, pergunte antes de criar a change. Registre
+   suposições menores na proposta em vez de perguntar.
 
-2. **Read the ground you are standing on**
+2. **Leia o terreno em que você está pisando**
 
    \`\`\`bash
    specs list --specs --json
    \`\`\`
-   Existing capabilities tell you which specs this change would modify and which it
-   would introduce. Read the specs that look related before writing the proposal.
+   As capacidades existentes dizem quais specs esta change modificaria e quais ela
+   introduziria. Leia as specs que parecem relacionadas antes de escrever a proposta.
 
-3. **Create the change**
+3. **Crie a change**
 
    \`\`\`bash
-   specs new change "<name>" --json
+   specs new change "<nome>" --json
    \`\`\`
-   Add \`--schema "<schema>"\` only when the user asked for a specific workflow schema;
-   \`specs schemas --json\` lists them. Add \`--skip-specs\` only when the change provably
-   alters no observable behavior (refactor, tooling, docs) - never to dodge validation.
+   Acrescente \`--schema "<schema>"\` só quando o usuário pediu um schema de workflow
+   específico; \`specs schemas --json\` lista os disponíveis. Acrescente \`--skip-specs\` só
+   quando a change comprovadamente não altera nenhum comportamento observável (refatoração,
+   tooling, docs) - nunca para escapar da validação.
 
-4. **Write the proposal**
+4. **Escreva a proposta**
 
 ${ARTIFACT_RULES.split('\n').map((line) => (line ? `   ${line}` : '')).join('\n')}
 
-   The proposal's Capabilities section is the contract the spec deltas are written
-   against, so name each capability precisely and use existing capability paths verbatim.
+   A seção Capabilities da proposta é o contrato contra o qual os deltas de spec são
+   escritos, então nomeie cada capacidade com precisão e use os caminhos de capacidade
+   existentes tal como são.
 
-5. **Report**
+5. **Reporte**
 
    \`\`\`bash
-   specs status --change "<name>"
+   specs status --change "<nome>"
    \`\`\`
 
-**Output**
+**Saída**
 
-- the change name and where it lives;
-- a two-line summary of the problem and the proposed scope;
-- the capabilities the change will add or modify;
-- next step: "Run \`/spec-plan\` when the proposal looks right."
+- o nome da change e onde ela fica;
+- um resumo de duas linhas do problema e do escopo proposto;
+- as capacidades que a change vai adicionar ou modificar;
+- próximo passo: "Rode \`/spec-plan\` quando a proposta estiver boa."
 
 **Guardrails**
-- Stop after the proposal. The remaining artifacts belong to \`/spec-plan\`.
-- Do not edit project code.
-- If a change with that name exists, ask whether to continue it or pick another name.`,
+- Pare depois da proposta. Os artefatos restantes pertencem ao \`/spec-plan\`.
+- Não edite o código do projeto.
+- Se já existir uma change com esse nome, pergunte se deve continuá-la ou escolher outro nome.`,
   };
 }

@@ -24,7 +24,7 @@ describe('change validation', () => {
     await writeFile(path.join(dir, 'proposal.md'), '');
     const report = await validateChange(workspace, 'add-data-export');
     expect(report.valid).toBe(false);
-    expect(messages(report, 'ERROR')).toContain('Missing "## Why" section');
+    expect(messages(report, 'ERROR')).toContain('Falta a seção "## Why"');
   });
 
   it('rejects a Why section shorter than the minimum', async () => {
@@ -33,7 +33,7 @@ describe('change validation', () => {
       proposal: '## Why\n\ntoo short\n\n## What Changes\n\n- something\n',
     });
     const report = await validateChange(workspace, 'c');
-    expect(messages(report, 'ERROR').some((message) => message.includes('at least 50'))).toBe(true);
+    expect(messages(report, 'ERROR').some((message) => message.includes('pelo menos 50'))).toBe(true);
   });
 
   it('treats an unfilled template section as empty', async () => {
@@ -49,7 +49,7 @@ describe('change validation', () => {
     const workspace = await makeWorkspace();
     await seedChange(workspace, 'c', { delta: null as unknown as string });
     const report = await validateChange(workspace, 'c');
-    expect(messages(report, 'ERROR').some((message) => message.startsWith('No spec deltas'))).toBe(true);
+    expect(messages(report, 'ERROR').some((message) => message.startsWith('Nenhum delta de spec'))).toBe(true);
   });
 
   it('accepts a zero-delta change that declares skip_specs', async () => {
@@ -65,7 +65,7 @@ describe('change validation', () => {
     const dir = await seedChange(workspace, 'c');
     await writeFile(path.join(dir, '.change.yaml'), 'schema: spec-driven\nskip_specs: true\n');
     const report = await validateChange(workspace, 'c');
-    expect(messages(report, 'ERROR').some((message) => message.includes('skip_specs is set'))).toBe(true);
+    expect(messages(report, 'ERROR').some((message) => message.includes('skip_specs está definido'))).toBe(true);
   });
 
   it('rejects a requirement with no scenario', async () => {
@@ -83,7 +83,7 @@ describe('change validation', () => {
       ].join('\n'),
     });
     const report = await validateChange(workspace, 'c');
-    expect(messages(report, 'ERROR').some((message) => message.includes('no scenario'))).toBe(true);
+    expect(messages(report, 'ERROR').some((message) => message.includes('não tem cenário'))).toBe(true);
   });
 
   it('rejects a requirement with no SHALL or MUST', async () => {
@@ -92,7 +92,7 @@ describe('change validation', () => {
       delta: DELTA_SPEC.replace('The system SHALL let', 'The system lets'),
     });
     const report = await validateChange(workspace, 'c');
-    expect(messages(report, 'ERROR')).toContain('Requirement text must use SHALL or MUST');
+    expect(messages(report, 'ERROR')).toContain('O texto do requisito precisa usar SHALL ou MUST');
   });
 
   it('rejects a MODIFIED delta whose requirement does not exist', async () => {
@@ -105,7 +105,7 @@ describe('change validation', () => {
       delta: ['## MODIFIED Requirements', '', '### Requirement: Ghost', 'The system SHALL ghost.', '', '#### Scenario: S', '- **WHEN** x', '- **THEN** y'].join('\n'),
     });
     const report = await validateChange(workspace, 'c');
-    expect(messages(report, 'ERROR').some((message) => message.includes('does not declare'))).toBe(true);
+    expect(messages(report, 'ERROR').some((message) => message.includes('não declara'))).toBe(true);
   });
 
   it('rejects a MODIFIED delta against a capability that does not exist', async () => {
@@ -114,7 +114,7 @@ describe('change validation', () => {
       delta: ['## MODIFIED Requirements', '', '### Requirement: Ghost', 'The system SHALL ghost.', '', '#### Scenario: S', '- **WHEN** x', '- **THEN** y'].join('\n'),
     });
     const report = await validateChange(workspace, 'c');
-    expect(messages(report, 'ERROR').some((message) => message.includes('does not exist in the workspace'))).toBe(true);
+    expect(messages(report, 'ERROR').some((message) => message.includes('não existe nas specs do workspace'))).toBe(true);
   });
 
   it('warns about a removal with no reason or migration, and fails under strict', async () => {
@@ -140,14 +140,14 @@ describe('change validation', () => {
       tasks: ['## 1. Group', '- [ ] 1.2 second and verify', '- [ ] 1.1 first and verify'].join('\n'),
     });
     const report = await validateChange(workspace, 'c');
-    expect(messages(report, 'WARNING').some((message) => message.includes('out of order'))).toBe(true);
+    expect(messages(report, 'WARNING').some((message) => message.includes('fora de ordem'))).toBe(true);
   });
 
   it('requires every task to be complete when asked to', async () => {
     const workspace = await makeWorkspace();
     await seedChange(workspace, 'c');
     const report = await validateChange(workspace, 'c', { requireCompletedTasks: true });
-    expect(messages(report, 'ERROR').some((message) => message.includes('unchecked tasks'))).toBe(true);
+    expect(messages(report, 'ERROR').some((message) => message.includes('tarefas não marcadas'))).toBe(true);
   });
 });
 
@@ -176,7 +176,7 @@ describe('spec validation', () => {
   it('rejects a delta header in a main spec', () => {
     const report = validateSpecContent('data-export', valid.replace('## Requirements', '## ADDED Requirements'));
     expect(report.valid).toBe(false);
-    expect(messages(report, 'ERROR').some((message) => message.includes('Delta headers belong'))).toBe(true);
+    expect(messages(report, 'ERROR').some((message) => message.includes('Cabeçalhos de delta pertencem'))).toBe(true);
   });
 
   it('rejects a requirement declared outside the requirements section', () => {
@@ -184,7 +184,7 @@ describe('spec validation', () => {
       'data-export',
       `${valid}\n\n## Notes\n\n### Requirement: Stray\nThe system SHALL stray.\n\n#### Scenario: S\n- **WHEN** x\n- **THEN** y`
     );
-    expect(messages(report, 'ERROR').some((message) => message.includes('outside the "## Requirements"'))).toBe(true);
+    expect(messages(report, 'ERROR').some((message) => message.includes('fora da seção "## Requirements"'))).toBe(true);
   });
 
   it('rejects duplicate requirement names', () => {
@@ -192,7 +192,7 @@ describe('spec validation', () => {
       'data-export',
       `${valid}\n\n### Requirement: Export\nThe system SHALL export twice.\n\n#### Scenario: S\n- **WHEN** x\n- **THEN** y`
     );
-    expect(messages(report, 'ERROR').some((message) => message.includes('Duplicate requirement name'))).toBe(true);
+    expect(messages(report, 'ERROR').some((message) => message.includes('Nome de requisito duplicado'))).toBe(true);
   });
 
   it('warns when the purpose is still the placeholder archiving writes', () => {

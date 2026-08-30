@@ -18,7 +18,7 @@ describe('harness registry', () => {
   });
 
   it('rejects an unknown harness rather than silently skipping it', () => {
-    expect(() => resolveHarnesses('claude,nope')).toThrow(/Unknown harness: nope/);
+    expect(() => resolveHarnesses('claude,nope')).toThrow(/Harness desconhecido: nope/);
   });
 });
 

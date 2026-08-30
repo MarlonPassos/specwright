@@ -5,6 +5,23 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.3.0] - 2026-08-30
+
+### Funcionalidades
+
+- **feat(cli): traduz para português tudo que chega ao usuário e ao agente**
+  - Saída dos comandos: `init`, `update`, `harnesses`, `new change`, `status`,
+    `instructions`, `archive`, `list`, `show`, `validate`, `schemas` e `templates`
+  - Mensagens de erro e de correção (`Erro:` / `Correção:`), incluindo as lançadas pelo core
+  - Mensagens de validação dos três níveis, e o placeholder de `## Purpose` escrito ao arquivar
+  - Corpos de instrução dos cinco comandos `/spec-*` gerados para os quatro harnesses
+  - Schema `spec-driven`: descrições e instruções de cada artefato e da fase de implementação
+  - Templates de `proposal.md`, `design.md`, `spec.md`, `tasks.md` e o `spec/project.md` inicial
+
+### Manutenção
+
+- **test: ajusta as asserções que casavam com as mensagens em inglês**
+
 ## [0.2.0] - 2026-08-30
 
 ### Funcionalidades

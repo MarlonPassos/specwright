@@ -36,7 +36,7 @@ export function splitSpec(content: string): SpecParts {
     (header) => header.level === 2 && REQUIREMENTS_HEADER.test(header.title)
   );
   if (!requirementsHeader) {
-    throw new SpecError('Spec has no "## Requirements" section to merge into', {
+    throw new SpecError('A spec não tem uma seção "## Requirements" onde aplicar', {
       code: 'spec_missing_requirements',
     });
   }
@@ -186,7 +186,7 @@ function requireBlock(
   const index = indexOfBlock(blocks, name);
   if (index < 0) {
     throw new SpecError(
-      `${operation} targets requirement "${name}", which spec "${capability}" does not declare`,
+      `${operation} aponta para o requisito "${name}", que a spec "${capability}" não declara`,
       { code: 'requirement_not_found', fix: `specs show ${capability} --type spec` }
     );
   }

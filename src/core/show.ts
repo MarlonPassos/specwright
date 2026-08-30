@@ -48,14 +48,14 @@ export async function resolveItemType(
 
   if (isChange && isSpec) {
     throw new SpecError(
-      `"${name}" is both a change and a capability. Pass --type change or --type spec.`,
+      `"${name}" é ao mesmo tempo uma change e uma capacidade. Passe --type change ou --type spec.`,
       { code: 'ambiguous_item' }
     );
   }
   if (isChange) return 'change';
   if (isSpec) return 'spec';
 
-  throw new SpecError(`No change or spec named "${name}"`, {
+  throw new SpecError(`Nenhuma change ou spec chamada "${name}"`, {
     code: 'item_not_found',
     fix: 'specs list',
   });
@@ -68,7 +68,7 @@ export async function showChange(
 ): Promise<ShownChange> {
   const dir = changeDir(workspace, id);
   if (!(await pathExists(dir))) {
-    throw new SpecError(`Change "${id}" does not exist`, { code: 'change_not_found', fix: 'specs list' });
+    throw new SpecError(`A change "${id}" não existe`, { code: 'change_not_found', fix: 'specs list' });
   }
 
   const metadata = await readChangeMetadata(dir);
@@ -120,7 +120,7 @@ export async function showChange(
 export async function showSpec(workspace: Workspace, capability: string): Promise<ShownSpec> {
   const found = await readSpec(workspace, capability);
   if (!found) {
-    throw new SpecError(`No spec for capability "${capability}"`, {
+    throw new SpecError(`Nenhuma spec para a capacidade "${capability}"`, {
       code: 'spec_not_found',
       fix: 'specs list --specs',
     });

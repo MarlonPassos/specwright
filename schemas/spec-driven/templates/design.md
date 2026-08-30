@@ -1,6 +1,6 @@
 ## Context
 
-<!-- Current state and constraints needed to follow the approach. Point at proposal.md for motivation. -->
+<!-- Estado atual e restrições necessárias para acompanhar a abordagem. Aponte para o proposal.md pela motivação. -->
 
 ## Goals / Non-Goals
 
@@ -14,18 +14,18 @@
 
 ## Decisions
 
-### <!-- decision name -->
+### <!-- nome da decisão -->
 
-<!-- What was chosen, why, and which alternatives were weighed. -->
+<!-- O que foi escolhido, por quê, e quais alternativas foram consideradas. -->
 
 ## Risks / Trade-offs
 
-- <!-- risk --> - Mitigation: <!-- mitigation -->
+- <!-- risco --> - Mitigação: <!-- mitigação -->
 
 ## Migration Plan
 
-<!-- Rollout and rollback steps. Delete this section when it does not apply. -->
+<!-- Passos de rollout e de rollback. Apague esta seção quando não se aplicar. -->
 
 ## Open Questions
 
-<!-- Unknowns that can safely be answered later. Delete this section when there are none. -->
+<!-- Incógnitas que podem ser respondidas depois com segurança. Apague esta seção quando não houver nenhuma. -->
