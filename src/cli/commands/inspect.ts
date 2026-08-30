@@ -14,11 +14,11 @@ import { fail, printJson, printLines } from '../output.js';
 export function registerInspectCommands(program: Command): void {
   program
     .command('list')
-    .description('List changes (default) or specs')
-    .option('--changes', 'List changes')
-    .option('--specs', 'List specs')
-    .option('--sort <order>', 'Sort changes by "recent" (default) or "name"', 'recent')
-    .option('--json', 'Output as JSON')
+    .description('Lista as changes (padrão) ou as specs')
+    .option('--changes', 'Lista as changes')
+    .option('--specs', 'Lista as specs')
+    .option('--sort <order>', 'Ordena as changes por "recent" (padrão) ou "name"', 'recent')
+    .option('--json', 'Saída em JSON')
     .action(async (options: { changes?: boolean; specs?: boolean; sort?: string; json?: boolean }) => {
       try {
         const workspace = await requireWorkspace();
@@ -65,10 +65,10 @@ export function registerInspectCommands(program: Command): void {
 
   program
     .command('show [item]')
-    .description('Show a change or a spec')
-    .option('--type <type>', 'Disambiguate: change or spec')
-    .option('--deltas-only', 'Show only the spec deltas of a change')
-    .option('--json', 'Output as JSON')
+    .description('Mostra uma change ou uma spec')
+    .option('--type <type>', 'Desambigua: change ou spec')
+    .option('--deltas-only', 'Mostra apenas os deltas de spec de uma change')
+    .option('--json', 'Saída em JSON')
     .action(async (item: string | undefined, options: { type?: string; deltasOnly?: boolean; json?: boolean }) => {
       try {
         const workspace = await requireWorkspace();
@@ -118,14 +118,14 @@ export function registerInspectCommands(program: Command): void {
 
   program
     .command('validate [item]')
-    .description('Validate a change or a spec')
-    .option('--all', 'Validate every change and spec')
-    .option('--changes', 'Validate every active change')
-    .option('--specs', 'Validate every spec')
-    .option('--archived', 'Validate archived changes, requiring every task to be complete')
-    .option('--type <type>', 'Disambiguate: change or spec')
-    .option('--strict', 'Treat warnings as failures')
-    .option('--json', 'Output as JSON')
+    .description('Valida uma change ou uma spec')
+    .option('--all', 'Valida todas as changes e specs')
+    .option('--changes', 'Valida todas as changes ativas')
+    .option('--specs', 'Valida todas as specs')
+    .option('--archived', 'Valida as changes arquivadas, exigindo toda tarefa concluída')
+    .option('--type <type>', 'Desambigua: change ou spec')
+    .option('--strict', 'Trata warnings como falhas')
+    .option('--json', 'Saída em JSON')
     .action(async (item: string | undefined, options: { all?: boolean; changes?: boolean; specs?: boolean; archived?: boolean; type?: string; strict?: boolean; json?: boolean }) => {
       try {
         const workspace = await requireWorkspace();

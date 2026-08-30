@@ -5,6 +5,17 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.2.0] - 2026-08-30
+
+### Funcionalidades
+
+- **feat(cli): traduz a ajuda do terminal para português**
+  - Descrição do programa, de cada comando e de cada opção
+  - Títulos de seção, `[opções]`, `[comando]` e o rótulo de valor padrão, que o commander
+    escreve em inglês sem oferecer ponto de extensão
+  - Os termos de comando são traduzidos onde são produzidos, para que a largura das
+    colunas seja medida sobre o texto já traduzido
+
 ## [0.1.3] - 2026-08-30
 
 ### Documentação

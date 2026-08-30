@@ -8,14 +8,14 @@ import { fail, printJson, printLines } from '../output.js';
 export function registerSetupCommands(program: Command): void {
   program
     .command('init [path]')
-    .description('Create a workspace and generate the harness commands')
+    .description('Cria o workspace e gera os comandos dos harnesses')
     .option(
       '--harnesses <list>',
-      `Harnesses to set up: "all" or a comma-separated list of ${harnessIds().join(', ')}`,
+      `Harnesses a configurar: "all" ou uma lista separada por vírgula de ${harnessIds().join(', ')}`,
       'all'
     )
-    .option('--schema <name>', 'Workflow schema for new changes')
-    .option('--json', 'Output as JSON')
+    .option('--schema <name>', 'Schema de workflow para novas changes')
+    .option('--json', 'Saída em JSON')
     .action(async (target: string | undefined, options: { harnesses?: string; schema?: string; json?: boolean }) => {
       try {
         const result = await initWorkspace(target ?? '.', {
@@ -62,9 +62,9 @@ export function registerSetupCommands(program: Command): void {
 
   program
     .command('update [path]')
-    .description('Regenerate the harness command files')
-    .option('--harnesses <list>', 'Harnesses to (re)generate; defaults to the configured ones')
-    .option('--json', 'Output as JSON')
+    .description('Regera os arquivos de comando dos harnesses')
+    .option('--harnesses <list>', 'Harnesses a (re)gerar; por padrão, os já configurados')
+    .option('--json', 'Saída em JSON')
     .action(async (target: string | undefined, options: { harnesses?: string; json?: boolean }) => {
       try {
         const workspace = await requireWorkspace(target ?? process.cwd());
@@ -91,8 +91,8 @@ export function registerSetupCommands(program: Command): void {
 
   program
     .command('harnesses')
-    .description('List the supported harnesses and the commands generated for them')
-    .option('--json', 'Output as JSON')
+    .description('Lista os harnesses suportados e os comandos gerados para eles')
+    .option('--json', 'Saída em JSON')
     .action((options: { json?: boolean }) => {
       const commands = workflowCommands();
 

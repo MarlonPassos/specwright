@@ -29,15 +29,15 @@ async function resolveChangeId(
 }
 
 export function registerWorkflowCommands(program: Command): void {
-  const newCommand = program.command('new').description('Create workspace items');
+  const newCommand = program.command('new').description('Cria itens do workspace');
 
   newCommand
     .command('change <name>')
-    .description('Create a change directory scaffolded for the workflow schema')
-    .option('--schema <name>', 'Workflow schema to use')
-    .option('--goal <text>', 'Goal recorded in the change metadata')
-    .option('--skip-specs', 'Declare that the change alters no observable behavior')
-    .option('--json', 'Output as JSON')
+    .description('Cria um diretório de change preparado para o schema do workflow')
+    .option('--schema <name>', 'Schema de workflow a usar')
+    .option('--goal <text>', 'Objetivo registrado nos metadados da change')
+    .option('--skip-specs', 'Declara que a change não altera nenhum comportamento observável')
+    .option('--json', 'Saída em JSON')
     .action(async (name: string, options: { schema?: string; goal?: string; skipSpecs?: boolean; json?: boolean }) => {
       try {
         const workspace = await requireWorkspace();
@@ -71,11 +71,11 @@ export function registerWorkflowCommands(program: Command): void {
 
   program
     .command('status')
-    .description('Show artifact completion for a change')
-    .option('--change <id>', 'Change to report on')
-    .option('--all', 'Report on every active change')
-    .option('--schema <name>', 'Schema override')
-    .option('--json', 'Output as JSON')
+    .description('Mostra a conclusão dos artefatos de uma change')
+    .option('--change <id>', 'Change a reportar')
+    .option('--all', 'Reporta todas as changes ativas')
+    .option('--schema <name>', 'Sobrescreve o schema')
+    .option('--json', 'Saída em JSON')
     .action(async (options: { change?: string; all?: boolean; schema?: string; json?: boolean }) => {
       try {
         const workspace = await requireWorkspace();
@@ -137,10 +137,10 @@ export function registerWorkflowCommands(program: Command): void {
 
   program
     .command('instructions [artifact]')
-    .description(`Print the instructions for an artifact, or for ${RESERVED_INSTRUCTION_IDS.join(' / ')}`)
-    .option('--change <id>', 'Change the instructions apply to')
-    .option('--schema <name>', 'Schema override')
-    .option('--json', 'Output as JSON')
+    .description(`Imprime as instruções de um artefato, ou de ${RESERVED_INSTRUCTION_IDS.join(' / ')}`)
+    .option('--change <id>', 'Change a que as instruções se aplicam')
+    .option('--schema <name>', 'Sobrescreve o schema')
+    .option('--json', 'Saída em JSON')
     .action(async (artifact: string | undefined, options: { change?: string; schema?: string; json?: boolean }) => {
       try {
         const workspace = await requireWorkspace();
@@ -198,11 +198,11 @@ export function registerWorkflowCommands(program: Command): void {
 
   program
     .command('archive [change]')
-    .description('Fold a change into the workspace specs and move it to the archive')
-    .option('--skip-specs', 'Do not merge spec deltas')
-    .option('--no-validate', 'Archive without validating first')
-    .option('--force', 'Archive even with unchecked tasks')
-    .option('--json', 'Output as JSON')
+    .description('Aplica uma change nas specs do workspace e a move para o arquivo')
+    .option('--skip-specs', 'Não aplica os deltas de spec')
+    .option('--no-validate', 'Arquiva sem validar antes')
+    .option('--force', 'Arquiva mesmo com tarefas não marcadas')
+    .option('--json', 'Saída em JSON')
     .action(async (change: string | undefined, options: { skipSpecs?: boolean; validate?: boolean; force?: boolean; json?: boolean }) => {
       try {
         const workspace = await requireWorkspace();
@@ -235,8 +235,8 @@ export function registerWorkflowCommands(program: Command): void {
 
   program
     .command('schemas')
-    .description('List the available workflow schemas')
-    .option('--json', 'Output as JSON')
+    .description('Lista os schemas de workflow disponíveis')
+    .option('--json', 'Saída em JSON')
     .action(async (options: { json?: boolean }) => {
       try {
         const workspace = await findWorkspace();
@@ -262,9 +262,9 @@ export function registerWorkflowCommands(program: Command): void {
 
   program
     .command('templates')
-    .description('Show the template each artifact of a schema is written from')
-    .option('--schema <name>', 'Schema to inspect; defaults to the workspace schema')
-    .option('--json', 'Output as JSON')
+    .description('Mostra o template a partir do qual cada artefato de um schema é escrito')
+    .option('--schema <name>', 'Schema a inspecionar; por padrão, o do workspace')
+    .option('--json', 'Saída em JSON')
     .action(async (options: { schema?: string; json?: boolean }) => {
       try {
         const workspace = await findWorkspace();
