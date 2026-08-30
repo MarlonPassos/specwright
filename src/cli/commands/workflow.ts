@@ -6,9 +6,12 @@ import { buildInstructions, RESERVED_INSTRUCTION_IDS } from '../../core/change/i
 import { archiveChange } from '../../core/archive/archive.js';
 import { listSchemas, loadSchema, templatePath } from '../../core/schema/loader.js';
 import { loadConfig } from '../../core/config.js';
-import { findWorkspace, listChanges, requireWorkspace } from '../../core/workspace.js';
+import { findWorkspace, listChanges, requireWorkspace, type Workspace } from '../../core/workspace.js';
 import { commandName } from '../../core/workflows/index.js';
 import { fail, printJson, printLines } from '../output.js';
+import { buildDashboard } from '../../core/dashboard.js';
+import { renderDashboard, type ViewOptions } from '../dashboard-view.js';
+import { watch } from '../watch.js';
 
 /** Resolves the change to act on: the explicit one, or the only active one. */
 async function resolveChangeId(
@@ -26,6 +29,56 @@ async function resolveChangeId(
     `Várias changes ativas: ${active.join(', ')}. Diga qual delas.`,
     { code: 'ambiguous_change' }
   );
+}
+
+interface StatusOptions {
+  change?: string;
+  all?: boolean;
+  schema?: string;
+  json?: boolean;
+  watch?: boolean;
+  interval?: string;
+  /** Commander sets this to false when --no-color is passed. */
+  color?: boolean;
+}
+
+/** The colour decision, in the order a terminal tool is expected to make it. */
+function viewOptions(options: StatusOptions): ViewOptions {
+  return {
+    color: options.color !== false && !process.env.NO_COLOR && Boolean(process.stdout.isTTY),
+    width: process.stdout.columns ?? 80,
+  };
+}
+
+function intervalMs(raw: string | undefined): number {
+  const seconds = Number(raw ?? '2');
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    throw new SpecError(`"${raw}" não é um intervalo válido. Use um número de segundos maior que zero.`, {
+      code: 'invalid_interval',
+    });
+  }
+  return Math.round(seconds * 1000);
+}
+
+async function runWatch(workspace: Workspace, options: StatusOptions): Promise<void> {
+  if (options.json) {
+    throw new SpecError('--watch não pode ser combinado com --json', {
+      code: 'invalid_option',
+      fix: 'specs status --json',
+    });
+  }
+  if (options.change || options.all) {
+    throw new SpecError('--watch redesenha o painel do projeto, então não aceita --change nem --all', {
+      code: 'invalid_option',
+      fix: 'specs status --watch',
+    });
+  }
+
+  const view = viewOptions(options);
+  await watch({
+    intervalMs: intervalMs(options.interval),
+    frame: async () => renderDashboard(await buildDashboard(workspace), { ...view, width: process.stdout.columns ?? view.width }),
+  });
 }
 
 export function registerWorkflowCommands(program: Command): void {
@@ -71,14 +124,27 @@ export function registerWorkflowCommands(program: Command): void {
 
   program
     .command('status')
-    .description('Mostra a conclusão dos artefatos de uma change')
+    .description('Mostra o painel do projeto, ou a conclusão dos artefatos de uma change')
     .option('--change <id>', 'Change a reportar')
     .option('--all', 'Reporta todas as changes ativas')
     .option('--schema <name>', 'Sobrescreve o schema')
+    .option('--watch', 'Redesenha o painel continuamente até Ctrl+C')
+    .option('--interval <segundos>', 'Intervalo do --watch em segundos', '2')
+    .option('--no-color', 'Desenha o painel sem cor nem glifos Unicode')
     .option('--json', 'Saída em JSON')
-    .action(async (options: { change?: string; all?: boolean; schema?: string; json?: boolean }) => {
+    .action(async (options: StatusOptions) => {
       try {
         const workspace = await requireWorkspace();
+
+        if (options.watch) {
+          await runWatch(workspace, options);
+          return;
+        }
+
+        if (!options.change && !options.all) {
+          process.stdout.write(renderDashboard(await buildDashboard(workspace), viewOptions(options)));
+          return;
+        }
 
         if (options.all) {
           const ids = await listChanges(workspace);

@@ -128,7 +128,7 @@ specs update [path]                  Regera os arquivos de comando do harness
 specs harnesses                      Lista os harnesses suportados e seus arquivos de comando
 
 specs new change <name>              Cria um diretório de change
-specs status [--change <id>|--all]   Conclusão dos artefatos de uma change
+specs status [--watch]              Painel do projeto, ou artefatos de uma change
 specs instructions [artifact]        Instruções de um artefato, ou de implement / archive
 specs archive [change]               Aplica os deltas nas specs e arquiva a change
 

@@ -5,6 +5,27 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.4.0] - 2026-08-30
+
+### Funcionalidades
+
+- **feat(cli): adiciona o painel do projeto ao `specs status`**
+  - Sem argumentos, `specs status` desenha o painel: wordmark, resumo com barra de
+    tarefas, changes agrupadas pela fase do workflow, capacidades e arquivo
+  - Cada change mostra o estado dos artefatos, o progresso do checklist, o que a bloqueia
+    e o comando que a move adiante
+  - Uma change que não pode ser lida vira uma linha em "com problema" em vez de derrubar
+    o painel inteiro
+  - `--no-color` troca cor e glifos Unicode por ASCII; sem terminal a cor já sai desligada
+
+- **feat(cli): adiciona `specs status --watch`**
+  - Redesenha o painel no intervalo de `--interval` segundos, padrão 2, até `Ctrl+C`
+  - Repinta por cima do quadro anterior num único write, sem limpar a tela antes, que é
+    o que evita a piscada
+  - Corta um quadro mais alto que a janela e diz quantas linhas ficaram de fora
+  - `Ctrl+C` encerra na hora, sem esperar o intervalo; sem terminal, cada quadro sai como
+    um snapshot separado
+
 ## [0.3.1] - 2026-08-30
 
 ### Correções

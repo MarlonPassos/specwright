@@ -56,13 +56,29 @@ Cria `spec/changes/<name>/` com os metadados dela. O nome precisa ser kebab-case
 
 ### `specs status`
 
-Conclusão dos artefatos de uma change.
+Sem argumentos, desenha o painel do projeto: resumo, changes agrupadas pela fase do
+workflow, capacidades e arquivo. Com `--change` ou `--all`, reporta a conclusão dos
+artefatos.
 
 | Opção | Significado |
 | --- | --- |
 | `--change <id>` | A change; padrão é a única ativa |
 | `--all` | Reporta sobre todas as changes ativas |
 | `--schema <name>` | Sobrescreve o schema |
+| `--watch` | Redesenha o painel continuamente até `Ctrl+C` |
+| `--interval <segundos>` | Intervalo do `--watch`; padrão `2` |
+| `--no-color` | Desenha sem cor nem glifos Unicode |
+
+O painel agrupa cada change pela fase em que ela está, derivada dos artefatos e do
+checklist: **em planejamento** enquanto `applyBlockedBy` não está vazio, **implementando**
+depois disso, e **pronta para arquivar** quando toda tarefa está marcada. Uma change que
+não pode ser lida aparece em **com problema**, com a mensagem — uma change quebrada não
+apaga o painel inteiro.
+
+O `--watch` é somente leitura. Ele redesenha por cima do quadro anterior, sem limpar a tela
+antes, então não pisca; um quadro mais alto que a janela é cortado com a contagem do que
+ficou de fora. `Ctrl+C` encerra na hora, sem esperar o intervalo. Sem terminal, cada quadro
+sai como um snapshot separado. Não combina com `--json`, `--change` nem `--all`.
 
 O JSON carrega `artifacts` (cada um com `state`, `generates`, `outputs`, `requires`,
 `missing`), `applyRequires`, `applyBlockedBy`, `next`, `tasks`, e os caminhos resolvidos
