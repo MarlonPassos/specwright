@@ -5,6 +5,21 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.1.1] - 2026-08-30
+
+### Manutenção
+
+- **build: adiciona instalação direta do repositório git**
+  - Script `prepare` compila o TypeScript durante a instalação, para que o `dist/` não
+    precise ser versionado
+  - Campos `repository`, `bugs`, `homepage` e `publishConfig` no manifesto do pacote
+
+### Documentação
+
+- **docs: documenta a instalação a partir do repositório**
+  - Seção com os comandos via SSH e HTTPS, e como fixar uma versão com `#<tag>`
+  - Seção de remoção da CLI instalada globalmente
+
 ## [0.1.0] - 2026-08-30
 
 ### Funcionalidades

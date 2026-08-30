@@ -1,6 +1,6 @@
 {
   "name": "specwright",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Spec-driven development workflow for AI coding harnesses",
   "keywords": [
     "spec-driven",
@@ -10,6 +10,17 @@
     "workflow"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/MarlonPassos/specwright.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MarlonPassos/specwright/issues"
+  },
+  "homepage": "https://github.com/MarlonPassos/specwright#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "engines": {
     "node": ">=20.19.0"
@@ -30,6 +41,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "prepare": "npm run build",
     "dev": "tsc -p tsconfig.json --watch",
     "test": "vitest run",
     "test:watch": "vitest",

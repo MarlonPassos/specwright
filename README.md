@@ -18,6 +18,36 @@ npm install --global specwright
 
 Requer Node.js 20.19 ou mais novo.
 
+### Direto do repositório
+
+Enquanto o pacote não está no npm, quem tem acesso ao repositório instala direto da branch
+principal:
+
+```bash
+npm install --global git+ssh://git@github.com/MarlonPassos/specwright.git#main
+# alternativa para ambientes sem chave SSH:
+npm install --global git+https://github.com/MarlonPassos/specwright.git#main
+```
+
+O npm clona o repositório, instala as dependências de desenvolvimento e roda o script
+`prepare`, que compila o TypeScript antes de publicar o binário — por isso o `dist/` não
+precisa estar versionado. Troque `#main` por `#<tag>` ou `#<commit>` para fixar uma versão.
+
+Confira a instalação com:
+
+```bash
+specs --version
+```
+
+### Remover
+
+```bash
+npm uninstall --global specwright
+```
+
+Isso remove o executável `specs` da máquina. Não remove nada que já tenha sido escrito nos
+projetos: o diretório `spec/` e os arquivos de comando dos harnesses continuam onde estão.
+
 ## Primeiros passos
 
 ```bash
