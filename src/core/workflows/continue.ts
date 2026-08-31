@@ -1,10 +1,10 @@
 import { commandRef, type WorkflowCommand } from './types.js';
 import { ARTIFACT_RULES, CLI_NOTE, PLANNING_BOUNDARY, RESOLVE_CHANGE } from './shared.js';
 
-export function planCommand(): WorkflowCommand {
+export function continueCommand(): WorkflowCommand {
   return {
-    id: 'plan',
-    name: 'Spec Plan',
+    id: 'continue',
+    name: 'Spec Continue',
     description: 'Completa os artefatos de planejamento de uma change até ela poder ser implementada',
     argumentHint: '[nome-da-change]',
     body: `Complete os artefatos de planejamento de uma change até a implementação poder começar.
@@ -48,6 +48,9 @@ ${ARTIFACT_RULES.split('\n').map((line) => (line ? `      ${line}` : '')).join('
    como done enquanto as dependências dele nunca foram escritas.
 
    Um artefato com \`skipped\` está satisfeito - a change abriu mão dele. Nunca o crie.
+
+   Um artefato com \`done\` também está satisfeito: este comando não o reescreve. Se ele
+   precisa mudar, isso é o \`${commandRef('revise')}\`.
 
    Pule um artefato apenas quando a \`instruction\` dele o marca como condicional (o documento
    de design é o caso usual). Diga qual você pulou e por quê. Um artefato condicional que você

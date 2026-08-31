@@ -5,6 +5,33 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.7.0] - 2026-08-31
+
+### Funcionalidades
+
+- **feat(harness): adiciona o comando `/spec-revise`**
+  - Sétimo comando de workflow, fora do ciclo: revisa os artefatos de planejamento que uma
+    change já tem e os mantém coerentes entre si
+  - Fecha o buraco entre o `/spec-continue`, que só escreve o que falta e nunca reabre um
+    artefato `done`, e o `/spec-implement`, que já é código
+  - Reconcilia nos dois sentidos: uma edição num artefato tardio pode exigir revisar um
+    anterior, e a ordem de construção é uma ordem de leitura, não uma restrição
+  - Edita apenas os arquivos que o `specs status` lista em `outputs` — já expandidos —
+    e nunca o padrão `generates`; ids e caminhos vêm do schema ativo, sem ramificar por
+    nome de artefato, então um schema customizado funciona sem mudança
+  - Não avança a fronteira de construção: artefato que falta é do `/spec-continue`, código é do
+    `/spec-implement`, e um pedido que muda a *intenção* da change vira outra change pelo
+    `/spec-propose`
+  - Toda edição é mostrada e confirmada antes de ser escrita; ao final roda
+    `specs validate <change> --strict`
+  - Gerado para Claude Code, Codex, OpenCode e Kiro, como os demais
+  - Adaptado do `update` do OpenSpec para o vocabulário deste projeto; o nome difere de
+    propósito, já que `specs update` na CLI é outra coisa: regerar arquivos de comando
+
+### Documentação
+
+- **docs: descreve o `/spec-revise` no README e no guia do workflow**
+
 ## [0.6.0] - 2026-08-31
 
 ### Correções
@@ -16,7 +43,7 @@ versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
   - Um corpo agora escreve um placeholder (`commandRef`) e o adaptador do harness o
     resolve na hora de gerar o arquivo; o adaptador passa a declarar como o usuário digita
     um comando (`invocation`)
-  - Vale para toda mensagem que cita um comando: próximo passo do `plan`, do `propose`,
+  - Vale para toda mensagem que cita um comando: próximo passo do `continue`, do `propose`,
     do `implement` e do `verify`, os guardrails que apontam para um comando irmão, os
     exemplos do `explore`, o `next` do painel, a linha de painel vazio e os próximos
     passos do `specs init`

@@ -25,7 +25,7 @@ export interface HarnessAdapter {
   format(command: WorkflowCommand): string;
 }
 
-/** The `/spec-plan` form, which every harness but Codex uses. */
+/** The `/spec-continue` form, which every harness but Codex uses. */
 export function slashInvocation(commandId: string): string {
   return `/${commandName(commandId)}`;
 }

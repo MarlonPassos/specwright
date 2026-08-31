@@ -20,7 +20,7 @@ ${RESOLVE_CHANGE}
    \`\`\`bash
    specs status --change "<change>" --json
    \`\`\`
-   Se \`applyBlockedBy\` não estiver vazio, pare e diga ao usuário para rodar \`${commandRef('plan')}\` antes.
+   Se \`applyBlockedBy\` não estiver vazio, pare e diga ao usuário para rodar \`${commandRef('continue')}\` antes.
 
 2. **Carregue as instruções da fase**
 

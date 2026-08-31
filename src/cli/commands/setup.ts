@@ -49,7 +49,7 @@ export function registerSetupCommands(program: Command): void {
             .filter((adapter) => result.harnesses.includes(adapter.id))
             .map(
               (adapter) =>
-                `  ${adapter.name.padEnd(12)} ${adapter.directory.padEnd(18)} ex.: ${adapter.invocation('plan')}`
+                `  ${adapter.name.padEnd(12)} ${adapter.directory.padEnd(18)} ex.: ${adapter.invocation('continue')}`
             ),
           '',
           // Named without a prefix: each harness types them the way the table above shows.
@@ -127,7 +127,7 @@ export function registerSetupCommands(program: Command): void {
         'Harnesses suportados:',
         ...allHarnesses().map(
           (adapter) =>
-            `  ${adapter.id.padEnd(10)} ${adapter.name.padEnd(14)} ${adapter.directory.padEnd(18)} ex.: ${adapter.invocation('plan')}`
+            `  ${adapter.id.padEnd(10)} ${adapter.name.padEnd(14)} ${adapter.directory.padEnd(18)} ex.: ${adapter.invocation('continue')}`
         ),
         '',
         'Comandos (os mesmos em todos os harnesses; a sintaxe de chamada varia, veja acima):',

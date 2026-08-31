@@ -3,12 +3,16 @@
 O ciclo de entrega tem cinco comandos, em ordem. Cada um tem um único trabalho e para
 quando esse trabalho termina, então uma revisão pode acontecer entre quaisquer duas etapas.
 O modo `/spec-explore` é opcional e pode ser usado antes de abrir uma change ou entre
-quaisquer etapas para investigar, comparar opções e esclarecer requisitos.
+quaisquer etapas para investigar, comparar opções e esclarecer requisitos. O
+`/spec-revise` também fica fora do ciclo: ele reabre os artefatos que uma change já tem
+quando uma decisão muda.
 
 ```
 /spec-explore (opcional, antes ou entre etapas)
 
-/spec-propose  ->  /spec-plan  ->  /spec-implement  ->  /spec-verify  ->  /spec-archive
+/spec-propose  ->  /spec-continue  ->  /spec-implement  ->  /spec-verify  ->  /spec-archive
+                          ^
+                    /spec-revise (opcional, sobre o que já foi escrito)
 ```
 
 ## /spec-explore
@@ -36,7 +40,7 @@ delta deve estar listado ali.
 
 O comando para depois da proposta. O planejamento continua no próximo.
 
-## /spec-plan
+## /spec-continue
 
 Escreve os artefatos de planejamento restantes até a implementação poder começar.
 
@@ -47,6 +51,24 @@ então roda `specs validate <change> --strict` e corrige o que voltar.
 O documento de design é condicional: as instruções dele mesmas dizem quando vale a pena
 escrevê-lo. Um artefato que o agente pula deliberadamente não bloqueia os artefatos que
 dependem dele.
+
+## /spec-revise
+
+Revisa os artefatos de planejamento que a change já tem, sem criar nenhum novo.
+
+O `/spec-continue` só escreve o que falta: um artefato `done` ele não reabre. Quando uma
+decisão muda no meio do planejamento — ou depois dele — é o `/spec-revise` que aplica a
+mudança e reconcilia o resto.
+
+O agente lê `specs status --change <id> --json`, edita apenas os arquivos listados em
+`outputs` (que já vêm com qualquer padrão expandido, nunca o padrão `generates`), e
+confronta os artefatos entre si **nos dois sentidos**: uma edição no design pode exigir
+revisar a proposta, não só o contrário. Cada revisão é mostrada e só é escrita depois que o
+usuário confirma; ao final ele roda `specs validate <change> --strict`.
+
+Ele não avança a fronteira de construção: artefato que ainda não existe é do `/spec-continue`,
+e código é do `/spec-implement`. Se o pedido muda a *intenção* da change em vez de refiná-la,
+o caminho é abrir outra change pelo `/spec-propose`.
 
 ## /spec-implement
 
@@ -93,7 +115,8 @@ O diretório da change então vai para `spec/changes/archive/<data>-<nome-da-cha
 | Etapa | Artefatos depois dela |
 | --- | --- |
 | propose | `.change.yaml`, `proposal.md` |
-| plan | `specs/**/spec.md`, `design.md` (quando se justifica), `tasks.md` |
+| continue | `specs/**/spec.md`, `design.md` (quando se justifica), `tasks.md` |
+| revise | os mesmos artefatos, revisados; nenhum arquivo novo |
 | implement | boxes marcados no `tasks.md`, e o código |
 | verify | um relatório; nenhum arquivo muda |
 | archive | `spec/specs/` atualizado, a change em `spec/changes/archive/` |

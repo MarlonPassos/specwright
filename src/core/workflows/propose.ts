@@ -66,10 +66,10 @@ ${ARTIFACT_RULES.split('\n').map((line) => (line ? `   ${line}` : '')).join('\n'
 - o nome da change e onde ela fica;
 - um resumo de duas linhas do problema e do escopo proposto;
 - as capacidades que a change vai adicionar ou modificar;
-- próximo passo: "Rode \`${commandRef('plan')}\` quando a proposta estiver boa."
+- próximo passo: "Rode \`${commandRef('continue')}\` quando a proposta estiver boa."
 
 **Guardrails**
-- Pare depois da proposta. Os artefatos restantes pertencem ao \`${commandRef('plan')}\`.
+- Pare depois da proposta. Os artefatos restantes pertencem ao \`${commandRef('continue')}\`.
 - Não edite o código do projeto.
 - Se já existir uma change com esse nome, pergunte se deve continuá-la ou escolher outro nome.`,
   };

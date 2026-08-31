@@ -22,7 +22,7 @@ describe('dashboard data', () => {
     expect(data.changes).toHaveLength(1);
     expect(data.changes[0].phase).toBe('planning');
     expect(data.changes[0].blockedBy).toContain('tasks');
-    expect(data.changes[0].next).toBe('/spec-plan');
+    expect(data.changes[0].next).toBe('/spec-continue');
   });
 
   it('places a planned change with open tasks in implementing', async () => {

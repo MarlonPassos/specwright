@@ -62,7 +62,7 @@ function phaseOf(
 function nextCommand(phase: ChangePhase, harness: HarnessAdapter): string {
   switch (phase) {
     case 'planning':
-      return harness.invocation('plan');
+      return harness.invocation('continue');
     case 'implementing':
       return harness.invocation('implement');
     case 'ready-to-archive':

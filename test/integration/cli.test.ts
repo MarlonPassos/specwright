@@ -31,7 +31,8 @@ describe('spec CLI', () => {
     expect(payload.commands.map((command: any) => command.name)).toEqual([
       'spec-explore',
       'spec-propose',
-      'spec-plan',
+      'spec-continue',
+      'spec-revise',
       'spec-implement',
       'spec-verify',
       'spec-archive',
@@ -40,10 +41,10 @@ describe('spec CLI', () => {
     const byId = Object.fromEntries(
       payload.harnesses.map((harness: any) => [harness.id, harness.invocations])
     );
-    expect(byId.claude.plan).toBe('/spec-plan');
-    expect(byId.opencode.plan).toBe('/spec-plan');
-    expect(byId.kiro.plan).toBe('/spec-plan');
-    expect(byId.codex.plan).toBe('$spec-plan');
+    expect(byId.claude.continue).toBe('/spec-continue');
+    expect(byId.opencode.continue).toBe('/spec-continue');
+    expect(byId.kiro.continue).toBe('/spec-continue');
+    expect(byId.codex.continue).toBe('$spec-continue');
   });
 
   it('suggests the next step in the syntax of the harness it is running under', async () => {
@@ -74,10 +75,10 @@ describe('spec CLI', () => {
   it('writes each harness its own command syntax', async () => {
     const dir = await initProject();
     const codex = await fs.readFile(
-      path.join(dir, '.agents', 'skills', 'spec-plan', 'SKILL.md'),
+      path.join(dir, '.agents', 'skills', 'spec-continue', 'SKILL.md'),
       'utf8'
     );
-    const claude = await fs.readFile(path.join(dir, '.claude', 'commands', 'spec-plan.md'), 'utf8');
+    const claude = await fs.readFile(path.join(dir, '.claude', 'commands', 'spec-continue.md'), 'utf8');
 
     expect(codex).toContain('$spec-implement');
     expect(codex).not.toContain('/spec-implement');
@@ -90,7 +91,7 @@ describe('spec CLI', () => {
     const listing = parseJson((await runCli(['init', '.', '--json'], dir)).stdout);
 
     expect(listing.created).toBe(false);
-    expect(listing.files).toHaveLength(24);
+    expect(listing.files).toHaveLength(28);
     for (const file of listing.files) {
       await expect(fs.stat(path.join(dir, file))).resolves.toBeTruthy();
     }
@@ -98,7 +99,7 @@ describe('spec CLI', () => {
 
   it('regenerates command files with update', async () => {
     const dir = await initProject();
-    const target = path.join(dir, '.claude', 'commands', 'spec-plan.md');
+    const target = path.join(dir, '.claude', 'commands', 'spec-continue.md');
     await fs.writeFile(target, 'stale', 'utf8');
 
     const result = await runCli(['update', '--json'], dir);

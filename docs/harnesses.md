@@ -1,7 +1,7 @@
 # Harnesses
 
 Quatro harnesses são suportados. Todos recebem os mesmos comandos, gerados a partir
-dos mesmos corpos de instrução, então `spec-plan` significa a mesma coisa em qualquer um
+dos mesmos corpos de instrução, então `spec-continue` significa a mesma coisa em qualquer um
 deles.
 
 | Harness | Arquivos de comando | Invocado como |
@@ -11,7 +11,8 @@ deles.
 | OpenCode | `.opencode/commands/spec-<id>.md` | `/spec-<id>` |
 | Kiro | `.kiro/prompts/spec-<id>.prompt.md` | `/spec-<id>` |
 
-Os seis ids são `explore`, `propose`, `plan`, `implement`, `verify` e `archive`.
+Os sete ids são `explore`, `propose`, `continue`, `revise`, `implement`, `verify` e
+`archive`.
 
 ## O que difere entre eles
 

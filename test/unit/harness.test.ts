@@ -12,7 +12,7 @@ import { renderHarness, renderHarnesses } from '../../src/core/harness/writer.js
 import { commandName, commandRef, workflowCommand, workflowCommands } from '../../src/core/workflows/index.js';
 
 const EXPECTED_HARNESSES = ['claude', 'codex', 'opencode', 'kiro'];
-const EXPECTED_COMMANDS = ['explore', 'propose', 'plan', 'implement', 'verify', 'archive'];
+const EXPECTED_COMMANDS = ['explore', 'propose', 'continue', 'revise', 'implement', 'verify', 'archive'];
 
 /** How each harness spells a command, and therefore what its files may contain. */
 const EXPECTED_INVOCATION: Record<string, (id: string) => string> = {
@@ -42,7 +42,7 @@ describe('harness registry', () => {
 });
 
 describe('generated commands', () => {
-  it('exposes the six workflow commands', () => {
+  it('exposes the seven workflow commands', () => {
     expect(workflowCommands().map((command) => command.id)).toEqual(EXPECTED_COMMANDS);
   });
 
@@ -61,6 +61,33 @@ describe('generated commands', () => {
     expect(explore?.body).toContain(commandRef('propose'));
     // The body never hard-codes one harness's syntax; it only carries placeholders.
     expect(explore?.body).not.toMatch(ANY_INVOCATION);
+  });
+
+  it('defines revise as a planning-only rework of artifacts that already exist', () => {
+    const revise = workflowCommand('revise');
+
+    expect(revise).toMatchObject({
+      id: 'revise',
+      name: 'Spec Revise',
+      argumentHint: '[nome-da-change] [o que mudou]',
+    });
+    // It reworks what exists and never advances the build frontier.
+    expect(revise?.body).toContain('só revisa o que já existe');
+    expect(revise?.body).toContain('nunca cria um artefato que falta');
+    expect(revise?.body).toContain(commandRef('continue'));
+    // It edits the concrete files status reports, never the declared pattern.
+    expect(revise?.body).toContain('São esses os arquivos que você pode editar');
+    expect(revise?.body).toContain('Nunca escreva nesse caminho');
+    expect(revise?.body).toContain('não ramifique');
+    // Planning only: code changes belong to implement.
+    expect(revise?.body).toContain('Nunca edite o código do projeto');
+    expect(revise?.body).toContain(commandRef('implement'));
+    // Every edit is confirmed first, and an intent change opens a new change.
+    expect(revise?.body).toContain('Escreva só depois que o usuário confirmar');
+    expect(revise?.body).toContain(commandRef('propose'));
+    expect(revise?.body).toContain('specs status --change "<change>" --json');
+    expect(revise?.body).toContain('specs validate "<change>" --strict --json');
+    expect(revise?.body).not.toMatch(ANY_INVOCATION);
   });
 
   it('names every command with the spec- prefix in every harness', () => {
@@ -91,7 +118,7 @@ describe('generated commands', () => {
 
   it('keeps the instruction body identical across harnesses once invocations are normalised', () => {
     const bodies = allHarnesses().map((adapter) => {
-      const file = renderHarness(adapter).find((entry) => entry.command === 'plan')!;
+      const file = renderHarness(adapter).find((entry) => entry.command === 'continue')!;
       // Only the command syntax may differ, so folding it back to a single token
       // must leave the same text in every harness.
       return file.content.split('\n---\n')[1].trim().replace(ANY_INVOCATION, '<cmd>');
@@ -181,14 +208,14 @@ describe('command invocations', () => {
       {
         id: 'demo',
         name: 'Demo',
-        description: `depois de ${commandRef('plan')}`,
+        description: `depois de ${commandRef('continue')}`,
         argumentHint: `saída de ${commandRef('propose')}`,
         body: `rode ${commandRef('verify')}`,
       },
       codex
     );
 
-    expect(resolved.description).toBe('depois de $spec-plan');
+    expect(resolved.description).toBe('depois de $spec-continue');
     expect(resolved.argumentHint).toBe('saída de $spec-propose');
     expect(resolved.body).toBe('rode $spec-verify');
   });
@@ -200,9 +227,9 @@ describe('command invocations', () => {
   });
 
   it('falls back to the default harness when the id is unknown', () => {
-    expect(invocationFor('codex', 'plan')).toBe('$spec-plan');
-    expect(invocationFor('ghost', 'plan')).toBe('/spec-plan');
-    expect(invocationFor(undefined, 'plan')).toBe('/spec-plan');
+    expect(invocationFor('codex', 'continue')).toBe('$spec-continue');
+    expect(invocationFor('ghost', 'continue')).toBe('/spec-continue');
+    expect(invocationFor(undefined, 'continue')).toBe('/spec-continue');
   });
 });
 

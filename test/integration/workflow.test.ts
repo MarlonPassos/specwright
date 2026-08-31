@@ -20,7 +20,7 @@ describe('init', () => {
 
     expect(result.created).toBe(true);
     expect(result.harnesses).toEqual(['claude', 'codex', 'opencode', 'kiro']);
-    expect(result.files).toHaveLength(24);
+    expect(result.files).toHaveLength(28);
 
     for (const file of result.files) {
       await expect(fs.stat(path.join(dir, file.path))).resolves.toBeTruthy();

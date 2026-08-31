@@ -18,8 +18,8 @@ export function commandName(id: string): string {
 /**
  * Placeholder for a sibling command inside a workflow body.
  *
- * How a command is typed differs per harness - `/spec-plan` in Claude Code,
- * `$spec-plan` in Codex - so a body never spells an invocation out. It writes
+ * How a command is typed differs per harness - `/spec-continue` in Claude Code,
+ * `$spec-continue` in Codex - so a body never spells an invocation out. It writes
  * this marker and the harness layer swaps in the syntax of the harness the file
  * is being generated for. See `renderCommandRefs`.
  */
