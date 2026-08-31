@@ -220,7 +220,7 @@ export function registerWorkflowCommands(program: Command): void {
           const next = status.next[0];
           if (!next) {
             throw new SpecError(
-              `Every artifact of "${changeId}" is written. Ask for "implement" or "archive" instructions.`,
+              `Todo artefato de "${changeId}" já foi escrito. Peça as instruções de "implement" ou "archive".`,
               { code: 'no_ready_artifact', fix: `specs instructions implement --change ${changeId}` }
             );
           }

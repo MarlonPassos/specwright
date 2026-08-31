@@ -63,7 +63,7 @@ specs init
 
 O `init` cria o workspace e escreve os arquivos de comando para cada harness suportado:
 
-```
+```text
 spec/
   config.yaml            schema do workflow, contexto do projeto, regras de artefato
   project.md             a descrição do projeto, legível por humanos
@@ -124,13 +124,13 @@ declara `skip_specs: true` no seu `.change.yaml` em vez de inventar um requisito
 
 ## CLI
 
-```
+```text
 specs init [path]                    Cria um workspace e gera os comandos do harness
 specs update [path]                  Regera os arquivos de comando do harness
 specs harnesses                      Lista os harnesses suportados e seus arquivos de comando
 
 specs new change <name>              Cria um diretório de change
-specs status [--watch]              Painel do projeto, ou artefatos de uma change
+specs status [--watch]               Painel do projeto, ou artefatos de uma change
 specs instructions [artifact]        Instruções de um artefato, ou de implement / archive
 specs archive [change]               Aplica os deltas nas specs e arquiva a change
 
@@ -178,10 +178,19 @@ aponte o `config.yaml` para ele. Veja [docs/schemas.md](docs/schemas.md).
 
 ## Créditos
 
-O Specwright é construído sobre o [OpenSpec](https://github.com/Fission-AI/OpenSpec) — o modelo de
-specs, changes e deltas vem de lá. Este projeto parte dessa base e a leva adiante: workflow
-declarado por schema, validação em três níveis, saída JSON em todo comando e suporte aos
-quatro harnesses.
+O Specwright é construído sobre o [OpenSpec](https://github.com/Fission-AI/OpenSpec) — o
+modelo de specs, changes e deltas vem de lá. Este projeto parte dessa base e a leva
+adiante: workflow declarado por schema, validação em três níveis, saída JSON em todo
+comando e suporte aos quatro harnesses.
+
+## O nome
+
+**Specwright** combina *spec*, abreviação de *specification*, com *wright*, uma pessoa que
+constrói ou cria algo. O nome sugere mais do que escrever especificações: significa
+elaborá-las como base para construir e evoluir software.
+
+Nesse sentido, Specwright pode ser entendido como **“construtor de especificações”**,
+ideia alinhada ao desenvolvimento de software orientado por especificações.
 
 ## Licença
 

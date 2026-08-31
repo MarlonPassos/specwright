@@ -5,14 +5,35 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
-## [0.4.0] - 2026-08-30
+## [0.5.0] - 2026-08-31
 
 ### Funcionalidades
 
 - **feat(harness): adiciona o modo `/spec-explore`**
-  - Gera o comando para Claude Code, Codex, OpenCode e Kiro
-  - Permite investigar ideias, problemas e changes sem implementar código
-  - Mantém a escrita de artefatos condicionada a um escopo confirmado explicitamente
+  - Sexto comando de workflow, fora do ciclo: pode rodar antes ou durante qualquer etapa
+  - Gerado para Claude Code, Codex, OpenCode e Kiro, como os demais
+  - Postura de investigação, não workflow: sem passos fixos e sem artefato obrigatório
+  - Somente leitura por padrão; escrever um artefato exige escopo nomeado e confirmação
+    explícita do usuário numa mensagem separada
+  - Adaptado do `explore` do OpenSpec para o vocabulário deste projeto: deltas de spec,
+    capacidades e os comandos da CLI `specs`
+
+### Correções
+
+- **fix(cli): traduz a mensagem de `specs instructions` sem artefato**
+  - Numa change com todos os artefatos escritos, o comando respondia em inglês; a
+    mensagem estava no CLI, longe das outras que já tinham sido traduzidas
+
+### Documentação
+
+- **docs: corrige a formatação do README**
+  - Alinha a coluna de descrição da linha do `specs status` no bloco da CLI
+  - Reflui os dois parágrafos que passavam da largura das demais linhas do corpo
+  - Marca como `text` as duas cercas de código que estavam sem linguagem
+
+## [0.4.0] - 2026-08-30
+
+### Funcionalidades
 
 - **feat(cli): adiciona o painel do projeto ao `specs status`**
   - Sem argumentos, `specs status` desenha o painel: wordmark, resumo com barra de
