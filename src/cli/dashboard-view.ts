@@ -8,15 +8,18 @@ export interface ViewOptions {
 }
 
 /**
- * The wordmark, drawn with half blocks so six pixel rows fit in three text rows.
- * Only the coloured mode uses it; it needs 49 columns and Unicode.
+ * The wordmark. Each letter is a 3x6 pixel glyph, with half blocks folding the six
+ * pixel rows into three terminal rows; W takes five columns because at three it
+ * reads as a U. Six pixel rows is what buys the clean strokes: at four, letters
+ * like S and R have to fold two strokes into one cell and blur.
+ * Only the coloured mode uses it; it needs 41 columns and Unicode.
  */
 const LOGO = [
-  '█▀▀▀ █▀▀▄ █▀▀▀ ▄▀▀▀ █  █ █▀▀▄ ▀█▀ ▄▀▀▀ █  █ ▀▀█▀▀',
-  '▀▀▀▄ █▀▀  █▀▀  █    █▄▄█ █▀█   █  █ ▄▄ █▀▀█   █',
-  '▄▄▄▀ █    █▄▄▄ ▀▄▄▄ ▀██▀ █  █ ▄█▄ ▀▄▄█ █  █   █',
+  '█▀▀ █▀█ █▀▀ █▀▀ █   █ █▀█ ▀█▀ █▀▀ █ █ ▀█▀',
+  '▀▀█ █▀▀ █▀▀ █   █ ▄ █ █▀▄  █  █ ▄ █▀█  █',
+  '▄▄█ █   █▄▄ █▄▄ ▀▄▀▄▀ █ ▀ ▄█▄ █▄█ █ █  █',
 ];
-const LOGO_WIDTH = 49;
+const LOGO_WIDTH = 41;
 
 interface Theme {
   off: string;
@@ -171,7 +174,7 @@ export function renderDashboard(data: DashboardData, options: ViewOptions): stri
   if (broken.length > 0) kv(theme.mark.broken, theme.red, 'Changes com problema', String(broken.length));
   lines.push(
     ' ' + theme.cyan + theme.mark.task + theme.off + ' ' + pad('Tarefas', LABEL_WIDTH) +
-      progress(data.totals.tasks, theme, theme.cyan)
+    progress(data.totals.tasks, theme, theme.cyan)
   );
   kv(
     theme.mark.spec,
@@ -196,7 +199,7 @@ export function renderDashboard(data: DashboardData, options: ViewOptions): stri
     for (const change of members) {
       lines.push(
         ' ' + accent + section.mark(theme) + theme.off + ' ' + pad(clip(change.id, nameWidth), nameWidth) + '  ' +
-          artifactDots(change, theme) + '  ' + progress(change.tasks, theme, accent)
+        artifactDots(change, theme) + '  ' + progress(change.tasks, theme, accent)
       );
       if (change.error) {
         lines.push('   ' + theme.red + theme.arrow + theme.off + ' ' + change.error);
@@ -212,7 +215,7 @@ export function renderDashboard(data: DashboardData, options: ViewOptions): stri
     for (const spec of data.specs) {
       lines.push(
         ' ' + theme.magenta + theme.mark.spec + theme.off + ' ' + pad(clip(spec.capability, nameWidth), nameWidth) +
-          '  ' + String(spec.requirements).padStart(3) + ' requisito(s)'
+        '  ' + String(spec.requirements).padStart(3) + ' requisito(s)'
       );
     }
   }

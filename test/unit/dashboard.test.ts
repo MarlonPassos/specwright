@@ -55,6 +55,18 @@ describe('dashboard data', () => {
     expect(data.changes.find((change) => change.id === 'good')!.phase).toBe('implementing');
   });
 
+  it('serves the dashboard payload as JSON, not the drawing', async () => {
+    const workspace = await makeWorkspace();
+    await seedChange(workspace, 'c');
+
+    const data = await buildDashboard(workspace);
+    // The shape `specs status --json` publishes when no change is named.
+    expect(Object.keys(data).sort()).toEqual(
+      ['archive', 'changes', 'projectName', 'schema', 'specs', 'totals', 'workspace'].sort()
+    );
+    expect(() => JSON.parse(JSON.stringify(data))).not.toThrow();
+  });
+
   it('totals tasks across every change', async () => {
     const workspace = await makeWorkspace();
     await seedChange(workspace, 'a', { tasks: '## 1. G\n\n- [x] 1.1 uma\n- [ ] 1.2 outra\n' });

@@ -69,6 +69,13 @@ artefatos.
 | `--interval <segundos>` | Intervalo do `--watch`; padrão `2` |
 | `--no-color` | Desenha sem cor nem glifos Unicode |
 
+Com `--json`, o comando serve o que ele mostra: sem `--change` nem `--all`, o documento é
+o do painel (`projectName`, `schema`, `changes`, `specs`, `archive`, `totals`); com
+`--change`, é o status da change; com `--all`, a lista de status.
+
+O wordmark do cabeçalho é desenhado com meio-blocos, que qualquer terminal com Unicode
+renderiza igual. Sem cor, sem terminal ou em janela estreita, o cabeçalho vira uma linha só.
+
 O painel agrupa cada change pela fase em que ela está, derivada dos artefatos e do
 checklist: **em planejamento** enquanto `applyBlockedBy` não está vazio, **implementando**
 depois disso, e **pronta para arquivar** quando toda tarefa está marcada. Uma change que

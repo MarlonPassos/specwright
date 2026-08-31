@@ -77,7 +77,11 @@ async function runWatch(workspace: Workspace, options: StatusOptions): Promise<v
   const view = viewOptions(options);
   await watch({
     intervalMs: intervalMs(options.interval),
-    frame: async () => renderDashboard(await buildDashboard(workspace), { ...view, width: process.stdout.columns ?? view.width }),
+    frame: async () =>
+      renderDashboard(await buildDashboard(workspace), {
+        ...view,
+        width: process.stdout.columns ?? view.width,
+      }),
   });
 }
 
@@ -142,7 +146,12 @@ export function registerWorkflowCommands(program: Command): void {
         }
 
         if (!options.change && !options.all) {
-          process.stdout.write(renderDashboard(await buildDashboard(workspace), viewOptions(options)));
+          const dashboard = await buildDashboard(workspace);
+          if (options.json) {
+            printJson(dashboard);
+            return;
+          }
+          process.stdout.write(renderDashboard(dashboard, viewOptions(options)));
           return;
         }
 

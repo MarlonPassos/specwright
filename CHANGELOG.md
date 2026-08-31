@@ -5,6 +5,27 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.5.1] - 2026-08-31
+
+### Correções
+
+- **fix(cli): `specs status --json` servia o painel desenhado em vez de JSON**
+  - O desvio para o painel testava só `--change` e `--all`, então sem argumento o
+    comando imprimia o desenho mesmo com `--json`
+  - Sem `--change` nem `--all`, o documento agora é o do painel (`projectName`,
+    `schema`, `changes`, `specs`, `archive`, `totals`); com `--change` e com `--all`
+    o formato segue o de antes
+
+### Melhorias
+
+- **style(cli): redesenha o wordmark do painel**
+  - De 49 para 41 colunas, com cada traço ocupando uma célula inteira
+  - O `W` passa a ter cinco colunas: com três ele saía idêntico ao `H`
+
+### Documentação
+
+- **docs(cli): descreve o que `specs status --json` serve em cada forma**
+
 ## [0.5.0] - 2026-08-31
 
 ### Funcionalidades
