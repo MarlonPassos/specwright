@@ -1,4 +1,4 @@
-import type { WorkflowCommand } from './types.js';
+import { commandRef, type WorkflowCommand } from './types.js';
 import { CLI_NOTE } from './shared.js';
 
 export function exploreCommand(): WorkflowCommand {
@@ -25,7 +25,7 @@ saída obrigatória. Você é um parceiro de pensamento.
 
 ${CLI_NOTE}
 
-**Entrada**: o que vier depois de \`/spec-explore\` é o que o usuário quer pensar. Pode ser:
+**Entrada**: o que vier depois de \`${commandRef('explore')}\` é o que o usuário quer pensar. Pode ser:
 - uma ideia vaga: "colaboração em tempo real"
 - um problema concreto: "a autenticação virou um nó"
 - o nome de uma change: "add-dark-mode" (para pensar no contexto dela)
@@ -128,7 +128,7 @@ Pense livremente. Quando as ideias assentarem, você pode oferecer:
 - ou continue explorando - não há pressa para formalizar.
 
 Se o usuário pedir para registrar a exploração como uma change nova, a rota normal é o
-\`/spec-propose\`, que faz exatamente isso. Só faça você mesmo se ele pedir para não trocar de
+\`${commandRef('propose')}\`, que faz exatamente isso. Só faça você mesmo se ele pedir para não trocar de
 comando; nesse caso:
 
 1. Rode \`specs new change "<nome>"\` antes de criar qualquer artefato. Nunca crie o diretório
@@ -260,7 +260,7 @@ Você: [lê o código]
 
 **Travado no meio da implementação:**
 \`\`\`
-Usuário: /spec-explore add-user-auth
+Usuário: ${commandRef('explore')} add-user-auth
          o OAuth é mais complicado do que parecia
 
 Você: [lê os artefatos da change]
@@ -327,7 +327,7 @@ Quando as coisas assentarem, você pode resumir:
 **Em aberto**: [se sobrou algo]
 
 **Próximo passo** (se estiver pronto):
-- abrir uma change com /spec-propose
+- abrir uma change com ${commandRef('propose')}
 - ou continuar explorando: é só continuar falando
 \`\`\`
 

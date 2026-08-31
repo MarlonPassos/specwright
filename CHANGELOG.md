@@ -5,6 +5,33 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.6.0] - 2026-08-31
+
+### Correções
+
+- **fix(harness): as dicas citavam comandos de outro harness**
+  - Os corpos de instrução escreviam `/spec-<id>` à mão, então o arquivo gerado para o
+    Codex — onde os comandos são skills chamadas com `$` — mandava o usuário rodar uma
+    barra que aquele harness não aceita
+  - Um corpo agora escreve um placeholder (`commandRef`) e o adaptador do harness o
+    resolve na hora de gerar o arquivo; o adaptador passa a declarar como o usuário digita
+    um comando (`invocation`)
+  - Vale para toda mensagem que cita um comando: próximo passo do `plan`, do `propose`,
+    do `implement` e do `verify`, os guardrails que apontam para um comando irmão, os
+    exemplos do `explore`, o `next` do painel, a linha de painel vazio e os próximos
+    passos do `specs init`
+  - Uma referência a um comando que não existe passa a falhar na geração, em vez de
+    entregar o placeholder cru dentro do arquivo
+
+### Melhorias
+
+- **feat(cli): a CLI detecta o harness em que está rodando**
+  - As dicas que ela imprime saem na sintaxe desse harness
+  - Ordem: `SPECS_HARNESS`, as variáveis que o próprio harness define, os harnesses do
+    `spec/config.yaml`, e por fim o primeiro suportado
+  - `specs status --json` ganha o campo `harness`; `specs harnesses --json` ganha um mapa
+    `invocations` por harness, e `commands[].invocation` vira `commands[].name`
+
 ## [0.5.1] - 2026-08-31
 
 ### Correções

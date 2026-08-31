@@ -7,6 +7,9 @@ import { fitFrame } from '../../src/cli/watch.js';
 import { makeWorkspace, seedChange, writeFile } from '../helpers/workspace.js';
 
 const PLAIN = { color: false, width: 100 };
+/** No harness markers, so the dashboard falls back to the default harness. */
+const CLAUDE_ENV = { env: {} };
+const CODEX_ENV = { env: { SPECS_HARNESS: 'codex' } };
 const ESC = String.fromCharCode(27);
 
 describe('dashboard data', () => {
@@ -15,7 +18,7 @@ describe('dashboard data', () => {
     const dir = await seedChange(workspace, 'c');
     await fs.rm(path.join(dir, 'tasks.md'));
 
-    const data = await buildDashboard(workspace);
+    const data = await buildDashboard(workspace, CLAUDE_ENV);
     expect(data.changes).toHaveLength(1);
     expect(data.changes[0].phase).toBe('planning');
     expect(data.changes[0].blockedBy).toContain('tasks');
@@ -26,7 +29,7 @@ describe('dashboard data', () => {
     const workspace = await makeWorkspace();
     await seedChange(workspace, 'c');
 
-    const data = await buildDashboard(workspace);
+    const data = await buildDashboard(workspace, CLAUDE_ENV);
     expect(data.changes[0].phase).toBe('implementing');
     expect(data.changes[0].tasks).toEqual({ total: 1, completed: 0 });
     expect(data.changes[0].next).toBe('/spec-implement');
@@ -38,7 +41,7 @@ describe('dashboard data', () => {
       tasks: '## 1. Export\n\n- [x] 1.1 Escrever o writer e confirmar o teste\n',
     });
 
-    const data = await buildDashboard(workspace);
+    const data = await buildDashboard(workspace, CLAUDE_ENV);
     expect(data.changes[0].phase).toBe('ready-to-archive');
     expect(data.changes[0].next).toBe('/spec-archive');
   });
@@ -48,7 +51,7 @@ describe('dashboard data', () => {
     await seedChange(workspace, 'good');
     await writeFile(path.join(workspace.changesPath, 'bad', '.change.yaml'), 'schema: ghost\n');
 
-    const data = await buildDashboard(workspace);
+    const data = await buildDashboard(workspace, CLAUDE_ENV);
     const bad = data.changes.find((change) => change.id === 'bad')!;
     expect(bad.phase).toBe('broken');
     expect(bad.error).toMatch(/ghost/);
@@ -59,10 +62,10 @@ describe('dashboard data', () => {
     const workspace = await makeWorkspace();
     await seedChange(workspace, 'c');
 
-    const data = await buildDashboard(workspace);
+    const data = await buildDashboard(workspace, CLAUDE_ENV);
     // The shape `specs status --json` publishes when no change is named.
     expect(Object.keys(data).sort()).toEqual(
-      ['archive', 'changes', 'projectName', 'schema', 'specs', 'totals', 'workspace'].sort()
+      ['archive', 'changes', 'harness', 'projectName', 'schema', 'specs', 'totals', 'workspace'].sort()
     );
     expect(() => JSON.parse(JSON.stringify(data))).not.toThrow();
   });
@@ -72,7 +75,7 @@ describe('dashboard data', () => {
     await seedChange(workspace, 'a', { tasks: '## 1. G\n\n- [x] 1.1 uma\n- [ ] 1.2 outra\n' });
     await seedChange(workspace, 'b', { tasks: '## 1. G\n\n- [x] 1.1 uma\n' });
 
-    const data = await buildDashboard(workspace);
+    const data = await buildDashboard(workspace, CLAUDE_ENV);
     expect(data.totals.tasks).toEqual({ total: 3, completed: 2 });
   });
 });
@@ -85,7 +88,7 @@ describe('dashboard view', () => {
       tasks: '## 1. Export\n\n- [x] 1.1 Escrever o writer e confirmar o teste\n',
     });
 
-    const output = renderDashboard(await buildDashboard(workspace), PLAIN);
+    const output = renderDashboard(await buildDashboard(workspace, CLAUDE_ENV), PLAIN);
     expect(output).toContain('RESUMO');
     expect(output).toContain('IMPLEMENTANDO');
     expect(output).toContain('PRONTAS PARA ARQUIVAR');
@@ -97,7 +100,7 @@ describe('dashboard view', () => {
     const workspace = await makeWorkspace();
     await seedChange(workspace, 'c');
 
-    const output = renderDashboard(await buildDashboard(workspace), PLAIN);
+    const output = renderDashboard(await buildDashboard(workspace, CLAUDE_ENV), PLAIN);
     expect(output.includes(ESC)).toBe(false);
   });
 
@@ -105,14 +108,32 @@ describe('dashboard view', () => {
     const workspace = await makeWorkspace();
     await seedChange(workspace, 'c');
 
-    for (const line of renderDashboard(await buildDashboard(workspace), PLAIN).split('\n')) {
+    for (const line of renderDashboard(await buildDashboard(workspace, CLAUDE_ENV), PLAIN).split('\n')) {
       expect(line).toBe(line.replace(/\s+$/, ''));
     }
   });
 
   it('points at /spec-propose when there is nothing to show', async () => {
     const workspace = await makeWorkspace();
-    expect(renderDashboard(await buildDashboard(workspace), PLAIN)).toContain('/spec-propose');
+    expect(renderDashboard(await buildDashboard(workspace, CLAUDE_ENV), PLAIN)).toContain('/spec-propose');
+  });
+
+  it('spells the next command the way the running harness accepts it', async () => {
+    const workspace = await makeWorkspace();
+    await seedChange(workspace, 'c');
+
+    const data = await buildDashboard(workspace, CODEX_ENV);
+    expect(data.harness).toBe('codex');
+    expect(data.changes[0].next).toBe('$spec-implement');
+    expect(data.changes[0].next).not.toContain('/spec-');
+  });
+
+  it('spells the idle hint for the running harness too', async () => {
+    const workspace = await makeWorkspace();
+    const output = renderDashboard(await buildDashboard(workspace, CODEX_ENV), PLAIN);
+
+    expect(output).toContain('$spec-propose');
+    expect(output).not.toContain('/spec-propose');
   });
 });
 

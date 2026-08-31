@@ -1,10 +1,29 @@
 import { describe, expect, it } from 'vitest';
-import { allHarnesses, getHarness, harnessIds, resolveHarnesses } from '../../src/core/harness/registry.js';
+import {
+  allHarnesses,
+  getHarness,
+  harnessIds,
+  invocationFor,
+  resolveHarnesses,
+} from '../../src/core/harness/registry.js';
+import { detectHarness } from '../../src/core/harness/current.js';
+import { renderCommandRefs, resolveCommand } from '../../src/core/harness/invocation.js';
 import { renderHarness, renderHarnesses } from '../../src/core/harness/writer.js';
-import { commandName, invocation, workflowCommand, workflowCommands } from '../../src/core/workflows/index.js';
+import { commandName, commandRef, workflowCommand, workflowCommands } from '../../src/core/workflows/index.js';
 
 const EXPECTED_HARNESSES = ['claude', 'codex', 'opencode', 'kiro'];
 const EXPECTED_COMMANDS = ['explore', 'propose', 'plan', 'implement', 'verify', 'archive'];
+
+/** How each harness spells a command, and therefore what its files may contain. */
+const EXPECTED_INVOCATION: Record<string, (id: string) => string> = {
+  claude: (id) => `/spec-${id}`,
+  opencode: (id) => `/spec-${id}`,
+  kiro: (id) => `/spec-${id}`,
+  codex: (id) => `$spec-${id}`,
+};
+
+/** Every command reference a generated file could carry, in any harness. */
+const ANY_INVOCATION = /[/$]spec-[a-z]+/g;
 
 describe('harness registry', () => {
   it('supports exactly the four target harnesses', () => {
@@ -39,7 +58,9 @@ describe('generated commands', () => {
     expect(explore?.body).toContain('não para implementar');
     expect(explore?.body).toContain('Antes da primeira ação que escreve');
     expect(explore?.body).toContain('specs list --json');
-    expect(explore?.body).toContain('/spec-propose');
+    expect(explore?.body).toContain(commandRef('propose'));
+    // The body never hard-codes one harness's syntax; it only carries placeholders.
+    expect(explore?.body).not.toMatch(ANY_INVOCATION);
   });
 
   it('names every command with the spec- prefix in every harness', () => {
@@ -48,7 +69,6 @@ describe('generated commands', () => {
         expect(adapter.filePath(command.id)).toContain(`spec-${command.id}`);
       }
     }
-    expect(invocation('propose')).toBe('/spec-propose');
     expect(commandName('archive')).toBe('spec-archive');
   });
 
@@ -69,10 +89,12 @@ describe('generated commands', () => {
     }
   });
 
-  it('keeps the instruction body identical across harnesses', () => {
+  it('keeps the instruction body identical across harnesses once invocations are normalised', () => {
     const bodies = allHarnesses().map((adapter) => {
       const file = renderHarness(adapter).find((entry) => entry.command === 'plan')!;
-      return file.content.split('\n---\n')[1].trim();
+      // Only the command syntax may differ, so folding it back to a single token
+      // must leave the same text in every harness.
+      return file.content.split('\n---\n')[1].trim().replace(ANY_INVOCATION, '<cmd>');
     });
     const reference = bodies[0];
     for (const body of bodies) {
@@ -97,7 +119,7 @@ describe('generated commands', () => {
     for (const file of files) {
       expect(file.content).toContain('Modo exploração é para pensar, não para implementar.');
       expect(file.content).toContain('Antes da primeira ação que escreve');
-      expect(file.content).toContain('/spec-explore');
+      expect(file.content).toContain(EXPECTED_INVOCATION[file.harness]('explore'));
     }
   });
 
@@ -116,10 +138,108 @@ describe('generated commands', () => {
 
   it('cross-references sibling commands by the name every harness registers', () => {
     for (const file of renderHarnesses(allHarnesses())) {
-      const references = file.content.match(/\/spec-[a-z]+/g) ?? [];
+      const references = file.content.match(ANY_INVOCATION) ?? [];
       for (const reference of references) {
-        expect(EXPECTED_COMMANDS.map((id) => `/spec-${id}`)).toContain(reference);
+        expect(EXPECTED_COMMANDS.map(EXPECTED_INVOCATION[file.harness])).toContain(reference);
       }
     }
+  });
+
+  it('leaves no unresolved command placeholder in a generated file', () => {
+    for (const file of renderHarnesses(allHarnesses())) {
+      expect(file.content).not.toContain('{{spec-command:');
+    }
+  });
+});
+
+describe('command invocations', () => {
+  it('spells commands the way each harness accepts them', () => {
+    for (const adapter of allHarnesses()) {
+      for (const id of EXPECTED_COMMANDS) {
+        expect(adapter.invocation(id)).toBe(EXPECTED_INVOCATION[adapter.id](id));
+      }
+    }
+  });
+
+  it('renders a body with only the running harness\'s syntax', () => {
+    for (const adapter of allHarnesses()) {
+      const text = renderCommandRefs(`Rode ${commandRef('implement')} depois.`, adapter);
+
+      expect(text).toBe(`Rode ${EXPECTED_INVOCATION[adapter.id]('implement')} depois.`);
+      for (const other of allHarnesses()) {
+        if (other.id === adapter.id) continue;
+        const foreign = EXPECTED_INVOCATION[other.id]('implement');
+        if (foreign === EXPECTED_INVOCATION[adapter.id]('implement')) continue;
+        expect(text).not.toContain(foreign);
+      }
+    }
+  });
+
+  it('resolves the description and the argument hint too, not just the body', () => {
+    const codex = getHarness('codex')!;
+    const resolved = resolveCommand(
+      {
+        id: 'demo',
+        name: 'Demo',
+        description: `depois de ${commandRef('plan')}`,
+        argumentHint: `saída de ${commandRef('propose')}`,
+        body: `rode ${commandRef('verify')}`,
+      },
+      codex
+    );
+
+    expect(resolved.description).toBe('depois de $spec-plan');
+    expect(resolved.argumentHint).toBe('saída de $spec-propose');
+    expect(resolved.body).toBe('rode $spec-verify');
+  });
+
+  it('rejects a reference to a command that does not exist', () => {
+    expect(() => renderCommandRefs('{{spec-command:ghost}}', getHarness('claude')!)).toThrow(
+      /Referência a um comando inexistente: ghost/
+    );
+  });
+
+  it('falls back to the default harness when the id is unknown', () => {
+    expect(invocationFor('codex', 'plan')).toBe('$spec-plan');
+    expect(invocationFor('ghost', 'plan')).toBe('/spec-plan');
+    expect(invocationFor(undefined, 'plan')).toBe('/spec-plan');
+  });
+});
+
+describe('detecting the running harness', () => {
+  it('honours an explicit SPECS_HARNESS over everything else', () => {
+    const adapter = detectHarness({
+      env: { SPECS_HARNESS: 'codex', CLAUDECODE: '1' },
+      configured: ['claude'],
+    });
+    expect(adapter.id).toBe('codex');
+  });
+
+  it('rejects an unknown SPECS_HARNESS instead of guessing', () => {
+    expect(() => detectHarness({ env: { SPECS_HARNESS: 'ghost' } })).toThrow(
+      /não é um harness suportado/
+    );
+  });
+
+  it('reads the environment the harness itself sets', () => {
+    expect(detectHarness({ env: { CLAUDECODE: '1' } }).id).toBe('claude');
+    expect(detectHarness({ env: { CODEX_SANDBOX: 'seatbelt' } }).id).toBe('codex');
+    expect(detectHarness({ env: { OPENCODE: '1' } }).id).toBe('opencode');
+    expect(detectHarness({ env: { KIRO_IDE: '1' } }).id).toBe('kiro');
+  });
+
+  it('prefers a configured harness when several environments look active', () => {
+    const env = { CLAUDECODE: '1', CODEX_HOME: '/home/u/.codex' };
+    expect(detectHarness({ env, configured: ['codex'] }).id).toBe('codex');
+    expect(detectHarness({ env, configured: ['claude', 'codex'] }).id).toBe('claude');
+  });
+
+  it('falls back to the configuration, then to the first supported harness', () => {
+    expect(detectHarness({ env: {}, configured: ['kiro'] }).id).toBe('kiro');
+    expect(detectHarness({ env: {} }).id).toBe('claude');
+  });
+
+  it('ignores an empty marker, which is how a shell exports an unset variable', () => {
+    expect(detectHarness({ env: { CODEX_HOME: '' }, configured: ['kiro'] }).id).toBe('kiro');
   });
 });

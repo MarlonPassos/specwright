@@ -1,4 +1,4 @@
-import type { WorkflowCommand } from './types.js';
+import { commandRef, type WorkflowCommand } from './types.js';
 import { CLI_NOTE, RESOLVE_CHANGE } from './shared.js';
 
 export function archiveCommand(): WorkflowCommand {
@@ -25,7 +25,7 @@ ${RESOLVE_CHANGE}
    valer, pare e diga o que está pendente. Tarefas não marcadas significam que o trabalho não
    acabou - não arquive por cima delas.
 
-   Se a change ainda não foi verificada, rode \`/spec-verify\` antes.
+   Se a change ainda não foi verificada, rode \`${commandRef('verify')}\` antes.
 
 2. **Leia o que o arquivamento vai mudar**
 

@@ -20,6 +20,20 @@ export function getHarness(id: string): HarnessAdapter | undefined {
   return ADAPTERS.find((adapter) => adapter.id === id);
 }
 
+/** Stands in wherever a harness could not be identified. */
+export function defaultHarness(): HarnessAdapter {
+  return ADAPTERS[0];
+}
+
+/**
+ * How a given harness types a command. The one place that falls back when the
+ * harness is unknown, so no caller grows its own conditional for that case.
+ */
+export function invocationFor(harnessId: string | undefined, commandId: string): string {
+  const adapter = harnessId ? getHarness(harnessId) : undefined;
+  return (adapter ?? defaultHarness()).invocation(commandId);
+}
+
 /**
  * Turns a `--harnesses` value into adapters. Accepts `all`, or a
  * comma-separated list of ids. Unknown ids fail loudly: silently skipping one

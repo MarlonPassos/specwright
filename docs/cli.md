@@ -16,6 +16,11 @@ tenha o comando dado certo ou não; uma falha adiciona um objeto `error`:
 Códigos de saída: `0` em sucesso, `1` em falha. O `specs validate` sai com `1` quando o
 relatório não está válido, o que sob `--strict` inclui warnings.
 
+Quando um comando sugere um próximo passo, ele escreve o comando na sintaxe do harness em
+que está rodando — `/spec-implement` no Claude Code, `$spec-implement` no Codex. A CLI
+detecta o harness pelo ambiente; `SPECS_HARNESS=<id>` força um. Veja
+[harnesses.md](harnesses.md).
+
 ## Setup
 
 ### `specs init [path]`
@@ -39,8 +44,9 @@ Regera os arquivos de comando dos harnesses que o workspace declara. Passe
 
 ### `specs harnesses`
 
-Lista os harnesses suportados, onde cada um escreve seus arquivos de comando, e os
-comandos gerados para todos eles.
+Lista os harnesses suportados, onde cada um escreve seus arquivos de comando, como cada um
+digita um comando, e os comandos gerados para todos eles. Com `--json`, cada harness
+carrega um mapa `invocations` do id do comando para a forma que ele aceita.
 
 ## Changes
 
@@ -70,8 +76,9 @@ artefatos.
 | `--no-color` | Desenha sem cor nem glifos Unicode |
 
 Com `--json`, o comando serve o que ele mostra: sem `--change` nem `--all`, o documento é
-o do painel (`projectName`, `schema`, `changes`, `specs`, `archive`, `totals`); com
-`--change`, é o status da change; com `--all`, a lista de status.
+o do painel (`projectName`, `schema`, `harness`, `changes`, `specs`, `archive`, `totals`);
+com `--change`, é o status da change; com `--all`, a lista de status. O campo `harness` diz
+para qual harness o `next` de cada change foi escrito.
 
 O wordmark do cabeçalho é desenhado com meio-blocos, que qualquer terminal com Unicode
 renderiza igual. Sem cor, sem terminal ou em janela estreita, o cabeçalho vira uma linha só.

@@ -1,5 +1,7 @@
 import path from 'node:path';
-import { loadConfig } from './config.js';
+import { loadConfig, type WorkspaceConfig } from './config.js';
+import { detectHarness } from './harness/current.js';
+import type { HarnessAdapter } from './harness/types.js';
 import { listSpecEntries } from './list.js';
 import { computeStatus, resolveChangeContext, type ArtifactState } from './change/status.js';
 import { listArchivedChanges, listChanges, type Workspace } from './workspace.js';
@@ -28,6 +30,8 @@ export interface DashboardData {
   projectName: string;
   workspace: string;
   schema: string;
+  /** The harness the commands in this dashboard are spelled for. */
+  harness: string;
   changes: DashboardChange[];
   specs: { capability: string; requirements: number }[];
   archive: { count: number; last?: string };
@@ -51,20 +55,28 @@ function phaseOf(
   return 'implementing';
 }
 
-function nextCommand(phase: ChangePhase): string {
+/**
+ * The command that moves a change forward, typed the way the running harness
+ * accepts it - never a slash command in a harness that has no slash commands.
+ */
+function nextCommand(phase: ChangePhase, harness: HarnessAdapter): string {
   switch (phase) {
     case 'planning':
-      return '/spec-plan';
+      return harness.invocation('plan');
     case 'implementing':
-      return '/spec-implement';
+      return harness.invocation('implement');
     case 'ready-to-archive':
-      return '/spec-archive';
+      return harness.invocation('archive');
     default:
       return 'specs validate';
   }
 }
 
-async function readChange(workspace: Workspace, id: string): Promise<DashboardChange> {
+async function readChange(
+  workspace: Workspace,
+  id: string,
+  harness: HarnessAdapter
+): Promise<DashboardChange> {
   try {
     const context = await resolveChangeContext(workspace, id);
     const status = await computeStatus(context);
@@ -76,7 +88,7 @@ async function readChange(workspace: Workspace, id: string): Promise<DashboardCh
       artifacts: status.artifacts.map((artifact) => ({ id: artifact.id, state: artifact.state })),
       blockedBy: status.applyBlockedBy,
       ...(status.tasks ? { tasks: status.tasks } : {}),
-      next: nextCommand(phase),
+      next: nextCommand(phase, harness),
     };
   } catch (error) {
     // One unreadable change must not blank the whole dashboard, which in watch
@@ -86,18 +98,27 @@ async function readChange(workspace: Workspace, id: string): Promise<DashboardCh
       phase: 'broken',
       artifacts: [],
       blockedBy: [],
-      next: nextCommand('broken'),
+      next: nextCommand('broken', harness),
       error: error instanceof Error ? error.message : String(error),
     };
   }
 }
 
+export interface DashboardOptions {
+  /** Where the running harness is read from. Defaults to `process.env`. */
+  env?: NodeJS.ProcessEnv;
+}
+
 /** Everything the dashboard renders, gathered in one pass over the workspace. */
-export async function buildDashboard(workspace: Workspace): Promise<DashboardData> {
-  const config = await loadConfig(workspace).catch(() => ({ schema: 'spec-driven' }));
+export async function buildDashboard(
+  workspace: Workspace,
+  options: DashboardOptions = {}
+): Promise<DashboardData> {
+  const config = await loadConfig(workspace).catch(() => ({ schema: 'spec-driven' }) as WorkspaceConfig);
+  const harness = detectHarness({ ...(options.env ? { env: options.env } : {}), configured: config.harnesses });
   const ids = await listChanges(workspace);
   const changes: DashboardChange[] = [];
-  for (const id of ids) changes.push(await readChange(workspace, id));
+  for (const id of ids) changes.push(await readChange(workspace, id, harness));
 
   const specs = (await listSpecEntries(workspace).catch(() => [])).map((entry) => ({
     capability: entry.capability,
@@ -119,6 +140,7 @@ export async function buildDashboard(workspace: Workspace): Promise<DashboardDat
     projectName: path.basename(workspace.projectRoot),
     workspace: workspace.root,
     schema: config.schema ?? 'spec-driven',
+    harness: harness.id,
     changes,
     specs,
     archive: { count: archived.length, ...(dates.length > 0 ? { last: dates[dates.length - 1] } : {}) },

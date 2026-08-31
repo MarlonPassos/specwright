@@ -1,4 +1,4 @@
-import type { WorkflowCommand } from './types.js';
+import { commandRef, type WorkflowCommand } from './types.js';
 import { CLI_NOTE, RESOLVE_CHANGE } from './shared.js';
 
 export function verifyCommand(): WorkflowCommand {
@@ -56,12 +56,12 @@ Um relatório curto:
 - por capacidade: requisitos verificados, e como;
 - cenários não verificados e desvios, cada um com o que resolveria;
 - um veredito: pronta para arquivar, ou a lista do que corrigir antes;
-- próximo passo quando estiver pronta: "Rode \`/spec-archive\` para aplicar as specs e encerrar a change."
+- próximo passo quando estiver pronta: "Rode \`${commandRef('archive')}\` para aplicar as specs e encerrar a change."
 
 **Guardrails**
 - Reporte o que encontrar. Não corrija código em silêncio enquanto verifica - diga o que está
   errado e deixe o usuário decidir, a menos que ele tenha pedido para corrigir no caminho.
 - Nunca afrouxe um requisito para a checagem passar.
-- Não arquive daqui; isso é o \`/spec-archive\`.`,
+- Não arquive daqui; isso é o \`${commandRef('archive')}\`.`,
   };
 }

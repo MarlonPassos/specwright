@@ -1,3 +1,4 @@
+import { invocationFor } from '../core/harness/registry.js';
 import type { ChangePhase, DashboardChange, DashboardData } from '../core/dashboard.js';
 import type { ArtifactState } from '../core/change/status.js';
 
@@ -185,7 +186,8 @@ export function renderDashboard(data: DashboardData, options: ViewOptions): stri
 
   if (data.changes.length === 0) {
     lines.push('');
-    lines.push(' Nenhuma change ativa  ·  ' + theme.cyan + '/spec-propose' + theme.off + ' abre a próxima.');
+    const propose = invocationFor(data.harness, 'propose');
+    lines.push(' Nenhuma change ativa  ·  ' + theme.cyan + propose + theme.off + ' abre a próxima.');
   }
 
   for (const section of SECTIONS) {

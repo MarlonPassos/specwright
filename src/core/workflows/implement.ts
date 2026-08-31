@@ -1,4 +1,4 @@
-import type { WorkflowCommand } from './types.js';
+import { commandRef, type WorkflowCommand } from './types.js';
 import { CLI_NOTE, RESOLVE_CHANGE } from './shared.js';
 
 export function implementCommand(): WorkflowCommand {
@@ -20,7 +20,7 @@ ${RESOLVE_CHANGE}
    \`\`\`bash
    specs status --change "<change>" --json
    \`\`\`
-   Se \`applyBlockedBy\` não estiver vazio, pare e diga ao usuário para rodar \`/spec-plan\` antes.
+   Se \`applyBlockedBy\` não estiver vazio, pare e diga ao usuário para rodar \`${commandRef('plan')}\` antes.
 
 2. **Carregue as instruções da fase**
 
@@ -62,12 +62,12 @@ ${RESOLVE_CHANGE}
 - tarefas concluídas nesta sessão, e o que resta;
 - desvios do plano, com o motivo;
 - qualquer coisa que apareceu e pertence a uma change separada;
-- próximo passo: "Rode \`/spec-verify\` para conferir a change contra as specs dela."
+- próximo passo: "Rode \`${commandRef('verify')}\` para conferir a change contra as specs dela."
 
 **Guardrails**
 - Construa o que as specs descrevem. Se a realidade contradiz uma spec, pare e atualize a spec
   junto com o usuário, em vez de construir algo que as specs não descrevem.
 - Se uma tarefa se mostrar errada, corrija o checklist como parte do trabalho e diga isso.
-- Nunca arquive daqui; isso é o \`/spec-archive\`.`,
+- Nunca arquive daqui; isso é o \`${commandRef('archive')}\`.`,
   };
 }

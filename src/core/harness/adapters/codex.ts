@@ -12,9 +12,15 @@ export const codexAdapter: HarnessAdapter = {
   id: 'codex',
   name: 'Codex',
   directory: path.join('.agents', 'skills'),
+  envMarkers: ['CODEX_SANDBOX', 'CODEX_SANDBOX_NETWORK_DISABLED', 'CODEX_HOME'],
 
   filePath(commandId) {
     return path.join('.agents', 'skills', commandName(commandId), 'SKILL.md');
+  },
+
+  /** A skill is invoked with `$`, not with the slash every other harness uses. */
+  invocation(commandId) {
+    return `$${commandName(commandId)}`;
   },
 
   format(command) {

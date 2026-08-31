@@ -83,6 +83,11 @@ Depois, no seu harness:
 | `/spec-verify` | Confere a implementação contra as specs e o checklist |
 | `/spec-archive` | Aplica os deltas da change nas specs e arquiva a change |
 
+A tabela usa a barra do Claude Code, do OpenCode e do Kiro. No Codex os mesmos comandos
+são skills e se digitam com `$` — `$spec-propose`. Cada harness recebe arquivos de comando
+que já citam os irmãos na sintaxe dele, e a CLI faz o mesmo nas dicas que imprime; veja
+[docs/harnesses.md](docs/harnesses.md).
+
 ## O modelo
 
 **Uma capacidade** é uma unidade de comportamento com uma spec em

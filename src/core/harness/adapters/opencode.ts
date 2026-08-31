@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { commandName } from '../../workflows/types.js';
-import { yamlScalar, type HarnessAdapter } from '../types.js';
+import { slashInvocation, yamlScalar, type HarnessAdapter } from '../types.js';
 
 const ARGUMENT_PLACEHOLDER = /\$ARGUMENTS\b/;
 
@@ -20,10 +20,13 @@ export const opencodeAdapter: HarnessAdapter = {
   id: 'opencode',
   name: 'OpenCode',
   directory: path.join('.opencode', 'commands'),
+  envMarkers: ['OPENCODE', 'OPENCODE_BIN_PATH'],
 
   filePath(commandId) {
     return path.join('.opencode', 'commands', `${commandName(commandId)}.md`);
   },
+
+  invocation: slashInvocation,
 
   format(command) {
     return `---

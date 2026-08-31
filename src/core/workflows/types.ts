@@ -15,7 +15,17 @@ export function commandName(id: string): string {
   return `spec-${id}`;
 }
 
-/** How a user invokes the command. */
-export function invocation(id: string): string {
-  return `/${commandName(id)}`;
+/**
+ * Placeholder for a sibling command inside a workflow body.
+ *
+ * How a command is typed differs per harness - `/spec-plan` in Claude Code,
+ * `$spec-plan` in Codex - so a body never spells an invocation out. It writes
+ * this marker and the harness layer swaps in the syntax of the harness the file
+ * is being generated for. See `renderCommandRefs`.
+ */
+export function commandRef(id: string): string {
+  return `{{spec-command:${id}}}`;
 }
+
+/** Matches what `commandRef` writes, capturing the command id. */
+export const COMMAND_REF_PATTERN = /\{\{spec-command:([a-z][a-z0-9-]*)\}\}/g;

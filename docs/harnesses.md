@@ -7,7 +7,7 @@ deles.
 | Harness | Arquivos de comando | Invocado como |
 | --- | --- | --- |
 | Claude Code | `.claude/commands/spec-<id>.md` | `/spec-<id>` |
-| Codex | `.agents/skills/spec-<id>/SKILL.md` | skill `spec-<id>` |
+| Codex | `.agents/skills/spec-<id>/SKILL.md` | `$spec-<id>` |
 | OpenCode | `.opencode/commands/spec-<id>.md` | `/spec-<id>` |
 | Kiro | `.kiro/prompts/spec-<id>.prompt.md` | `/spec-<id>` |
 
@@ -28,8 +28,32 @@ Só o envelope do arquivo:
 - Arquivos do **OpenCode** carregam `description`, e o corpo termina com um placeholder
   `$ARGUMENTS` explícito — o OpenCode passa o texto do usuário só por um.
 
-O corpo da instrução é, fora isso, idêntico byte a byte nos quatro, e um teste garante
-isso.
+Fora o envelope, a única diferença no corpo é a sintaxe com que ele cita os comandos
+irmãos, e um teste garante que nada mais varia.
+
+## Como um comando é citado
+
+Um corpo de instrução nunca escreve uma invocação à mão. Ele escreve um placeholder, e o
+adaptador troca pela sintaxe do harness para o qual o arquivo está sendo gerado — a
+mesma resolução vale para as mensagens de próximo passo que a CLI imprime. Assim nenhuma
+dica sugere um comando de outro harness: o arquivo do Codex diz `$spec-implement`, o do
+Claude Code diz `/spec-implement`.
+
+A CLI descobre sob qual harness está rodando, nesta ordem:
+
+1. a variável `SPECS_HARNESS`, quando definida (`claude`, `codex`, `opencode`, `kiro`);
+2. as variáveis que o próprio harness define no processo (`CLAUDECODE`, `CODEX_SANDBOX`,
+   `OPENCODE`, `KIRO_IDE`, entre outras);
+3. os harnesses configurados no `spec/config.yaml`;
+4. o primeiro harness suportado.
+
+Um id desconhecido em `SPECS_HARNESS` é rejeitado com a lista dos suportados. Use a
+variável quando a detecção não tiver como acertar — um harness sem marcador próprio, ou
+um terminal aberto por fora dele:
+
+```bash
+SPECS_HARNESS=codex specs status
+```
 
 ## Selecionando harnesses
 
@@ -50,6 +74,7 @@ atualizar a CLI para que as instruções em disco batam com a CLI que vai execut
 
 ## Adicionando um harness
 
-Um adaptador de harness declara o id dele, o nome de exibição, onde os arquivos vão e como
-formatar um. Adicionar um significa adicionar um adaptador e registrá-lo — os corpos dos
-comandos, a CLI e o workflow ficam intocados.
+Um adaptador de harness declara o id dele, o nome de exibição, onde os arquivos vão, como
+o usuário digita um comando (`invocation`), as variáveis de ambiente que denunciam que ele
+está rodando (`envMarkers`) e como formatar um arquivo. Adicionar um significa adicionar um
+adaptador e registrá-lo — os corpos dos comandos, a CLI e o workflow ficam intocados.

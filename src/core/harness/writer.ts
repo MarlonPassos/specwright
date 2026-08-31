@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { writeFileEnsured } from '../../util/fs.js';
 import { workflowCommands } from '../workflows/index.js';
+import { resolveCommand } from './invocation.js';
 import type { HarnessAdapter } from './types.js';
 
 export interface GeneratedFile {
@@ -17,7 +18,7 @@ export function renderHarness(adapter: HarnessAdapter): GeneratedFile[] {
     harness: adapter.id,
     command: command.id,
     path: adapter.filePath(command.id),
-    content: adapter.format(command),
+    content: adapter.format(resolveCommand(command, adapter)),
   }));
 }
 

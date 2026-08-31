@@ -1,4 +1,4 @@
-import type { WorkflowCommand } from './types.js';
+import { commandRef, type WorkflowCommand } from './types.js';
 import { ARTIFACT_RULES, CLI_NOTE, PLANNING_BOUNDARY, RESOLVE_CHANGE } from './shared.js';
 
 export function planCommand(): WorkflowCommand {
@@ -67,7 +67,7 @@ ${ARTIFACT_RULES.split('\n').map((line) => (line ? `      ${line}` : '')).join('
 - artefatos escritos, uma linha cada, mais qualquer artefato condicional que você pulou e por quê;
 - as capacidades que os deltas adicionam ou modificam;
 - resultado da validação;
-- próximo passo: "Rode \`/spec-implement\` quando estiver pronto para construir."
+- próximo passo: "Rode \`${commandRef('implement')}\` quando estiver pronto para construir."
 
 **Guardrails**
 - Apenas planejamento. Não edite o código do projeto e não comece a implementar.

@@ -28,14 +28,61 @@ describe('spec CLI', () => {
       'opencode',
       'kiro',
     ]);
-    expect(payload.commands.map((command: any) => command.invocation)).toEqual([
-      '/spec-explore',
-      '/spec-propose',
-      '/spec-plan',
-      '/spec-implement',
-      '/spec-verify',
-      '/spec-archive',
+    expect(payload.commands.map((command: any) => command.name)).toEqual([
+      'spec-explore',
+      'spec-propose',
+      'spec-plan',
+      'spec-implement',
+      'spec-verify',
+      'spec-archive',
     ]);
+
+    const byId = Object.fromEntries(
+      payload.harnesses.map((harness: any) => [harness.id, harness.invocations])
+    );
+    expect(byId.claude.plan).toBe('/spec-plan');
+    expect(byId.opencode.plan).toBe('/spec-plan');
+    expect(byId.kiro.plan).toBe('/spec-plan');
+    expect(byId.codex.plan).toBe('$spec-plan');
+  });
+
+  it('suggests the next step in the syntax of the harness it is running under', async () => {
+    const dir = await makeTempDir();
+
+    const codex = await runCli(['init', '.'], dir, { env: { SPECS_HARNESS: 'codex' } });
+    expect(codex.stdout).toContain('Próximo passo');
+    expect(codex.stdout).toContain('$spec-propose');
+    expect(codex.stdout).not.toContain('/spec-propose');
+
+    const claude = await runCli(['init', '.'], dir, { env: { SPECS_HARNESS: 'claude' } });
+    expect(claude.stdout).toContain('/spec-propose');
+    expect(claude.stdout).not.toContain('$spec-propose');
+  });
+
+  it('spells the status hints for the harness it is running under', async () => {
+    const dir = await initProject();
+
+    const payload = parseJson(
+      (await runCli(['status', '--json'], dir, { env: { SPECS_HARNESS: 'codex' } })).stdout
+    );
+    expect(payload.harness).toBe('codex');
+
+    const plain = await runCli(['status'], dir, { env: { SPECS_HARNESS: 'codex' } });
+    expect(plain.stdout).not.toContain('/spec-');
+  });
+
+  it('writes each harness its own command syntax', async () => {
+    const dir = await initProject();
+    const codex = await fs.readFile(
+      path.join(dir, '.agents', 'skills', 'spec-plan', 'SKILL.md'),
+      'utf8'
+    );
+    const claude = await fs.readFile(path.join(dir, '.claude', 'commands', 'spec-plan.md'), 'utf8');
+
+    expect(codex).toContain('$spec-implement');
+    expect(codex).not.toContain('/spec-implement');
+    expect(claude).toContain('/spec-implement');
+    expect(claude).not.toContain('$spec-implement');
   });
 
   it('initialises a workspace and writes the harness files', async () => {

@@ -35,9 +35,16 @@ export interface CliResult {
 }
 
 /** Runs the built CLI in `cwd`. Requires `npm run build` (the pretest step). */
-export async function runCli(args: string[], cwd: string): Promise<CliResult> {
+export async function runCli(
+  args: string[],
+  cwd: string,
+  options: { env?: Record<string, string> } = {}
+): Promise<CliResult> {
+  // The harness the CLI thinks it is running under decides how it spells the
+  // commands it suggests, so a test that checks one pins it here.
+  const env = { ...process.env, ...options.env };
   try {
-    const { stdout, stderr } = await execFileAsync(process.execPath, [cliEntry, ...args], { cwd });
+    const { stdout, stderr } = await execFileAsync(process.execPath, [cliEntry, ...args], { cwd, env });
     return { stdout, stderr, code: 0 };
   } catch (error) {
     const failure = error as { stdout?: string; stderr?: string; code?: number };
