@@ -5,6 +5,19 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.7.1] - 2026-09-01
+
+### Documentação
+
+- **docs(schema): traduz os exemplos de instruction para português**
+  - Exemplo de delta em `schemas/spec-driven/schema.yaml` (artefato `specs`) e o trecho
+    espelhado no README estavam em inglês, e é esse texto que o agente imita ao gerar
+    `spec.md` - por isso a saída real saía em inglês mesmo com o resto do prompt em PT
+  - Traduzida a prosa do exemplo (nome do requisito, texto normativo, nome do cenário,
+    condições WHEN/THEN) e os grupos do exemplo de `tasks.md` (`Setup`/`Export`)
+  - Mantidos intactos os termos que o parser reconhece literalmente: os headers
+    estruturais, `SHALL`/`MUST` e os marcadores `WHEN`/`THEN`
+
 ## [0.7.0] - 2026-08-31
 
 ### Funcionalidades

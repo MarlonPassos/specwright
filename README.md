@@ -113,12 +113,12 @@ o que a change faz com a capacidade:
 ```markdown
 ## ADDED Requirements
 
-### Requirement: Self-service export
-The system SHALL let a signed-in user export their own data as a CSV file.
+### Requirement: Exportação self-service
+O sistema SHALL permitir que um usuário autenticado exporte seus próprios dados como um arquivo CSV.
 
-#### Scenario: Export succeeds
-- **WHEN** a signed-in user requests an export
-- **THEN** the system returns a CSV file with that user's data
+#### Scenario: Exportação bem-sucedida
+- **WHEN** um usuário autenticado solicita uma exportação
+- **THEN** o sistema retorna um arquivo CSV com os dados desse usuário
 ```
 
 `## MODIFIED Requirements` carrega o texto de substituição completo, `## REMOVED Requirements`
