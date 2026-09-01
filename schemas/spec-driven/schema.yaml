@@ -101,16 +101,16 @@ artifacts:
 
       ## ADDED Requirements
 
-      ### Requirement: Data export
-      The system SHALL let a signed-in user export their data as CSV.
+      ### Requirement: Exportação de dados
+      O sistema SHALL permitir que um usuário autenticado exporte seus dados como CSV.
 
-      #### Scenario: Export succeeds
-      - **WHEN** the user requests an export
-      - **THEN** the system returns a CSV file containing their data
+      #### Scenario: Exportação bem-sucedida
+      - **WHEN** o usuário solicita uma exportação
+      - **THEN** o sistema retorna um arquivo CSV contendo os dados dele
 
       ## REMOVED Requirements
 
-      ### Requirement: Legacy export
+      ### Requirement: Exportação legada
       **Reason**: Substituído pelo export CSV acima
       **Migration**: Chame o endpoint de export v2 no lugar
       ```
@@ -171,12 +171,12 @@ artifacts:
 
       Exemplo:
       ```
-      ## 1. Setup
+      ## 1. Configuração
 
       - [ ] 1.1 Criar o esqueleto do módulo e confirmar que os arquivos esperados existem
       - [ ] 1.2 Adicionar a dependência e confirmar que a instalação funciona
 
-      ## 2. Export
+      ## 2. Exportação
 
       - [ ] 2.1 Implementar o escritor de CSV e confirmar que os testes unitários passam
       - [ ] 2.2 Ligar o endpoint de export e confirmar que o teste de integração passa
