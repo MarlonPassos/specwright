@@ -71,7 +71,7 @@ artifacts:
       Regras de formato:
       - um requisito é `### Requirement: <nome>` seguido do texto dele
       - o texto normativo usa SHALL ou MUST
-      - um cenário é `#### Scenario: <nome>` com marcadores WHEN/THEN
+      - um cenário é `#### Scenario: <nome>` com marcadores QUANDO/ENTÃO
       - cenários precisam de exatamente quatro cerquilhas; três cerquilhas ou uma lista não são interpretadas
       - todo requisito precisa de pelo menos um cenário
 
@@ -105,8 +105,8 @@ artifacts:
       O sistema SHALL permitir que um usuário autenticado exporte seus dados como CSV.
 
       #### Scenario: Exportação bem-sucedida
-      - **WHEN** o usuário solicita uma exportação
-      - **THEN** o sistema retorna um arquivo CSV contendo os dados dele
+      - **QUANDO** o usuário solicita uma exportação
+      - **ENTÃO** o sistema retorna um arquivo CSV contendo os dados dele
 
       ## REMOVED Requirements
 
@@ -133,12 +133,12 @@ artifacts:
       Se nenhum valer, pule este artefato e diga isso.
 
       Seções:
-      - **Context**: apenas o estado atual e as restrições necessárias para acompanhar a abordagem. Aponte para o proposal.md pela motivação, em vez de repeti-la.
-      - **Goals / Non-Goals**: o que o design alcança e o que ele deliberadamente deixa de fora.
-      - **Decisions**: cada escolha central com a justificativa e as alternativas consideradas.
-      - **Risks / Trade-offs**: o que pode dar errado, cada um com sua mitigação.
-      - **Migration Plan**: passos de rollout e de rollback, quando for o caso.
-      - **Open Questions**: incógnitas que podem ser respondidas depois com segurança. Omita a seção quando não houver nenhuma.
+      - **Contexto**: apenas o estado atual e as restrições necessárias para acompanhar a abordagem. Aponte para o proposal.md pela motivação, em vez de repeti-la.
+      - **Objetivos / Não-objetivos**: o que o design alcança e o que ele deliberadamente deixa de fora.
+      - **Decisões**: cada escolha central com a justificativa e as alternativas consideradas.
+      - **Riscos / Compensações**: o que pode dar errado, cada um com sua mitigação.
+      - **Plano de Migração**: passos de rollout e de rollback, quando for o caso.
+      - **Perguntas em Aberto**: incógnitas que podem ser respondidas depois com segurança. Omita a seção quando não houver nenhuma.
 
       Uma questão em aberto é uma incógnita genuinamente adiável, não uma decisão que você
       pulou. Se a resposta mudaria as specs, a abordagem ou a divisão em tarefas, resolva

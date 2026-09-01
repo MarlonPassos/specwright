@@ -7,5 +7,5 @@
 <!-- The system SHALL ... -->
 
 #### Scenario: <!-- nome do cenário -->
-- **WHEN** <!-- condição -->
-- **THEN** <!-- resultado observável -->
+- **QUANDO** <!-- condição -->
+- **ENTÃO** <!-- resultado observável -->
