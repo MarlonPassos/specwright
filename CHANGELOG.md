@@ -5,6 +5,24 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.7.2] - 2026-09-01
+
+### Documentação
+
+- **docs(schema): traduz marcadores WHEN/THEN e headers do design.md**
+  - `**WHEN**`/`**THEN**` (padrão BDD/Gherkin) viram `**QUANDO**`/`**ENTÃO**` no template
+    de spec, no exemplo do `schema.yaml` e no README - não são lidos por nenhum parser,
+    então a tradução é livre
+  - Headers do `design.md` traduzidos: `Context` → `Contexto`, `Goals / Non-Goals` →
+    `Objetivos / Não-objetivos`, `Decisions` → `Decisões`, `Risks / Trade-offs` →
+    `Riscos / Compensações`, `Migration Plan` → `Plano de Migração`, `Open Questions` →
+    `Perguntas em Aberto` - seção também é texto livre, sem parsing por código
+  - Mensagem de erro `REQUIREMENT_NO_SCENARIO` atualizada para citar QUANDO/ENTÃO
+  - README ganhou nota explicando a origem do padrão (BDD/Gherkin) e por que
+    `SHALL`/`MUST` ficam em inglês (RFC 2119, casados literalmente pelo parser)
+  - Mantidos em inglês os termos hardcoded no parser: headers estruturais,
+    `SHALL`/`MUST`, `Requirement:`, `Scenario:`, `Reason`/`Migration`, `FROM:`/`TO:`
+
 ## [0.7.1] - 2026-09-01
 
 ### Documentação

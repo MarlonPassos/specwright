@@ -1,31 +1,31 @@
-## Context
+## Contexto
 
 <!-- Estado atual e restrições necessárias para acompanhar a abordagem. Aponte para o proposal.md pela motivação. -->
 
-## Goals / Non-Goals
+## Objetivos / Não-objetivos
 
-**Goals**
-
-- 
-
-**Non-Goals**
+**Objetivos**
 
 - 
 
-## Decisions
+**Não-objetivos**
+
+- 
+
+## Decisões
 
 ### <!-- nome da decisão -->
 
 <!-- O que foi escolhido, por quê, e quais alternativas foram consideradas. -->
 
-## Risks / Trade-offs
+## Riscos / Compensações
 
 - <!-- risco --> - Mitigação: <!-- mitigação -->
 
-## Migration Plan
+## Plano de Migração
 
 <!-- Passos de rollout e de rollback. Apague esta seção quando não se aplicar. -->
 
-## Open Questions
+## Perguntas em Aberto
 
 <!-- Incógnitas que podem ser respondidas depois com segurança. Apague esta seção quando não houver nenhuma. -->

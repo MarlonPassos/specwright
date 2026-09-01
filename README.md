@@ -117,9 +117,14 @@ o que a change faz com a capacidade:
 O sistema SHALL permitir que um usuário autenticado exporte seus próprios dados como um arquivo CSV.
 
 #### Scenario: Exportação bem-sucedida
-- **WHEN** um usuário autenticado solicita uma exportação
-- **THEN** o sistema retorna um arquivo CSV com os dados desse usuário
+- **QUANDO** um usuário autenticado solicita uma exportação
+- **ENTÃO** o sistema retorna um arquivo CSV com os dados desse usuário
 ```
+
+`QUANDO`/`ENTÃO` seguem o padrão **BDD** (Behavior-Driven Development, da sintaxe Gherkin
+do Cucumber — `Given/When/Then`, aqui sem o `Given`). `SHALL`/`MUST` vêm de outra convenção,
+a linguagem normativa da RFC 2119, e ficam sempre em inglês porque o parser casa por essas
+palavras exatas.
 
 `## MODIFIED Requirements` carrega o texto de substituição completo, `## REMOVED Requirements`
 carrega um **Reason** e uma **Migration**, e `## RENAMED Requirements` usa linhas

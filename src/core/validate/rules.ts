@@ -49,7 +49,7 @@ export const MESSAGES = {
   REQUIREMENT_EMPTY: 'O texto do requisito está vazio',
   REQUIREMENT_NO_KEYWORD: 'O texto do requisito precisa usar SHALL ou MUST',
   REQUIREMENT_NO_SCENARIO:
-    'O requisito não tem cenário. Adicione um bloco "#### Scenario:" com marcadores WHEN/THEN ' +
+    'O requisito não tem cenário. Adicione um bloco "#### Scenario:" com marcadores QUANDO/ENTÃO ' +
     '(exatamente quatro cerquilhas - três cerquilhas ou uma lista não são interpretadas)',
   REQUIREMENT_TOO_LONG: `O texto do requisito está muito longo (acima de ${MAX_REQUIREMENT_TEXT_LENGTH} caracteres) - considere dividi-lo`,
   SCENARIO_EMPTY: 'O cenário não tem conteúdo',
