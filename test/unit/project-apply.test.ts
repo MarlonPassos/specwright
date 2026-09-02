@@ -246,3 +246,30 @@ describe('apply — mensagens que ensinam o formato', () => {
     ).rejects.toMatchObject({ code: 'unknown_ref', fix: expect.stringContaining('bundle-schema') });
   });
 });
+
+describe('apply — títulos que o YAML odeia', () => {
+  it('grava um incremento cujo título tem dois-pontos, sem plan_invalid', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedPlan(workspace, manifest({ id: 'demo', revision: 0, changes: [] }));
+    const result = await applyPlanBundle(workspace, 'demo', {
+      bundleVersion: BUNDLE_VERSION,
+      expectRevision: 0,
+      operations: [
+        {
+          op: 'addChange',
+          ref: '$fundacao-packaging',
+          slug: 'fundacao-packaging',
+          title: 'Fundação: empacotamento, modo não-interativo e config',
+          plannedChange: { objetivo: 'Base.', escopo: ['pip'], criteriosMacro: ['instala'] },
+        },
+      ],
+    });
+    expect(result.applied).toBe(true);
+    expect(result.idMap).toEqual({ '$fundacao-packaging': 'CH-001' });
+
+    const { manifest: reloaded } = await loadPlan(workspace.projectRoot, 'demo');
+    expect(reloaded.changes[0].title).toBe('Fundação: empacotamento, modo não-interativo e config');
+    const status = await computeProjectStatus(workspace, 'demo');
+    expect(status.changes[0].plannedChange!.state).toBe('current');
+  });
+});

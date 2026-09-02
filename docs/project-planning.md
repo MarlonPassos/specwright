@@ -193,7 +193,8 @@ catálogo publicado não diverge da união zod que o parser usa de verdade.
 
 - `expectRevision` precisa casar a revisão no disco (`plan_revision_conflict`).
 - `$ref` só em `addChange` e `splitChange.into`; `dependsOn`/`rewire`/milestones
-  aceitam ID real ou `ref` do mesmo bundle.
+  aceitam ID real ou `ref` do mesmo bundle. Um ref é `$` seguido de letras,
+  dígitos, `_` ou `-` — espelhar o slug (`$bug-fixes`) é a convenção mais simples.
 - Nenhuma operação atinge um incremento `archived` sem `--allow-completed` (e aí
   o relatório traz um `WARNING`).
 - **Split** marca o original `cancelled` com `superseded_by: [novos IDs]` e exige

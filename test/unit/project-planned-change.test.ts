@@ -104,3 +104,29 @@ describe('planned change renderer', () => {
     expect(sectionHasText(parsed.sections, 'Critérios macro')).toBe(false);
   });
 });
+
+describe('renderPlannedChange — frontmatter serializado, nunca concatenado', () => {
+  const hostile = [
+    ['dois-pontos', 'Fundação: empacotamento e config'],
+    ['hash', 'Suporte a #tags no filtro'],
+    ['aspas', 'O modo "não-interativo"'],
+    ['hífen inicial', '- item que parece lista'],
+    ['chaves', 'Config {json} e [array]'],
+    ['pipe', 'Export | import de dados'],
+    ['crase e cifrão', 'Usar `$HOME` como base'],
+  ] as const;
+
+  it.each(hostile)('sobrevive a um título com %s', (_label, title) => {
+    const parsed = parsePlannedChange(
+      renderPlannedChange({ id: 'CH-001', slug: 'x', title, planRevision: 0 })
+    );
+    expect(parsed.frontmatterError).toBeUndefined();
+    expect(parsed.frontmatter?.title).toBe(title);
+  });
+
+  it('não muda o frontmatter de um título simples', () => {
+    const text = renderPlannedChange({ id: 'CH-001', slug: 'x', title: 'Título simples', planRevision: 2 });
+    expect(text).toContain('title: Título simples');
+    expect(text.startsWith('---\nschema_version: 1\nid: CH-001\nslug: x\n')).toBe(true);
+  });
+});

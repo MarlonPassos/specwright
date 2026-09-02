@@ -31,8 +31,18 @@ const PlannedChangeSpecSchema = z
   .strict();
 export type PlannedChangeSpec = z.infer<typeof PlannedChangeSpecSchema>;
 
-const ref = z.string().regex(/^\$[A-Za-z0-9_]+$/);
-const idOrRef = z.union([z.string().regex(/^CH-\d{3,}$/), ref]);
+// Every slug in the system is kebab-case, so `$bug-fixes` is the ref an author
+// reaches for first. Forbidding `-` here turned that instinct into a wall of
+// `ref: Invalid` with nothing saying which character was the problem.
+const REF_MESSAGE = 'um ref é "$nome" com letras, dígitos, "_" ou "-" (ex.: "$bug-fixes")';
+const ref = z.string().regex(/^\$[A-Za-z0-9_-]+$/, REF_MESSAGE);
+// A union reports "Invalid" for the whole thing; one regex reports what it wants.
+const idOrRef = z
+  .string()
+  .regex(
+    /^(?:CH-\d{3,}|\$[A-Za-z0-9_-]+)$/,
+    'use um id "CH-NNN" já existente ou um ref "$nome" declarado antes neste bundle'
+  );
 
 export const OperationSchema = z.discriminatedUnion('op', [
   z.object({

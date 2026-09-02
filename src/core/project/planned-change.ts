@@ -1,4 +1,4 @@
-import { parse as parseYaml } from 'yaml';
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { z } from 'zod';
 import {
   findSection,
@@ -129,16 +129,18 @@ export function renderPlannedChange(input: RenderPlannedChangeInput): string {
     provided.Objetivo?.trim() ||
     `Incremento "${input.title}". Descreva aqui o resultado que este incremento entrega.`;
 
-  const lines: string[] = [
-    '---',
-    `schema_version: ${PLANNED_CHANGE_SCHEMA_VERSION}`,
-    `id: ${input.id}`,
-    `slug: ${input.slug}`,
-    `title: ${input.title}`,
-    `plan_revision: ${input.planRevision}`,
-    '---',
-    '',
-  ];
+  // Serialised, never concatenated: a title carrying `:` — "Fundação: empacotamento"
+  // is the natural way to write one — produced frontmatter that no longer parsed
+  // as YAML, and the increment was rejected as invalid at write time.
+  const frontmatter = stringifyYaml({
+    schema_version: PLANNED_CHANGE_SCHEMA_VERSION,
+    id: input.id,
+    slug: input.slug,
+    title: input.title,
+    plan_revision: input.planRevision,
+  }).trimEnd();
+
+  const lines: string[] = ['---', frontmatter, '---', ''];
 
   for (const heading of PLANNED_CHANGE_SECTIONS) {
     lines.push(`# ${heading}`, '');

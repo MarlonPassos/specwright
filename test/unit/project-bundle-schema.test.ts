@@ -80,3 +80,72 @@ describe('bundle errors — self-documenting', () => {
     }
   });
 });
+
+describe('refs — o kebab-case que todo slug usa', () => {
+  it('aceita "-" no ref, em toda posição que cita um incremento', () => {
+    expect(() =>
+      parseBundle({
+        bundleVersion: 1,
+        expectRevision: 0,
+        operations: [
+          { op: 'addChange', ref: '$bug-fixes', slug: 'bug-fixes', title: 'Bugs' },
+          { op: 'addChange', ref: '$terminal-ux', slug: 'terminal-ux', title: 'UX', dependsOn: ['$bug-fixes'] },
+          {
+            op: 'setMilestones',
+            milestones: [{ id: 'M1', name: 'Um', order: 1, changes: ['$bug-fixes', '$terminal-ux'] }],
+          },
+        ],
+      })
+    ).not.toThrow();
+  });
+
+  it('aceita "-" também em splitChange.into e no rewire', () => {
+    expect(() =>
+      parseBundle({
+        bundleVersion: 1,
+        expectRevision: 0,
+        operations: [
+          {
+            op: 'splitChange',
+            id: 'CH-002',
+            into: [
+              { ref: '$parte-a', slug: 'parte-a', title: 'A' },
+              { ref: '$parte-b', slug: 'parte-b', title: 'B', dependsOn: ['$parte-a'] },
+            ],
+            rewire: { 'CH-003': ['$parte-a'], 'CH-004': ['$parte-a', '$parte-b'] },
+          },
+        ],
+      })
+    ).not.toThrow();
+  });
+
+  it('um ref realmente inválido diz o que é um ref, não apenas "Invalid"', () => {
+    try {
+      parseBundle({
+        bundleVersion: 1,
+        expectRevision: 0,
+        operations: [{ op: 'addChange', ref: '$com espaço', slug: 'x', title: 'X' }],
+      });
+      throw new Error('deveria ter falhado');
+    } catch (error) {
+      const message = (error as Error).message;
+      expect(message).not.toMatch(/ref: Invalid/);
+      expect(message).toContain('$bug-fixes');
+    }
+  });
+
+  it('uma referência que não é nem id nem ref explica as duas formas aceitas', () => {
+    try {
+      parseBundle({
+        bundleVersion: 1,
+        expectRevision: 0,
+        operations: [{ op: 'setDependencies', id: 'CH-001', dependsOn: ['fundacao'] }],
+      });
+      throw new Error('deveria ter falhado');
+    } catch (error) {
+      const message = (error as Error).message;
+      expect(message).not.toMatch(/dependsOn\.0: Invalid/);
+      expect(message).toContain('CH-NNN');
+    }
+  });
+});
