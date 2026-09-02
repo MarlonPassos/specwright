@@ -403,8 +403,9 @@ export function applyBundle(
     }
   }
 
-  // Proposed state must be a DAG.
+  // Proposed state must be a DAG, and structurally valid, BEFORE any write.
   ProjectGraph.from(working.changes);
+  assertProposedStateValid(working);
 
   working.revision = manifest.revision + 1;
   working.updated_at = localDateStamp(ctx.now ?? new Date());
@@ -417,6 +418,73 @@ export function applyBundle(
     documents,
     completedTouched: [...completedTouched],
   };
+}
+
+const KEBAB_SLUG = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
+
+/**
+ * The §7.17 ERROR rules a bundle can violate that `ProjectGraph.from` does not
+ * already cover: slug shape, `superseded_by` targets, and the two-way
+ * increment ↔ milestone consistency. Failing here means nothing is written.
+ */
+export function assertProposedStateValid(manifest: PlanManifest): void {
+  const ids = new Set(manifest.changes.map((change) => change.id));
+
+  for (const change of manifest.changes) {
+    if (!KEBAB_SLUG.test(change.slug)) {
+      throw new SpecError(`O slug "${change.slug}" de ${change.id} não é kebab-case.`, {
+        code: 'plan_invalid',
+      });
+    }
+    for (const superseded of change.superseded_by) {
+      if (!ids.has(superseded)) {
+        throw new SpecError(`${change.id}.superseded_by cita ${superseded}, que o plano não declara.`, {
+          code: 'plan_invalid',
+        });
+      }
+    }
+  }
+
+  const milestoneIds = new Set(manifest.milestones.map((m) => m.id));
+  const orders = new Set<number>();
+  for (const milestone of manifest.milestones) {
+    if (orders.has(milestone.order)) {
+      throw new SpecError(`order ${milestone.order} de milestone está duplicado.`, {
+        code: 'plan_invalid',
+      });
+    }
+    orders.add(milestone.order);
+    for (const memberId of milestone.changes) {
+      if (!ids.has(memberId)) {
+        throw new SpecError(`Milestone ${milestone.id} lista ${memberId}, que não é um incremento.`, {
+          code: 'plan_invalid',
+        });
+      }
+      const member = manifest.changes.find((c) => c.id === memberId)!;
+      if (member.milestone !== milestone.id) {
+        throw new SpecError(
+          `${milestone.id} lista ${memberId}, mas ${memberId} declara milestone ${member.milestone ?? 'null'}.`,
+          { code: 'plan_invalid' }
+        );
+      }
+    }
+  }
+  for (const change of manifest.changes) {
+    if (change.milestone !== null) {
+      if (!milestoneIds.has(change.milestone)) {
+        throw new SpecError(`${change.id} declara milestone ${change.milestone}, que não existe.`, {
+          code: 'plan_invalid',
+        });
+      }
+      const milestone = manifest.milestones.find((m) => m.id === change.milestone)!;
+      if (!milestone.changes.includes(change.id)) {
+        throw new SpecError(
+          `${change.id} declara milestone ${change.milestone}, mas ${change.milestone} não o lista.`,
+          { code: 'plan_invalid' }
+        );
+      }
+    }
+  }
 }
 
 function pendingRef(id: string, slug: string, revision: number): ProjectChange['planned_change'] {

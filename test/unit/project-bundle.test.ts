@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { applyBundle, parseBundle, BUNDLE_VERSION } from '../../src/core/project/bundle.js';
+import {
+  applyBundle,
+  assertProposedStateValid,
+  parseBundle,
+  BUNDLE_VERSION,
+} from '../../src/core/project/bundle.js';
 import { manifest, change } from '../helpers/plan.js';
 
 const ctx = {
@@ -203,6 +208,36 @@ describe('applyBundle', () => {
     expect(result.briefRenames).toEqual([
       { from: 'planned-changes/CH-003-old.md', to: 'planned-changes/CH-003-catalog.md' },
     ]);
+  });
+
+  it('assertProposedStateValid rejects a milestone that lists an increment which does not declare it', () => {
+    const inconsistent = manifest({
+      milestones: [{ id: 'M1', name: 'Um', order: 1, changes: ['CH-001'] }],
+      changes: [change({ id: 'CH-001', slug: 'a', milestone: null })],
+    });
+    expectCode(() => assertProposedStateValid(inconsistent), 'plan_invalid');
+  });
+
+  it('assertProposedStateValid rejects a superseded_by that points nowhere and a duplicate order', () => {
+    expectCode(
+      () =>
+        assertProposedStateValid(
+          manifest({ changes: [change({ id: 'CH-001', slug: 'a', superseded_by: ['CH-099'] })] })
+        ),
+      'plan_invalid'
+    );
+    expectCode(
+      () =>
+        assertProposedStateValid(
+          manifest({
+            milestones: [
+              { id: 'M1', name: 'Um', order: 1, changes: [] },
+              { id: 'M2', name: 'Dois', order: 1, changes: [] },
+            ],
+          })
+        ),
+      'plan_invalid'
+    );
   });
 
   it('a cycle in the proposed state fails before any write', () => {

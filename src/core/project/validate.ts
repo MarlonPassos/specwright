@@ -315,6 +315,52 @@ async function checkManifest(
     warn('status', 'plano em draft já tem Planned Changes materializados');
   }
 
+  // high fan-out: more than five direct dependents
+  const directDependents = new Map<string, number>();
+  for (const change of manifest.changes) {
+    for (const dependency of change.depends_on) {
+      directDependents.set(dependency, (directDependents.get(dependency) ?? 0) + 1);
+    }
+  }
+  for (const [id, count] of directDependents) {
+    if (count > 5) {
+      warn(`changes.${id}.depends_on`, `${id} tem ${count} dependentes diretos (high_fanout_change)`);
+    }
+  }
+
+  // partial write: a staging directory left on disk
+  try {
+    const remnants = (await fs.readdir(ctx.paths.dir)).filter((name) => name.startsWith('.tmp-'));
+    if (remnants.length > 0) {
+      warn(
+        '.',
+        `staging remanescente no disco: ${remnants.join(', ')} — rode git restore planning/ (partial_write_detected)`
+      );
+    }
+  } catch {
+    /* plan dir unreadable is caught elsewhere */
+  }
+
+  // an active change with a proposal and no link in the plan
+  const linkedNames = new Set(
+    manifest.changes.filter((change) => change.link).map((change) => change.link!.name)
+  );
+  try {
+    const activeChanges = (await fs.readdir(path.join(ctx.projectRoot, WORKSPACE_DIR, CHANGES_DIR), {
+      withFileTypes: true,
+    }))
+      .filter((entry) => entry.isDirectory() && entry.name !== ARCHIVE_DIR)
+      .map((entry) => entry.name);
+    for (const name of activeChanges.sort()) {
+      if (linkedNames.has(name)) continue;
+      if (await pathExists(path.join(ctx.projectRoot, WORKSPACE_DIR, CHANGES_DIR, name, 'proposal.md'))) {
+        warn(`link`, `a change ativa "${name}" tem proposta e não está vinculada (unlinked_active_change)`);
+      }
+    }
+  } catch {
+    /* no spec/changes yet */
+  }
+
   // Orphan Planned Change files
   const referenced = new Set(
     manifest.changes

@@ -30,6 +30,14 @@ versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
     proteção de histórico).
   - `specs project list`, `pause --reason`, `resume`, `archive` (ciclo de vida do
     plano) e `specs project --watch [--interval <s>]` (reusa `watch()`).
+  - `apply` valida o estado proposto (grafo + slug, `superseded_by`, consistência
+    incremento↔milestone, `order` duplicado) **antes** de qualquer escrita
+    (`plan_invalid`).
+  - `validate` ganha `high_fanout_change`, `unlinked_active_change` e
+    `partial_write_detected`.
+  - Testes de desempenho (200 incrementos: `status`/`next` < 500 ms,
+    `generate` < 2 s) e de confidencialidade (marcador de fonte nunca aparece em
+    `planning/` nem em saída de comando).
 
 - **feat(project): Project Planning — Fase 3 (vínculo, adoção e sincronização)**
   - `src/core/project/link.ts` — `linkChange` (vínculo 1:1 com todas as
