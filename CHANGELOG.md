@@ -5,6 +5,41 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.11.0] - 2026-09-02
+
+### Adicionado
+
+- **feat(project): `specs project bundle-schema` publica o contrato do bundle**
+  — raiz, catálogo de operações com campos obrigatórios e opcionais,
+  `PlannedChangeSpec`, regras e um exemplo aplicável, em texto ou `--json`.
+
+  O formato do bundle existia só em `docs/project-planning.md`. Um assistente
+  trabalhando num projeto que apenas **instala** o specwright não alcança esse
+  arquivo, então descobria o schema sondando `apply --dry-run` com payloads
+  quebrados para ler a estrutura de volta nas mensagens de erro — cerca de vinte
+  chamadas, e ainda assim sem achar o `$ref`, único jeito de citar um incremento
+  que o próprio bundle cria. `PLAN_WRITE_PROTOCOL`, `/spec-project-plan` e
+  `/spec-project-refine` passam a mandar ler o contrato antes do primeiro bundle.
+
+  Um teste compara o catálogo publicado com a união zod que o parser usa de
+  verdade — nome de operação, nome de campo e obrigatoriedade — então a
+  documentação não pode divergir do runtime em silêncio.
+
+### Corrigido
+
+- **fix(project): `apply --dry-run` reportava uma revisão e uma validação falsas**
+  — o preview devolvia `revision: { from: N, to: N }` e `validation: { valid:
+  true, errors: 0, warnings: 0 }` fixos. O assistente mostrava ao usuário
+  `0 → 0, 0 avisos` e o `apply` real caía em outra revisão com avisos anexados.
+  Agora o preview projeta a revisão futura e roda as regras de validação contra
+  o estado proposto (`validateProposedPlan`), com os briefs que o bundle vai
+  escrever contando como presentes. Preview e escrita devolvem números iguais.
+- **fix(project): erros de bundle não ensinavam o formato** — `invalid_bundle` e
+  `unsupported_bundle_version` apontam `specs project bundle-schema --json`.
+  `unknown_dependency` num `CH-NNN` previsto explica que o ID é alocado pela CLI
+  e que citar um incremento do mesmo bundle exige `ref: "$nome"`; `unknown_ref`
+  explica que o ref precisa ser declarado antes de ser citado.
+
 ## [0.10.0] - 2026-09-01
 
 ### Corrigido

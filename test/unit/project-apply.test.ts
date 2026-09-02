@@ -139,3 +139,110 @@ async function seedAndId(workspace: Awaited<ReturnType<typeof makePlanWorkspace>
   await seedPlan(workspace, manifest({ id: 'p', status: 'active', changes: [] }));
   return 'p';
 }
+
+describe('apply --dry-run — o preview não pode mentir', () => {
+  it('projeta a MESMA revisão e a MESMA validação que o apply real', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedPlan(workspace, manifest({ id: 'demo', revision: 0, changes: [] }));
+    const bundle = {
+      bundleVersion: 1,
+      expectRevision: 0,
+      operations: [
+        {
+          op: 'addChange',
+          ref: '$a',
+          slug: 'fundacao',
+          title: 'Fundação',
+          plannedChange: {
+            objetivo: 'Base.',
+            escopo: ['pastas'],
+            criteriosMacro: ['build verde'],
+          },
+        },
+        { op: 'addChange', ref: '$b', slug: 'auth', title: 'Auth', dependsOn: ['$a'] },
+        {
+          op: 'setMilestones',
+          milestones: [{ id: 'M1', name: 'Base', order: 1, changes: ['$a', '$b'] }],
+        },
+      ],
+    };
+
+    const preview = await applyPlanBundle(workspace, 'demo', bundle, { dryRun: true });
+    const real = await applyPlanBundle(workspace, 'demo', bundle);
+
+    expect(preview.revision).toEqual(real.revision);
+    expect(preview.validation).toEqual(real.validation);
+    expect(preview.idMap).toEqual(real.idMap);
+    expect(preview.revision.to).toBe(1);
+  });
+
+  it('não acusa como ausente um brief que o próprio bundle vai escrever', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedPlan(workspace, manifest({ id: 'demo', revision: 0, changes: [] }));
+    const preview = await applyPlanBundle(
+      workspace,
+      'demo',
+      {
+        bundleVersion: 1,
+        expectRevision: 0,
+        operations: [
+          {
+            op: 'addChange',
+            slug: 'x',
+            title: 'X',
+            plannedChange: { objetivo: 'o', escopo: ['e'], criteriosMacro: ['c'] },
+          },
+        ],
+      },
+      { dryRun: true }
+    );
+    expect(preview.validation.errors).toBe(0);
+  });
+});
+
+describe('apply — mensagens que ensinam o formato', () => {
+  it('um CH-NNN previsto para um incremento do mesmo bundle aponta o $ref', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedPlan(workspace, manifest({ id: 'demo', revision: 0, changes: [] }));
+    await expect(
+      applyPlanBundle(
+        workspace,
+        'demo',
+        {
+          bundleVersion: 1,
+          expectRevision: 0,
+          operations: [
+            { op: 'addChange', slug: 'x', title: 'X' },
+            {
+              op: 'setMilestones',
+              milestones: [{ id: 'M1', name: 'Um', order: 1, changes: ['CH-042'] }],
+            },
+          ],
+        },
+        { dryRun: true }
+      )
+    ).rejects.toMatchObject({ code: 'unknown_dependency', fix: expect.stringContaining('$nome') });
+  });
+
+  it('um ref citado antes de ser declarado aponta a ordem correta', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedPlan(workspace, manifest({ id: 'demo', revision: 0, changes: [] }));
+    await expect(
+      applyPlanBundle(
+        workspace,
+        'demo',
+        {
+          bundleVersion: 1,
+          expectRevision: 0,
+          operations: [
+            {
+              op: 'setMilestones',
+              milestones: [{ id: 'M1', name: 'Um', order: 1, changes: ['$naoDeclarado'] }],
+            },
+          ],
+        },
+        { dryRun: true }
+      )
+    ).rejects.toMatchObject({ code: 'unknown_ref', fix: expect.stringContaining('bundle-schema') });
+  });
+});

@@ -34,7 +34,7 @@ export type PlannedChangeSpec = z.infer<typeof PlannedChangeSpecSchema>;
 const ref = z.string().regex(/^\$[A-Za-z0-9_]+$/);
 const idOrRef = z.union([z.string().regex(/^CH-\d{3,}$/), ref]);
 
-const OperationSchema = z.discriminatedUnion('op', [
+export const OperationSchema = z.discriminatedUnion('op', [
   z.object({
     op: z.literal('addChange'),
     ref: ref.optional(),
@@ -144,12 +144,15 @@ export function parseBundle(raw: unknown): Bundle {
     const detail = result.error.issues
       .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
       .join('; ');
-    throw new SpecError(`Bundle inválido: ${detail}`, { code: 'invalid_bundle' });
+    throw new SpecError(`Bundle inválido: ${detail}`, {
+      code: 'invalid_bundle',
+      fix: 'specs project bundle-schema --json',
+    });
   }
   if (result.data.bundleVersion !== BUNDLE_VERSION) {
     throw new SpecError(
       `bundleVersion ${result.data.bundleVersion} não é suportado (esperado ${BUNDLE_VERSION}).`,
-      { code: 'unsupported_bundle_version' }
+      { code: 'unsupported_bundle_version', fix: 'specs project bundle-schema --json' }
     );
   }
   return result.data;
@@ -191,11 +194,24 @@ export function applyBundle(
   const resolveRef = (token: string): string => {
     if (token.startsWith('$')) {
       const mapped = idMap[token];
-      if (!mapped) throw new SpecError(`ref desconhecido: ${token}`, { code: 'unknown_ref' });
+      if (!mapped)
+        throw new SpecError(`ref desconhecido: ${token}`, {
+          code: 'unknown_ref',
+          fix: 'Um ref precisa ser declarado por um addChange/splitChange ANTES da operação que o cita. Contrato: specs project bundle-schema',
+        });
       return mapped;
     }
     if (!allIds().has(token)) {
-      throw new SpecError(`${token} não é um incremento do plano.`, { code: 'unknown_dependency' });
+      // An assistant that predicts CH-NNN for an increment the same bundle is
+      // creating lands here. Name the `$ref` mechanism so the next attempt is
+      // informed instead of another guess.
+      throw new SpecError(
+        `${token} não é um incremento do plano.`,
+        {
+          code: 'unknown_dependency',
+          fix: 'Para citar um incremento que este mesmo bundle cria, declare `ref: "$nome"` no addChange/splitChange e use "$nome" aqui — nunca um CH-NNN previsto. Contrato completo: specs project bundle-schema',
+        }
+      );
     }
     return token;
   };

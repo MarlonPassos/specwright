@@ -161,7 +161,18 @@ archive por padrão a cada execução, então a conclusão nunca depende de `syn
 Toda mudança estrutural além dos comandos próprios — `addChange`, `updateChange`,
 `setDependencies`, `setBlockers`, `renameSlug`, `replacePlannedChange`,
 `splitChange`, `mergeChanges`, `setMilestones`, `writeDocument` — passa por um
-**bundle JSON** aplicado por `specs project apply` (stdin ou `--file`):
+**bundle JSON** aplicado por `specs project apply` (stdin ou `--file`).
+
+O contrato completo é publicado pela própria CLI, então um assistente trabalhando
+num projeto que apenas *instala* o specwright não precisa deste arquivo:
+
+```bash
+specs project bundle-schema --json
+```
+
+Ele devolve raiz, operações com campos obrigatórios e opcionais,
+`PlannedChangeSpec`, as regras e um exemplo que aplica. Um teste garante que o
+catálogo publicado não diverge da união zod que o parser usa de verdade.
 
 ```json
 {

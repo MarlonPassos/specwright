@@ -47,8 +47,9 @@ ${PROJECT_BOUNDARY}
 4. Se o impacto atinge um incremento \`archived\`, **não** o altere: recomende uma
    change corretiva nova. Só use \`--allow-completed\` se o usuário pedir
    explicitamente, ciente do \`WARNING\`.
-5. Monte o bundle com \`expectRevision\` igual ao \`revision\` lido. Mostre uma
-   tabela de rewire explícita.
+5. \`specs project bundle-schema --json\` se ainda não leu o contrato nesta
+   sessão. Monte o bundle com \`expectRevision\` igual ao \`revision\` lido.
+   Mostre uma tabela de rewire explícita.
 6. \`specs project apply --dry-run --json\`. Mostre \`idMap\`, o diff e o impacto.
 7. Confirme em mensagem separada. Depois do sim, \`specs project apply\`.
 8. Feche com \`specs project validate --strict --json\` e aponte

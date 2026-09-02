@@ -10,7 +10,7 @@ import { assertRoadmapMarkers, renderRoadmapBlock, spliceRoadmap } from './rende
 import { sha256, sourceHash, recordHash, type HashableSource } from './hashes.js';
 import { renderManifest } from './model.js';
 import { resolveWithinRoot, safeResolve } from './paths.js';
-import { validatePlan, validatePlannedChangeContent } from './validate.js';
+import { validatePlan, validateProposedPlan, validatePlannedChangeContent } from './validate.js';
 import {
   applyBundle,
   parseBundle,
@@ -244,15 +244,28 @@ export async function applyPlanBundle(
   }
 
   if (options.dryRun) {
+    // A preview that reports the CURRENT revision and a hardcoded clean bill of
+    // health is worse than no preview: the assistant shows the user `0 → 0` and
+    // `0 warnings`, then the real apply lands on a different revision with
+    // warnings attached. Report the projected revision and the issue counts
+    // actually computed for the proposed state.
+    const proposedReports = await validateProposedPlan(
+      workspace.projectRoot,
+      planId,
+      result.manifest,
+      briefFiles
+    );
+    const errors = proposedReports.reduce((total, report) => total + report.summary.errors, 0);
+    const warnings = proposedReports.reduce((total, report) => total + report.summary.warnings, 0);
     return {
       applied: false,
       dryRun: true,
-      revision: { from: manifest.revision, to: manifest.revision },
+      revision: { from: manifest.revision, to: result.manifest.revision },
       idMap: result.idMap,
       written,
       removed,
       impact,
-      validation: { valid: true, errors: 0, warnings: 0 },
+      validation: { valid: errors === 0, errors, warnings },
       diagnostics,
     };
   }
