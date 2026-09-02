@@ -220,3 +220,14 @@ reconcilia o bloco `link` com `spec/changes/` e o archive (idempotente).
 
 Códigos de erro: `link_target_missing`, `link_already_used`, `invalid_transition`,
 `missing_reason`, `completed_change_protected`.
+
+### `specs project apply` / `impact` / `list` / `pause` / `resume` / `archive` / `--watch`
+
+`apply` lê um bundle JSON (stdin ou `--file`), valida o estado proposto e grava;
+`--dry-run` imprime `idMap`, diff e impacto sem escrever. `impact --change <id>...`
+dá o impacto estrutural determinístico. `list` indexa os planos. `pause --reason`,
+`resume` e `archive` movem o `status` declarado do plano. `specs project --watch
+[--interval <s>]` repinta o dashboard por polling até Ctrl+C (`--watch` + `--json`
+→ `invalid_option`).
+
+Formato do bundle e regras: [project-planning.md](project-planning.md).

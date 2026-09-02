@@ -9,6 +9,28 @@ versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ### Adicionado
 
+- **feat(project): Project Planning — Fases 4–5 (bundle, impacto, ciclo de vida e watch)**
+  - `src/core/project/bundle.ts` — Zod do bundle e as dez operações de §7.11
+    (`addChange`, `updateChange`, `setDependencies`, `setBlockers`, `renameSlug`,
+    `replacePlannedChange`, `splitChange`, `mergeChanges`, `setMilestones`,
+    `writeDocument`), com `ref → ID` reprodutível, proteção de histórico
+    (`completed_change_protected`), split que cancela o original com
+    `superseded_by` e exige `rewire` completo (`unmapped_dependents`), merge que
+    recusa entrada concluída (`merge_completed_change`), e validação do estado
+    proposto (`ProjectGraph.from`) antes de qualquer escrita.
+  - `src/core/project/apply.ts` — `specs project apply` (stdin ou `--file`):
+    pipeline `parse → aplicar em memória → validar → impacto → staging → rename
+    atômico → projetar roadmap → revalidar`. `--dry-run` não toca no disco;
+    `--allow-completed` libera uma operação sobre incremento concluído com
+    `WARNING`.
+  - `src/core/project/impact.ts` — `specs project impact --change <id>...`:
+    dependentes, ancestrais, milestones, changes vinculadas com estado resolvido,
+    capabilities compartilhadas, Planned Changes afetados, concluídos atingidos.
+  - `project-refine` ganha o corpo completo (impacto, split/merge/rename,
+    proteção de histórico).
+  - `specs project list`, `pause --reason`, `resume`, `archive` (ciclo de vida do
+    plano) e `specs project --watch [--interval <s>]` (reusa `watch()`).
+
 - **feat(project): Project Planning — Fase 3 (vínculo, adoção e sincronização)**
   - `src/core/project/link.ts` — `linkChange` (vínculo 1:1 com todas as
     pré-condições: incremento não concluído nem cancelado, change nativa

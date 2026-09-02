@@ -13,5 +13,8 @@ export * from './next.js';
 export * from './generate.js';
 export * from './link.js';
 export * from './sync.js';
+export * from './bundle.js';
+export * from './impact.js';
+export * from './apply.js';
 export * from './validate.js';
 export * from './create.js';

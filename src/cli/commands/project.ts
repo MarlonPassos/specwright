@@ -9,12 +9,30 @@ import { recommendNext } from '../../core/project/next.js';
 import { generatePlannedChanges } from '../../core/project/generate.js';
 import { linkChange, unlinkChange, adoptChange, setPlanningState } from '../../core/project/link.js';
 import { syncPlan } from '../../core/project/sync.js';
-import { PLANNING_STATES, type PlanningState } from '../../core/project/model.js';
+import { applyPlanBundle } from '../../core/project/apply.js';
+import { computeImpact } from '../../core/project/impact.js';
+import { loadPlan, savePlan } from '../../core/project/repository.js';
+import { PLANNING_STATES, type PlanningState, type PlanStatusValue } from '../../core/project/model.js';
 import type { ValidationReport } from '../../core/validate/report.js';
 import { renderProjectDashboard } from '../project-dashboard-view.js';
+import { watch } from '../watch.js';
 import { fail, printJson, printLines } from '../output.js';
 
 const DASHBOARD_SCHEMA_VERSION = 1;
+
+function intervalMs(raw: string | undefined): number {
+  const seconds = Number(raw ?? '2');
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    throw new SpecError(`"${raw}" não é um intervalo válido.`, { code: 'invalid_interval' });
+  }
+  return Math.round(seconds * 1000);
+}
+
+async function readStdin(): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
+  return Buffer.concat(chunks).toString('utf8');
+}
 
 /** `--json` for a subcommand: its own flag, or the group's. */
 function wantsJson(command: Command): boolean {
@@ -26,8 +44,12 @@ export function registerProjectCommands(program: Command): void {
     .command('project')
     .description('Planejamento de projeto: decompõe um documento grande em incrementos ordenados')
     .option('--json', 'Saída em JSON')
-    .option('--watch', 'Repinta o dashboard por polling (Fase 5)')
-    .action(async function (this: Command, options: { json?: boolean; watch?: boolean }) {
+    .option('--watch', 'Repinta o dashboard por polling até Ctrl+C')
+    .option('--interval <segundos>', 'Intervalo do --watch em segundos', '2')
+    .action(async function (
+      this: Command,
+      options: { json?: boolean; watch?: boolean; interval?: string }
+    ) {
       try {
         if (options.json && options.watch) {
           throw new SpecError('--json e --watch são mutuamente exclusivos.', { code: 'invalid_option' });
@@ -42,6 +64,18 @@ export function registerProjectCommands(program: Command): void {
         }
 
         const id = await resolvePlanId(workspace.projectRoot);
+
+        if (options.watch) {
+          await watch({
+            intervalMs: intervalMs(options.interval),
+            frame: async () => {
+              const snapshot = await computeProjectStatus(workspace, id);
+              return renderProjectDashboard(snapshot, recommendNext(snapshot)).join('\n');
+            },
+          });
+          return;
+        }
+
         const status = await computeProjectStatus(workspace, id);
         const next = recommendNext(status);
 
@@ -399,6 +433,157 @@ export function registerProjectCommands(program: Command): void {
         fail(error, { json, payload: { id: null } });
       }
     });
+
+  project
+    .command('apply [plan-id]')
+    .description('Lê um bundle JSON do stdin ou de --file, valida o estado proposto e grava')
+    .option('--file <path>', 'Lê o bundle deste arquivo em vez do stdin')
+    .option('--dry-run', 'Imprime diff e impacto sem escrever nada')
+    .option('--allow-completed', 'Permite uma operação atingir um incremento concluído')
+    .option('--json', 'Saída em JSON')
+    .action(async function (
+      this: Command,
+      planId: string | undefined,
+      options: { file?: string; dryRun?: boolean; allowCompleted?: boolean }
+    ) {
+      const json = wantsJson(this);
+      try {
+        const workspace = await requireWorkspace();
+        const id = await resolvePlanId(workspace.projectRoot, planId);
+        const raw =
+          options.file && options.file !== '-'
+            ? await (await import('node:fs/promises')).readFile(options.file, 'utf8')
+            : await readStdin();
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          throw new SpecError('O bundle não é JSON válido.', { code: 'invalid_bundle' });
+        }
+        const result = await applyPlanBundle(workspace, id, parsed, {
+          dryRun: options.dryRun,
+          allowCompleted: options.allowCompleted,
+        });
+        if (json) {
+          printJson(result);
+          return;
+        }
+        printLines([
+          result.dryRun ? 'Prévia do apply (nada foi escrito):' : `Aplicado (revisão ${result.revision.to}).`,
+          ...Object.entries(result.idMap).map(([ref, allocated]) => `  ${ref} → ${allocated}`),
+          ...result.written.map((file) => `  + ${file}`),
+          ...result.removed.map((file) => `  - ${file}`),
+        ]);
+      } catch (error) {
+        fail(error, { json, payload: { applied: false } });
+      }
+    });
+
+  project
+    .command('impact [plan-id]')
+    .description('Impacto estrutural de tocar um ou mais incrementos')
+    .option('--change <id...>', 'Incrementos alvo')
+    .option('--json', 'Saída em JSON')
+    .action(async function (this: Command, planId: string | undefined, options: { change?: string[] }) {
+      const json = wantsJson(this);
+      try {
+        if (!options.change || options.change.length === 0) {
+          throw new SpecError('Informe pelo menos um --change <id>.', { code: 'invalid_option' });
+        }
+        const workspace = await requireWorkspace();
+        const id = await resolvePlanId(workspace.projectRoot, planId);
+        const result = await computeImpact(workspace, id, options.change);
+        if (json) {
+          printJson(result);
+          return;
+        }
+        printLines([
+          `Alvos: ${result.targets.join(', ')}`,
+          `  dependentes: ${result.dependents.join(', ') || '—'}`,
+          `  ancestrais: ${result.ancestors.join(', ') || '—'}`,
+          `  milestones: ${result.milestones.join(', ') || '—'}`,
+          `  capabilities: ${result.sharedCapabilities.join(', ') || '—'}`,
+          `  concluídos atingidos: ${result.completedReached.join(', ') || '—'}`,
+        ]);
+      } catch (error) {
+        fail(error, { json, payload: { targets: [] } });
+      }
+    });
+
+  project
+    .command('list')
+    .description('Lista os planos existentes com identidade, status e progresso')
+    .option('--json', 'Saída em JSON')
+    .action(async function (this: Command) {
+      const json = wantsJson(this);
+      try {
+        const workspace = await requireWorkspace();
+        const ids = await listPlanIds(workspace.projectRoot);
+        const plans = [];
+        for (const id of ids) {
+          const status = await computeProjectStatus(workspace, id);
+          plans.push({
+            id,
+            name: status.plan.name,
+            status: status.plan.status,
+            derivedStatus: status.plan.derivedStatus,
+            total: status.progress.total,
+            archived: status.progress.archived,
+            percent: status.progress.percent,
+            updatedAt: status.plan.updatedAt,
+          });
+        }
+        if (json) {
+          printJson({ plans });
+          return;
+        }
+        printLines(
+          plans.length === 0
+            ? ['Nenhum plano.']
+            : plans.map(
+                (plan) =>
+                  `  ${plan.id.padEnd(20)} ${plan.derivedStatus.padEnd(10)} ${plan.archived}/${plan.total} (${plan.percent}%)`
+              )
+        );
+      } catch (error) {
+        fail(error, { json, payload: { plans: [] } });
+      }
+    });
+
+  for (const [name, target, needsReason] of [
+    ['pause', 'paused', true],
+    ['resume', 'active', false],
+    ['archive', 'archived', false],
+  ] as const) {
+    project
+      .command(`${name} [plan-id]`)
+      .description(`Move o plano para o estado "${target}"`)
+      .option('--reason <texto>', 'Motivo', undefined)
+      .option('--json', 'Saída em JSON')
+      .action(async function (this: Command, planId: string | undefined, options: { reason?: string }) {
+        const json = wantsJson(this);
+        try {
+          if (needsReason && !options.reason?.trim()) {
+            throw new SpecError(`specs project ${name} exige --reason.`, {
+              code: 'missing_reason',
+              fix: `specs project ${name} --reason "<texto>"`,
+            });
+          }
+          const workspace = await requireWorkspace();
+          const id = await resolvePlanId(workspace.projectRoot, planId);
+          const { manifest, paths } = await loadPlan(workspace.projectRoot, id);
+          const next = await savePlan(paths, {
+            ...manifest,
+            status: target as PlanStatusValue,
+          });
+          const payload = { plan: id, status: next.status, revision: next.revision };
+          if (json) printJson(payload);
+          else printLines([`Plano "${id}" agora em ${next.status} (revisão ${next.revision}).`]);
+        } catch (error) {
+          fail(error, { json, payload: { plan: null } });
+        }
+      });
+  }
 }
 
 function formatReports(reports: ValidationReport[], valid: boolean): string[] {

@@ -149,6 +149,38 @@ describe('specs project — link / adopt / sync / set-state', () => {
     expect(parseJson(missing.stdout).error.code).toBe('link_target_missing');
   });
 
+  it('apply reads a bundle from --file and from stdin, and impact/list/pause work', async () => {
+    const dir = await initProject();
+    await runCli(['project', 'create', 'shop', '--json'], dir);
+
+    const bundle = JSON.stringify({
+      bundleVersion: 1,
+      expectRevision: 0,
+      operations: [
+        { op: 'addChange', ref: '$a', slug: 'foundation', title: 'Fundação', priority: 'critical',
+          plannedChange: { objetivo: 'Base.', escopo: ['x'], criteriosMacro: ['y'] } },
+        { op: 'addChange', ref: '$b', slug: 'auth', title: 'Auth', dependsOn: ['$a'],
+          plannedChange: { objetivo: 'Login.', escopo: ['x'], criteriosMacro: ['y'] } },
+      ],
+    });
+    await writeFile(path.join(dir, 'b.json'), bundle);
+
+    const applied = parseJson((await runCli(['project', 'apply', '--file', 'b.json', '--json'], dir)).stdout);
+    expect(applied).toMatchObject({ applied: true, idMap: { $a: 'CH-001', $b: 'CH-002' } });
+
+    const impact = parseJson((await runCli(['project', 'impact', '--change', 'CH-001', '--json'], dir)).stdout);
+    expect(impact.dependents).toEqual(['CH-002']);
+
+    const list = parseJson((await runCli(['project', 'list', '--json'], dir)).stdout);
+    expect(list.plans[0]).toMatchObject({ id: 'shop', total: 2 });
+
+    const paused = await runCli(['project', 'pause', '--json'], dir);
+    expect(parseJson(paused.stdout).error.code).toBe('missing_reason');
+    const ok = parseJson((await runCli(['project', 'pause', '--reason', 'x', '--json'], dir)).stdout);
+    expect(ok.status).toBe('paused');
+    expect(parseJson((await runCli(['project', 'resume', '--json'], dir)).stdout).status).toBe('active');
+  });
+
   it('a corrupt plan.yaml never affects specs archive', async () => {
     const dir = await initProject();
     await runCli(['project', 'create', 'p', '--json'], dir);

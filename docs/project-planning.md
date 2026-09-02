@@ -1,9 +1,10 @@
 # Project Planning
 
-> **Status:** Fases 1–3 (opt-in). Modelo, proveniência, validação, grafo, três
-> dimensões de estado, `generate`, `status`, `next`, `show`, dashboard, os seis
-> comandos de harness, e vínculo (`link`/`unlink`/`adopt`/`sync`/`set-state`).
-> `apply`, `impact` e `--watch` chegam nas fases seguintes.
+> **Status:** capacidade completa (Fases 1–5), opt-in. Modelo, proveniência,
+> validação, grafo, três dimensões de estado, `generate`, `status`, `next`,
+> `show`, dashboard (com `--watch`), os seis comandos de harness, vínculo
+> (`link`/`unlink`/`adopt`/`sync`/`set-state`), mutação por bundle (`apply`),
+> `impact`, `list` e o ciclo de vida do plano (`pause`/`resume`/`archive`).
 
 O Project Planning adiciona uma camada de **plano** acima da unidade `change`:
 uma forma de decompor um documento grande em incrementos ordenados, rastreáveis e
@@ -105,6 +106,13 @@ specs project unlink   [<plan-id>] <change-id> [--force] [--json]
 specs project adopt    [<plan-id>] <change-name|archive-dir> [--json]
 specs project sync     [<plan-id>] [--check] [--json]
 specs project set-state [<plan-id>] <change-id> <state> [--reason <texto>] [--json]
+specs project apply    [<plan-id>] [--file <path>|-] [--dry-run] [--allow-completed] [--json]
+specs project impact   [<plan-id>] --change <id>... [--json]
+specs project list     [--json]
+specs project pause    [<plan-id>] --reason <texto> [--json]
+specs project resume   [<plan-id>] [--json]
+specs project archive  [<plan-id>] [--json]
+specs project --watch [--interval <s>]
 ```
 
 - `status` — identidade e revisão do plano, progresso geral e por milestone, cada
@@ -146,6 +154,57 @@ similaridade.
 O `archive_path` persistido é um **atalho de leitura**: `status` resolve o
 archive por padrão a cada execução, então a conclusão nunca depende de `sync`.
 `specs archive` não conhece o plano — não há hook nem campo novo no seu JSON.
+
+## Mutação por bundle (`apply`)
+
+Toda mudança estrutural além dos comandos próprios — `addChange`, `updateChange`,
+`setDependencies`, `setBlockers`, `renameSlug`, `replacePlannedChange`,
+`splitChange`, `mergeChanges`, `setMilestones`, `writeDocument` — passa por um
+**bundle JSON** aplicado por `specs project apply` (stdin ou `--file`):
+
+```json
+{
+  "bundleVersion": 1,
+  "expectRevision": 7,
+  "plan": { "name": "...", "status": "active", "sourceDocuments": ["docs/x.md"] },
+  "operations": [
+    { "op": "addChange", "ref": "$a", "slug": "foundation", "title": "Fundação",
+      "priority": "critical", "dependsOn": [],
+      "plannedChange": { "objetivo": "...", "escopo": ["..."], "criteriosMacro": ["..."] } },
+    { "op": "splitChange", "id": "CH-008",
+      "into": [ { "ref": "$s1", "slug": "cart", "title": "Carrinho" },
+                { "ref": "$s2", "slug": "pay", "title": "Pagamento", "dependsOn": ["$s1"] } ],
+      "rewire": { "CH-009": ["$s1"], "CH-010": ["$s1", "$s2"] } }
+  ]
+}
+```
+
+- `expectRevision` precisa casar a revisão no disco (`plan_revision_conflict`).
+- `$ref` só em `addChange` e `splitChange.into`; `dependsOn`/`rewire`/milestones
+  aceitam ID real ou `ref` do mesmo bundle.
+- Nenhuma operação atinge um incremento `archived` sem `--allow-completed` (e aí
+  o relatório traz um `WARNING`).
+- **Split** marca o original `cancelled` com `superseded_by: [novos IDs]` e exige
+  `rewire` cobrindo todos os dependentes. O ID original nunca é reutilizado.
+- **Merge** escolhe um `survivor ∈ ids`, marca os demais `cancelled`, e é
+  recusado se qualquer entrada estiver concluída.
+- O estado proposto passa por `ProjectGraph.from` (ciclo → `plan_invalid`) antes
+  de qualquer escrita. `--dry-run` imprime `idMap`, diff e impacto sem tocar no
+  disco. A escrita é por staging: falha no meio deixa um estado detectável, não
+  um manifesto inválido.
+
+`specs project impact --change <id>...` calcula dependentes, ancestrais,
+milestones atingidos, changes vinculadas com o estado resolvido, capabilities
+compartilhadas (`readDeltaSpecs` de cada change vinculada no disco), Planned
+Changes afetados e incrementos concluídos atingidos.
+
+## Ciclo de vida do plano
+
+`specs project list` indexa os planos (`id`, status declarado e derivado,
+progresso). `pause --reason` / `resume` / `archive` movem o `status` declarado —
+o derivado continua sendo confrontado a cada `status`. `specs project --watch`
+repinta o dashboard por polling reusando o mesmo loop de `specs status --watch`
+(`--interval <s>`, Ctrl+C sai na hora, `--json` e `--watch` são exclusivos).
 
 ## Comandos de harness
 
