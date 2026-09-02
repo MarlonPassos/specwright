@@ -9,6 +9,35 @@ versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ### Corrigido
 
+- **fix(project): falhas da reauditoria de 2026-09-02**
+  - **Brief inválido nunca fica `ready` (R-01, FR-22):** um `content_hash` que
+    confere prova que os bytes são os registrados, **não** que o documento é
+    válido. `status` passa a validar a estrutura do brief e, quando ela falha,
+    emite `planned_change_invalid` (ERROR) e passa `diagnosticBlocking` para a
+    readiness — o incremento vira `blocked` com `diagnostic_blocking`,
+    apresentação `inconsistente`, e `next` nunca o recomenda.
+  - **`apply` valida a árvore proposta inteira (R-01, regra 11 de §7.11):** e não
+    só os briefs que ele próprio escreve. Uma mutação que **toca** um incremento
+    com brief inválido é recusada com `plan_invalid` sem escrever nada; um brief
+    já inválido em outro incremento vira `WARNING` no relatório — o esqueleto que
+    `generate` grava de propósito (§7.5) não trava o fluxo.
+  - **Symlink não cruza mais a fronteira do workspace (R-05, I-8, NFR-08):**
+    `adopt`, `link` e `readEvidence` resolvem o alvo por `safeResolve`/realpath
+    antes de qualquer `stat` ou leitura. Um `spec/changes/<nome>` que aponta para
+    fora do projeto era adotado e copiava um título externo para o manifesto.
+  - **Path de fonte normalizado (R-06, FR-06):** `plan.sourceDocuments` é
+    convertido para a forma POSIX uma vez, no aplicador do bundle; antes um
+    `docs\source.md` era persistido literalmente.
+  - **Commit multi-arquivo com rollback (R-07, NFR-07, AC-49):** `withStaging`
+    ganha pré-checagem (um destino que é diretório é recusado antes do primeiro
+    move), backup de cada destino existente e **rollback** de tudo que já foi
+    movido quando qualquer rename falha. O staging só permanece no disco quando o
+    próprio rollback falha, que é o caso em que §7.13 pede
+    `partial_write_detected`. Antes, uma falha no meio deixava o manifesto na
+    revisão nova e apagava o staging.
+  - Testes: regressão para cada item em `test/unit/project-hardening.test.ts`,
+    incluindo o caso de não-deadlock com o esqueleto. 337 testes.
+
 - **fix(project): falhas residuais da reauditoria**
   - **Validação pré-escrita completa (R-01, §4.1.5, regra 11 de §7.11):** `apply`
     valida o conteúdo de **todos** os briefs da árvore proposta em memória, antes

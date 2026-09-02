@@ -230,10 +230,15 @@ export function applyBundle(
     if (plan.summary !== undefined) working.summary = plan.summary;
     if (plan.scope) working.scope = { in: plan.scope.in ?? [], out: plan.scope.out ?? [] };
     if (plan.sourceDocuments) {
-      working.source_documents = plan.sourceDocuments.map((path) => ({
-        path,
-        sha256: ctx.resolveSourceHash(path) ?? '',
-      }));
+      // FR-06: persist only the POSIX form, normalised once here so the hash,
+      // the resolution and the manifest all agree across platforms.
+      working.source_documents = plan.sourceDocuments.map((declared) => {
+        const normalised = declared.replace(/\\/g, '/');
+        return {
+          path: normalised,
+          sha256: ctx.resolveSourceHash(declared) ?? ctx.resolveSourceHash(normalised) ?? '',
+        };
+      });
     }
   }
 

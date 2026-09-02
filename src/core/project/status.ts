@@ -5,6 +5,7 @@ import { type Workspace } from '../workspace.js';
 import { loadPlan } from './repository.js';
 import { ProjectGraph } from './graph.js';
 import { parsePlannedChange } from './planned-change.js';
+import { validatePlannedChangeContent } from './validate.js';
 import { safeResolve } from './paths.js';
 import { readEvidence } from './evidence.js';
 import { sha256, sourceHash, type HashableSource } from './hashes.js';
@@ -135,6 +136,8 @@ export async function computeProjectStatus(
   // Materialization
   const materialization = new Map<string, MaterializationState>();
   const briefRevision = new Map<string, number>();
+  /** Increments whose brief exists but does not satisfy §7.3. */
+  const invalidBrief = new Map<string, string[]>();
   for (const change of manifest.changes) {
     const ref = change.planned_change;
     if (!ref) {
@@ -156,6 +159,18 @@ export async function computeProjectStatus(
       })
     );
     briefRevision.set(change.id, ref.generated_from_plan_revision);
+
+    // A matching hash proves the bytes are the ones recorded; it does NOT prove
+    // the document is structurally valid. Without this an invalid brief read as
+    // `current` and the increment as `ready` (FR-22).
+    if (briefContent !== undefined) {
+      const issues = validatePlannedChangeContent(
+        briefContent,
+        { id: change.id, slug: change.slug },
+        ref.path
+      ).filter((issue) => issue.level === 'ERROR');
+      if (issues.length > 0) invalidBrief.set(change.id, issues.map((issue) => issue.message));
+    }
   }
 
   // Execution — independent of other changes
@@ -189,6 +204,7 @@ export async function computeProjectStatus(
         change,
         materialization: materialization.get(id2) ?? 'missing',
         dependencyExecution,
+        diagnosticBlocking: invalidBrief.has(id2),
       })
     );
   }
@@ -210,6 +226,7 @@ export async function computeProjectStatus(
         planningState: change.planning_state,
         readiness: ready.readiness,
         execution: exec,
+        diagnosticBlocking: invalidBrief.has(change.id),
       }),
       priority: change.priority,
       milestone: change.milestone,
@@ -249,6 +266,16 @@ export async function computeProjectStatus(
     anySourceChanged,
     ambiguousArchive,
   });
+
+  for (const [id2, messages] of invalidBrief) {
+    diagnostics.push({
+      level: 'ERROR',
+      code: 'planned_change_invalid',
+      path: `changes.${id2}.planned_change`,
+      message: `o Planned Change de ${id2} não é válido: ${messages.join('; ')}`,
+      fix: 'specs project validate --json',
+    });
+  }
 
   const derivedStatus = deriveStatus(manifest, views, diagnostics);
   if (derivedStatus !== manifest.status) {

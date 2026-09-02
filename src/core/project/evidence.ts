@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { pathExists } from '../../util/fs.js';
+import { isDirectory, pathExists } from '../../util/fs.js';
 import { readTaskProgress } from '../change/model.js';
 import {
   ARCHIVE_DIR,
@@ -42,10 +42,13 @@ export async function readEvidence(
     return { linked: false, activeDirExists: false, proposalPresent: false, ambiguousArchive: [] };
   }
 
-  const activeDir = path.join(workspace.changesPath, link.name);
-  const activeDirExists = await pathExists(activeDir);
-  const proposalPresent = activeDirExists && (await pathExists(path.join(activeDir, 'proposal.md')));
-  const progress = activeDirExists ? await readTaskProgress(activeDir) : undefined;
+  // `link.name` comes from the manifest: resolve it fail-closed, so a symlink
+  // that leaves the workspace reads as absent instead of leaking (I-8, NFR-08).
+  const activeDir = safeResolve(workspace.changesPath, link.name);
+  const activeDirExists = activeDir !== undefined && (await isDirectory(activeDir));
+  const proposalPresent =
+    activeDirExists && (await pathExists(path.join(activeDir!, 'proposal.md')));
+  const progress = activeDirExists ? await readTaskProgress(activeDir!) : undefined;
 
   const matches = await resolveArchive(workspace, link);
 

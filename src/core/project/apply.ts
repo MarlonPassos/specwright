@@ -174,18 +174,50 @@ export async function applyPlanBundle(
     }
   }
 
-  // FALHAR ANTES DE GRAVAR (§4.1.5, regra 11 de §7.11): every brief the bundle
-  // would write is validated in memory. A bundle carrying an empty
-  // `plannedChange` used to be committed and only then reported as invalid.
-  const proposedIssues = [];
-  for (const [relPath, content] of briefFiles) {
-    const record = result.manifest.changes.find((entry) => entry.planned_change?.path === relPath);
-    if (!record) continue;
+  // FALHAR ANTES DE GRAVAR (§4.1.5, regra 11 de §7.11). The proposed tree is
+  // EVERY brief the plan will have after the commit, not only the ones this
+  // bundle writes: a brief already invalid on disk used to survive a mutation
+  // that merely touched `priority`, leaving the plan invalid.
+  const proposedIssues: Array<{ level: string; path: string; message: string; changeId: string }> = [];
+  for (const record of result.manifest.changes) {
+    const ref = record.planned_change;
+    if (!ref) continue;
+
+    let content = briefFiles.get(ref.path);
+    if (content === undefined) {
+      const absolute = safeResolve(paths.dir, ref.path);
+      content = absolute === undefined ? undefined : await readFileIfExists(absolute);
+    }
+    if (content === undefined) {
+      proposedIssues.push({
+        level: 'ERROR',
+        path: ref.path,
+        message: `o Planned Change de ${record.id} não existe no disco`,
+        changeId: record.id,
+      });
+      continue;
+    }
     proposedIssues.push(
-      ...validatePlannedChangeContent(content, { id: record.id, slug: record.slug }, relPath)
+      ...validatePlannedChangeContent(content, { id: record.id, slug: record.slug }, ref.path).map(
+        (issue) => ({ ...issue, changeId: record.id })
+      )
     );
   }
-  const blocking = proposedIssues.filter((issue) => issue.level === 'ERROR');
+  // What this bundle touches must be valid — that is the pre-write guarantee.
+  // A brief that was ALREADY invalid elsewhere is surfaced as a diagnostic
+  // instead of blocking: `generate` writes a deliberately invalid skeleton for
+  // an increment with no content yet (§7.5), and blocking on it would deadlock
+  // the documented workflow. Such an increment can never be `ready` — `status`
+  // reports `planned_change_invalid` and readiness falls to `blocked`.
+  const touched = new Set(collectTargets(bundle, result.idMap));
+  for (const relPath of briefFiles.keys()) {
+    const record = result.manifest.changes.find((entry) => entry.planned_change?.path === relPath);
+    if (record) touched.add(record.id);
+  }
+
+  const blocking = proposedIssues.filter(
+    (issue) => issue.level === 'ERROR' && touched.has(issue.changeId)
+  );
   if (blocking.length > 0) {
     throw new SpecError(
       `O estado proposto é inválido; nada foi escrito:\n${blocking
@@ -193,6 +225,22 @@ export async function applyPlanBundle(
         .join('\n')}`,
       { code: 'plan_invalid', fix: 'specs project validate --json' }
     );
+  }
+  // One diagnostic per increment, not one per rule it violates.
+  const alreadyInvalid = new Map<string, string[]>();
+  for (const issue of proposedIssues) {
+    if (issue.level !== 'ERROR' || touched.has(issue.changeId)) continue;
+    alreadyInvalid.set(issue.changeId, [
+      ...(alreadyInvalid.get(issue.changeId) ?? []),
+      issue.message,
+    ]);
+  }
+  for (const [changeId, messages] of alreadyInvalid) {
+    diagnostics.push({
+      level: 'WARNING',
+      code: 'planned_change_invalid',
+      message: `${changeId} já tinha um Planned Change inválido antes desta mutação: ${messages.join('; ')}`,
+    });
   }
 
   if (options.dryRun) {

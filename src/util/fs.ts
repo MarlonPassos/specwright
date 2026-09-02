@@ -70,51 +70,98 @@ export async function writeFileAtomic(target: string, content: string): Promise<
 }
 
 /**
- * Staging for a multi-file mutation. Every write goes into a sibling temporary
- * directory first; only after `run` resolves are the files moved onto their
- * destinations, one atomic rename each. On any error the staging directory is
- * removed and no destination is touched.
+ * Staging for a multi-file mutation, with rollback.
  *
- * The rename step is per-file, not a single filesystem transaction: an
- * interruption mid-sequence leaves the already-moved files in place and the
- * staging directory on disk, which `specs project validate` reports as
- * `partial_write_detected`. That is deliberate — a detectable, `git restore`-able
- * partial state beats an invisible wrong one.
+ * Everything is written to a sibling temporary directory first. Before the
+ * commit, every destination is checked: a destination that is a directory would
+ * make `rename` fail halfway, so it is rejected up front. During the commit each
+ * existing destination is moved aside into the staging area before being
+ * replaced, so a failure on the N-th file restores every destination already
+ * moved and the mutation is all-or-nothing.
+ *
+ * When a rollback itself cannot complete, the staging directory is deliberately
+ * LEFT ON DISK so `specs project validate` can report `partial_write_detected`
+ * and the repair is `git restore planning/<plan-id>/`.
  */
 export async function withStaging<T>(
   stagingRoot: string,
   run: (stage: (relativePath: string, content: string) => void) => Promise<T>
 ): Promise<T> {
   const stagingDir = path.join(stagingRoot, `.tmp-${process.pid}-${randomBytes(6).toString('hex')}`);
+  const backupDir = path.join(stagingDir, '.backup');
   const pending = new Map<string, string>();
 
   const stage = (relativePath: string, content: string): void => {
     pending.set(relativePath, content);
   };
 
+  let result: T;
   try {
-    const result = await run(stage);
+    result = await run(stage);
+  } catch (error) {
+    await fs.rm(stagingDir, { recursive: true, force: true });
+    throw error;
+  }
 
+  // Pre-flight: a destination that is a directory can never be replaced by a
+  // rename. Catch it before the first move instead of halfway through.
+  for (const relativePath of pending.keys()) {
+    const target = path.join(stagingRoot, relativePath);
+    const stats = await fs.stat(target).catch(() => undefined);
+    if (stats?.isDirectory()) {
+      await fs.rm(stagingDir, { recursive: true, force: true });
+      throw new Error(
+        `Não é possível gravar "${relativePath}": o destino existe e é um diretório.`
+      );
+    }
+  }
+
+  try {
     await ensureDir(stagingDir);
     for (const [relativePath, content] of pending) {
       const staged = path.join(stagingDir, relativePath);
       await ensureDir(path.dirname(staged));
       await fs.writeFile(staged, content, 'utf8');
     }
-
-    for (const relativePath of pending.keys()) {
-      const staged = path.join(stagingDir, relativePath);
-      const target = path.join(stagingRoot, relativePath);
-      await ensureDir(path.dirname(target));
-      await fs.rename(staged, target);
-    }
-
-    await fs.rm(stagingDir, { recursive: true, force: true });
-    return result;
   } catch (error) {
     await fs.rm(stagingDir, { recursive: true, force: true });
     throw error;
   }
+
+  /** Destinations already replaced, newest first, for rollback. */
+  const moved: Array<{ target: string; backup?: string }> = [];
+
+  try {
+    for (const relativePath of pending.keys()) {
+      const staged = path.join(stagingDir, relativePath);
+      const target = path.join(stagingRoot, relativePath);
+      await ensureDir(path.dirname(target));
+
+      let backup: string | undefined;
+      if (await pathExists(target)) {
+        backup = path.join(backupDir, relativePath);
+        await ensureDir(path.dirname(backup));
+        await fs.rename(target, backup);
+      }
+      await fs.rename(staged, target);
+      moved.unshift({ target, backup });
+    }
+  } catch (error) {
+    try {
+      for (const entry of moved) {
+        await fs.rm(entry.target, { force: true });
+        if (entry.backup) await fs.rename(entry.backup, entry.target);
+      }
+      await fs.rm(stagingDir, { recursive: true, force: true });
+    } catch {
+      // The rollback failed: keep the staging directory so the partial state is
+      // detectable and reparable instead of silently disappearing.
+    }
+    throw error;
+  }
+
+  await fs.rm(stagingDir, { recursive: true, force: true });
+  return result;
 }
 
 /**

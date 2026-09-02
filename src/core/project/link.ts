@@ -7,6 +7,7 @@ import { parseProposal } from '../change/model.js';
 import { loadPlan, savePlan } from './repository.js';
 import { nextChangeId, type ChangeLink, type PlanningState, type ProjectChange } from './model.js';
 import { readEvidence } from './evidence.js';
+import { safeResolve } from './paths.js';
 import { assertTransition, executionOf } from './state.js';
 import { computeProjectStatus } from './status.js';
 
@@ -63,8 +64,10 @@ export async function linkChange(
       code: 'invalid_change_name',
     });
   }
-  // A change is a DIRECTORY. A regular file with the same name is not a change.
-  if (!(await isDirectory(path.join(workspace.changesPath, changeName)))) {
+  // A change is a DIRECTORY inside `spec/changes/`. A regular file is not a
+  // change, and a symlink that realpaths outside the workspace is not either.
+  const changeDir = safeResolve(workspace.changesPath, changeName);
+  if (changeDir === undefined || !(await isDirectory(changeDir))) {
     throw new SpecError(`spec/changes/${changeName}/ não existe como diretório.`, {
       code: 'link_target_missing',
       fix: `specs new change ${changeName}`,
@@ -160,14 +163,16 @@ export async function adoptChange(
   const { manifest, paths } = await loadPlan(workspace.projectRoot, planId);
 
   assertSafeAdoptTarget(target);
-  const activeDir = path.join(workspace.changesPath, target);
-  const archiveDir = path.join(workspace.archivePath, target);
+  // `safeResolve` runs realpath: a symlink pointing outside the workspace
+  // resolves to undefined and the target is simply not found (I-8, NFR-08).
+  const activeDir = safeResolve(workspace.changesPath, target);
+  const archiveDir = safeResolve(workspace.archivePath, target);
 
   let name: string;
   let link: ChangeLink;
   let proposalDir: string;
 
-  if (await isDirectory(activeDir)) {
+  if (activeDir !== undefined && (await isDirectory(activeDir))) {
     name = target;
     proposalDir = activeDir;
     link = {
@@ -176,7 +181,7 @@ export async function adoptChange(
       archive_path: null,
       linked_at: localDateStamp(),
     };
-  } else if (await isDirectory(archiveDir)) {
+  } else if (archiveDir !== undefined && (await isDirectory(archiveDir))) {
     name = target.replace(/^\d{4}-\d{2}-\d{2}-/, '').replace(/-\d+$/, '');
     proposalDir = archiveDir;
     link = {
