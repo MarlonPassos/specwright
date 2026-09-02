@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { writeFileEnsured } from '../../util/fs.js';
-import { workflowCommands } from '../workflows/index.js';
+import { allCommands } from '../workflows/index.js';
 import { resolveCommand } from './invocation.js';
 import type { HarnessAdapter } from './types.js';
 
@@ -14,7 +14,7 @@ export interface GeneratedFile {
 
 /** Renders every workflow command for one harness, without touching the disk. */
 export function renderHarness(adapter: HarnessAdapter): GeneratedFile[] {
-  return workflowCommands().map((command) => ({
+  return allCommands().map((command) => ({
     harness: adapter.id,
     command: command.id,
     path: adapter.filePath(command.id),

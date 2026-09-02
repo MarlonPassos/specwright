@@ -14,6 +14,7 @@ import {
   sectionHasText,
 } from './planned-change.js';
 import { parseManifest } from './repository.js';
+import { ProjectGraph } from './graph.js';
 import {
   PLANNED_CHANGES_DIR,
   planPaths,
@@ -139,6 +140,15 @@ async function checkManifest(
           `${change.id}.superseded_by cita ${superseded}, que o plano não declara`
         );
       }
+    }
+  }
+
+  // Cycle: the graph is the authority; identity errors above are reported already.
+  try {
+    ProjectGraph.from(manifest.changes);
+  } catch (graphError) {
+    if ((graphError as { code?: string }).code === 'dependency_cycle') {
+      error('changes', (graphError as Error).message);
     }
   }
 

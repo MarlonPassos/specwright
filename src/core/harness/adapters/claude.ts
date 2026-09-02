@@ -22,7 +22,7 @@ export const claudeAdapter: HarnessAdapter = {
 name: ${yamlScalar(commandName(command.id))}
 description: ${yamlScalar(command.description)}
 argument-hint: ${yamlScalar(command.argumentHint)}
-allowed-tools: ${ALLOWED_TOOLS}
+allowed-tools: ${command.allowedTools ?? ALLOWED_TOOLS}
 ---
 
 ${command.body}

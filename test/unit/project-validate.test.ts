@@ -86,6 +86,20 @@ describe('validatePlan — manifest rules', () => {
     expect(issues(reports, 'ERROR').join(' ')).toMatch(/duplicad/);
   });
 
+  it('flags a dependency cycle before any write', async () => {
+    const workspace = await makePlanWorkspace();
+    const data = manifest({
+      changes: [
+        change({ id: 'CH-001', slug: 'a', depends_on: ['CH-003'] }),
+        change({ id: 'CH-002', slug: 'b', depends_on: ['CH-001'] }),
+        change({ id: 'CH-003', slug: 'c', depends_on: ['CH-002'] }),
+      ],
+    });
+    await seedPlan(workspace, data);
+    const errors = issues(await validatePlan(workspace.projectRoot, data.id, {}), 'ERROR').join(' ');
+    expect(errors).toMatch(/Ciclo de dependência/);
+  });
+
   it('flags an unknown dependency and a self dependency', async () => {
     const workspace = await makePlanWorkspace();
     const data = manifest({

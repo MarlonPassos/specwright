@@ -25,7 +25,7 @@ export const PLAN_STATUSES = [
   'completed',
   'archived',
 ] as const;
-export type PlanStatus = (typeof PLAN_STATUSES)[number];
+export type PlanStatusValue = (typeof PLAN_STATUSES)[number];
 
 /** Derived, never persisted. */
 export const MATERIALIZATION_STATES = ['current', 'outdated', 'modified', 'missing'] as const;

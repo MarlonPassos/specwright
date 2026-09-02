@@ -9,6 +9,31 @@ versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ### Adicionado
 
+- **feat(project): Project Planning — Fase 2 (grafo, estado, materialização, dashboard e comandos)**
+  - `src/core/project/graph.ts` — DAG entre Project Changes com ordem topológica
+    (desempate por declaração), dependentes, ancestrais, descendentes e detecção
+    de ciclo com o caminho na mensagem.
+  - `evidence.ts` + `state.ts` — as três dimensões de estado: `planning_state`
+    (persistido), `readiness` (derivado do grafo e da materialização) e
+    `execution` (observado no filesystem da change nativa), com códigos de razão
+    estáveis e apresentação derivada.
+  - `status.ts` — `specs project status`: progresso geral e por milestone, cada
+    incremento com as três dimensões, status derivado do plano e diagnósticos
+    (`dangling_link`, `duplicate_link`, `source_changed`, `missing_source`, …).
+  - `next.ts` — `specs project next`: ranking determinístico de cinco níveis,
+    alternativas, `parallelReady` com ressalva e `excluded` com o código que
+    eliminou cada incremento.
+  - `generate.ts` + `render.ts` — `specs project generate`: materialização
+    seletiva por `--change`/`--milestone`, idempotente, com detecção de fonte
+    alterada e edição humana (conflito de três vias, recusa sem `--force`) e
+    projeção do bloco de roadmap em `plan.md` preservando o texto fora dos
+    marcadores. `--dry-run` não toca no disco.
+  - `specs project show <change-id>` e o dashboard de `specs project` (somente
+    leitura; `--json` e `--watch` mutuamente exclusivos).
+  - Seis comandos de harness gerados para os quatro harnesses (`project-plan`,
+    `-review`, `-generate`, `-status`, `-next`, `-refine`), com `allowed-tools`
+    por comando no Claude Code.
+
 - **feat(project): Project Planning — Fase 1 (modelo, proveniência e validação)**
   - Nova área de planejamento em `planning/<plan-id>/`, fora de `spec/`, com
     `plan.yaml` (manifesto estruturado), `plan.md`, `architecture.md` e
@@ -35,6 +60,15 @@ versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
   além de `'change'` e `'spec'`. `formatReports` já imprime `report.type`
   genericamente, então consumidores da saída humana não são afetados; quem lê o
   JSON de `validate` passa a ver os dois valores novos apenas para planos.
+- **Catálogo de comandos gerados** passa de sete para treze. `workflowCommands()`
+  continua devolvendo os sete comandos do ciclo de change; `allCommands()` expõe
+  o conjunto completo (ciclo + seis comandos de plano), e é ele que `init`,
+  `update`, `harnesses` e o writer de harness passam a iterar. `specs init`/
+  `update --harnesses all` escrevem 52 arquivos de comando (antes 28); a escrita
+  é aditiva e nenhum arquivo anterior muda de conteúdo.
+- **`WorkflowCommand`** ganha o campo opcional `allowedTools`; o adapter do
+  Claude Code usa `command.allowedTools ?? 'Bash(specs:*)'`, então os sete
+  comandos existentes mantêm exatamente `Bash(specs:*)`.
 
 ## [0.7.2] - 2026-09-01
 

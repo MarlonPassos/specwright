@@ -1,8 +1,9 @@
 # Project Planning
 
-> **Status:** Fase 1 (opt-in). Modelo, proveniência e validação. Grafo, estado,
-> `generate`, `status`, `next`, dashboard, vínculo e os comandos de harness
-> chegam nas fases seguintes.
+> **Status:** Fases 1–2 (opt-in). Modelo, proveniência, validação, grafo, três
+> dimensões de estado, `generate`, `status`, `next`, `show`, dashboard e os seis
+> comandos de harness. Vínculo (`link`/`adopt`/`sync`/`set-state`), `apply`,
+> `impact` e `--watch` chegam nas fases seguintes.
 
 O Project Planning adiciona uma camada de **plano** acima da unidade `change`:
 uma forma de decompor um documento grande em incrementos ordenados, rastreáveis e
@@ -71,12 +72,57 @@ julgamento humano: *a fonte mudou desde que este brief foi escrito?* e *alguém
 editou este brief à mão?* Os hashes normalizam CRLF/CR para LF antes de calcular,
 então independem de plataforma.
 
-## Comandos (Fase 1)
+## Três dimensões de estado
+
+Uma Project Change não tem um campo único de status. Três dimensões independentes,
+e nenhuma sobrescreve a outra:
+
+| Dimensão | Origem | Valores |
+|---|---|---|
+| `planning_state` | **persistido** em `plan.yaml` | `idea` · `planned` · `on_hold` · `cancelled` |
+| `readiness` | **derivado** do grafo e da materialização | `ready` · `blocked` · `not_applicable` |
+| `execution` | **observado** no filesystem da change nativa | `unlinked` · `proposed` · `in_progress` · `verifying` · `archived` · `unknown` |
+
+`readiness: ready` exige `planning_state: planned`, Planned Change `current`, toda
+dependência com `execution: archived` e nenhum blocker manual. Um blocker manual
+tem precedência sobre dependência e aparece em `manualBlockers`, com `blockedBy`
+vazio. Nada derivado é gravado — `status` recalcula tudo a cada leitura.
+
+## Comandos
 
 ```
+specs project                                     # dashboard humano
+specs project --json                              # dashboard estruturado (statusPayload + dashboardSchemaVersion + generatedAt)
 specs project create <plan-id> [fontes...] [--name <nome>] [--owner <nome>] [--json]
 specs project validate [<plan-id>] [--strict] [--json]
+specs project status   [<plan-id>] [--json]
+specs project next     [<plan-id>] [--json]
+specs project show     [<plan-id>] <change-id> [--json]
+specs project generate [<plan-id>] [--change <id>...] [--milestone <id>]
+                                   [--dry-run] [--force] [--expect-revision <n>] [--json]
 ```
+
+- `status` — identidade e revisão do plano, progresso geral e por milestone, cada
+  Project Change com as três dimensões e códigos de razão estáveis, milestones
+  derivados e diagnósticos.
+- `next` — recomendação determinística (ranking de cinco níveis: prioridade,
+  desbloqueios transitivos, desbloqueios diretos, `milestone.order`, índice de
+  declaração), `alternatives`, `parallelReady` com ressalva, e `excluded` com o
+  código que eliminou cada incremento. Sem elegíveis, `recommended` é `null`.
+- `generate` — materializa os briefs dos incrementos selecionados. Idempotente
+  (`current` → `skipped`), detecta fonte alterada (`outdated`) e edição humana
+  (`modified`, recusa sem `--force`), projeta o bloco de roadmap em `plan.md`
+  preservando o texto fora dos marcadores, e recusa grafo inválido antes de
+  qualquer escrita. `--dry-run` não toca no disco.
+
+## Comandos de harness
+
+Seis comandos gerados para os quatro harnesses (`/spec-project-plan`,
+`-review`, `-generate`, `-status`, `-next`, `-refine`). Cada corpo instrui: não
+implementar código, não criar artefatos de change, consultar estado por `--json`,
+mostrar preview e pedir confirmação em mensagem separada antes da primeira
+escrita, e rotular fato, cálculo e recomendação. O catálogo gerado passa de sete
+para treze comandos; `specs init`/`update --harnesses all` escrevem 52 arquivos.
 
 - `create` é idempotente por recusa: um plano existente falha com `plan_exists` e
   nenhum arquivo é modificado. Uma fonte fora da raiz do projeto (`..`, absoluto,
@@ -103,8 +149,11 @@ seção recomendada vazia no brief; `missing_source`; `source_changed`;
 `orphan_planned_change`; `plan.md`/`architecture.md` ausente; plano em `draft`
 com briefs já materializados.
 
-> A detecção de ciclo, o estado derivado (`readiness`, `execution`) e as regras
-> que dependem deles chegam com o grafo na Fase 2.
+A detecção de **ciclo** (`dependency_cycle`, com o caminho na mensagem) falha
+antes de qualquer escrita. Os diagnósticos derivados que aparecem em
+`specs project status` — `dangling_link`, `duplicate_link`, `source_changed`,
+`missing_source`, `ambiguous_archive_match` — usam código estável e trazem `fix`
+quando há recuperação óbvia.
 
 ## Limites
 

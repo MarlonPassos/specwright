@@ -5,9 +5,11 @@ import { reviseCommand } from './revise.js';
 import { implementCommand } from './implement.js';
 import { verifyCommand } from './verify.js';
 import { archiveCommand } from './archive.js';
+import { projectCommands } from './project/index.js';
 import type { WorkflowCommand } from './types.js';
 
 export * from './types.js';
+export { projectCommands } from './project/index.js';
 
 /**
  * The workflow, in the order it is walked, with explore first: it sits outside
@@ -34,4 +36,21 @@ export function workflowCommand(id: string): WorkflowCommand | undefined {
 
 export function workflowCommandIds(): string[] {
   return workflowCommands().map((command) => command.id);
+}
+
+/**
+ * The complete generated catalogue: the seven change-cycle commands plus the six
+ * plan commands. `workflowCommands()` still returns only the cycle, so callers
+ * that reason about the delivery loop are untouched.
+ */
+export function allCommands(): WorkflowCommand[] {
+  return [...workflowCommands(), ...projectCommands()];
+}
+
+export function allCommandIds(): string[] {
+  return allCommands().map((command) => command.id);
+}
+
+export function anyCommand(id: string): WorkflowCommand | undefined {
+  return allCommands().find((command) => command.id === id);
 }

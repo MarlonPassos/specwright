@@ -9,10 +9,27 @@ import {
 import { detectHarness } from '../../src/core/harness/current.js';
 import { renderCommandRefs, resolveCommand } from '../../src/core/harness/invocation.js';
 import { renderHarness, renderHarnesses } from '../../src/core/harness/writer.js';
-import { commandName, commandRef, workflowCommand, workflowCommands } from '../../src/core/workflows/index.js';
+import {
+  allCommandIds,
+  allCommands,
+  commandName,
+  commandRef,
+  projectCommands,
+  workflowCommand,
+  workflowCommands,
+} from '../../src/core/workflows/index.js';
 
 const EXPECTED_HARNESSES = ['claude', 'codex', 'opencode', 'kiro'];
-const EXPECTED_COMMANDS = ['explore', 'propose', 'continue', 'revise', 'implement', 'verify', 'archive'];
+const EXPECTED_WORKFLOW_COMMANDS = ['explore', 'propose', 'continue', 'revise', 'implement', 'verify', 'archive'];
+const EXPECTED_PROJECT_COMMANDS = [
+  'project-plan',
+  'project-review',
+  'project-generate',
+  'project-status',
+  'project-next',
+  'project-refine',
+];
+const EXPECTED_COMMANDS = [...EXPECTED_WORKFLOW_COMMANDS, ...EXPECTED_PROJECT_COMMANDS];
 
 /** How each harness spells a command, and therefore what its files may contain. */
 const EXPECTED_INVOCATION: Record<string, (id: string) => string> = {
@@ -23,7 +40,7 @@ const EXPECTED_INVOCATION: Record<string, (id: string) => string> = {
 };
 
 /** Every command reference a generated file could carry, in any harness. */
-const ANY_INVOCATION = /[/$]spec-[a-z]+/g;
+const ANY_INVOCATION = /[/$]spec-[a-z][a-z-]*/g;
 
 describe('harness registry', () => {
   it('supports exactly the four target harnesses', () => {
@@ -43,7 +60,13 @@ describe('harness registry', () => {
 
 describe('generated commands', () => {
   it('exposes the seven workflow commands', () => {
-    expect(workflowCommands().map((command) => command.id)).toEqual(EXPECTED_COMMANDS);
+    expect(workflowCommands().map((command) => command.id)).toEqual(EXPECTED_WORKFLOW_COMMANDS);
+  });
+
+  it('exposes the six plan commands and a catalogue of thirteen', () => {
+    expect(projectCommands().map((command) => command.id)).toEqual(EXPECTED_PROJECT_COMMANDS);
+    expect(allCommands()).toHaveLength(13);
+    expect(allCommandIds()).toEqual(EXPECTED_COMMANDS);
   });
 
   it('defines explore as an optional, read-only thinking mode', () => {

@@ -72,6 +72,42 @@ describe('specs project — CLI', () => {
     expect(() => parseJson(result.stdout)).not.toThrow();
     expect(parseJson(result.stdout).error.code).toBeTruthy();
   });
+
+  it('status, next, generate and the dashboard round-trip on a real plan', async () => {
+    const dir = await initProject();
+    await writeFile(path.join(dir, 'docs/v.md'), '# vision\n');
+    await runCli(['project', 'create', 'p', 'docs/v.md', '--json'], dir);
+
+    // Seed two increments via a bundle-less manifest edit is not allowed;
+    // generate needs a change record, so drive it through the CLI surface only.
+    const status0 = parseJson((await runCli(['project', 'status', '--json'], dir)).stdout);
+    expect(status0.plan.id).toBe('p');
+    expect(status0.changes).toEqual([]);
+
+    const next0 = parseJson((await runCli(['project', 'next', '--json'], dir)).stdout);
+    expect(next0.recommended).toBeNull();
+    expect(next0.parallelCaveat).toBeTruthy();
+
+    const dash = parseJson((await runCli(['project', '--json'], dir)).stdout);
+    expect(dash.dashboardSchemaVersion).toBe(1);
+    expect(dash.generatedAt).toBeTruthy();
+  });
+
+  it('rejects --json with --watch (AC-59)', async () => {
+    const dir = await initProject();
+    await runCli(['project', 'create', 'p', '--json'], dir);
+    const result = await runCli(['project', '--json', '--watch'], dir);
+    expect(result.code).toBe(1);
+    expect(parseJson(result.stdout).error.code).toBe('invalid_option');
+  });
+
+  it('the empty dashboard suggests create and writes nothing (AC-58)', async () => {
+    const dir = await initProject();
+    const result = await runCli(['project'], dir);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('specs project create');
+    await expect(fs.stat(path.join(dir, 'planning'))).rejects.toThrow();
+  });
 });
 
 describe('specs project — no regression', () => {

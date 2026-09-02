@@ -119,6 +119,41 @@ export async function hashesFor(
   return { source_hash: sourceHash(hashable), content_hash: sha256(content) };
 }
 
+/** Writes a Planned Change ref onto a change with hashes matching the seeded file. */
+export async function withBrief(
+  workspace: Workspace,
+  planId: string,
+  c: ProjectChange
+): Promise<ProjectChange> {
+  const file = await seedPlannedChange(workspace, planId, {
+    id: c.id,
+    slug: c.slug,
+    title: c.title,
+  });
+  const content = await fs.readFile(file, 'utf8');
+  return {
+    ...c,
+    planned_change: {
+      path: `planned-changes/${plannedChangeFileName(c.id, c.slug)}`,
+      generated_from_plan_revision: 0,
+      source_hash: sourceHash([]),
+      content_hash: sha256(content),
+    },
+  };
+}
+
+/** Creates `spec/changes/archive/<date>-<slug>/` so evidence resolves `archived`. */
+export async function seedArchivedChange(
+  workspace: Workspace,
+  slug: string,
+  date = '2026-09-01'
+): Promise<string> {
+  const dir = path.join(workspace.archivePath, `${date}-${slug}`);
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(path.join(dir, 'proposal.md'), '# archived\n');
+  return dir;
+}
+
 /** fixture: 3 increments, linear chain, one milestone, all with skeleton briefs. */
 export function planSimple(): PlanManifest {
   return manifest({

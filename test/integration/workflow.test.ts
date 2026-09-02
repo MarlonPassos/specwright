@@ -10,6 +10,7 @@ import { listChangeEntries, listSpecEntries } from '../../src/core/list.js';
 import { showChange } from '../../src/core/show.js';
 import { validateSpecContent } from '../../src/core/validate/spec-validator.js';
 import { workspaceAt, listArchivedChanges } from '../../src/core/workspace.js';
+import { allCommands } from '../../src/core/workflows/index.js';
 import { loadConfig } from '../../src/core/config.js';
 import { makeTempDir, makeWorkspace, seedChange, writeFile } from '../helpers/workspace.js';
 
@@ -20,7 +21,7 @@ describe('init', () => {
 
     expect(result.created).toBe(true);
     expect(result.harnesses).toEqual(['claude', 'codex', 'opencode', 'kiro']);
-    expect(result.files).toHaveLength(28);
+    expect(result.files).toHaveLength(allCommands().length * 4);
 
     for (const file of result.files) {
       await expect(fs.stat(path.join(dir, file.path))).resolves.toBeTruthy();

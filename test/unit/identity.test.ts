@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { allHarnesses } from '../../src/core/harness/registry.js';
 import { renderHarnesses } from '../../src/core/harness/writer.js';
-import { workflowCommands } from '../../src/core/workflows/index.js';
+import { allCommands } from '../../src/core/workflows/index.js';
 import { projectRoot } from '../helpers/workspace.js';
 
 const CLI = 'specs';
@@ -70,7 +70,7 @@ describe('project identity', () => {
 
   it('documents every workflow command in the readme', async () => {
     const readme = await readText('README.md');
-    for (const command of workflowCommands()) {
+    for (const command of allCommands()) {
       expect(readme).toContain(`/${COMMAND_PREFIX}${command.id}`);
     }
   });

@@ -192,3 +192,17 @@ Sai com `1` quando inválido.
 Códigos de erro: `plan_not_found`, `ambiguous_plan`, `plan_exists`, `invalid_plan`,
 `plan_invalid`, `unsupported_plan_version`, `unsafe_source_path`, `unsafe_plan_path`,
 `source_not_found`.
+
+### `specs project status` / `next` / `show` / `generate`
+
+`status` devolve as três dimensões de cada incremento, progresso, milestones
+derivados e diagnósticos. `next` recomenda o próximo incremento com ranking
+determinístico e justifica cada exclusão. `show <change-id>` traz o registro, o
+Planned Change parseado seção por seção, dependências e dependentes resolvidos.
+`generate` materializa os briefs (`--change`, `--milestone`, `--dry-run`,
+`--force`, `--expect-revision`); recusa sobrescrever um brief editado à mão e
+projeta o roadmap em `plan.md`.
+
+`specs project` sem subcomando renderiza o dashboard (somente leitura); `--json`
+soma `dashboardSchemaVersion` e `generatedAt` ao payload de `status`. `--json` e
+`--watch` são mutuamente exclusivos (`invalid_option`).
