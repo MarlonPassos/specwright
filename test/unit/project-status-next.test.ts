@@ -299,3 +299,54 @@ describe('progress — conta trabalho pendente, não entregue', () => {
   });
 });
 
+describe('next.startWith — nunca manda criar o que já existe', () => {
+  it('sugere vincular quando a change já está no archive', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedArchivedChange(workspace, 'bug-fixes');
+    const ch = await withBrief(workspace, 'demo', change({ id: 'CH-001', slug: 'bug-fixes' }));
+    await seedPlan(workspace, manifest({ id: 'demo', changes: [ch] }));
+
+    const next = recommendNext(await computeProjectStatus(workspace, 'demo'));
+    expect(next.recommended!.startWith).toBe('specs project link CH-001 bug-fixes');
+    expect(next.recommended!.startWith).not.toContain('specs new change');
+  });
+
+  it('sugere vincular quando a change ativa já existe', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedChange(workspace, 'bug-fixes');
+    const ch = await withBrief(workspace, 'demo', change({ id: 'CH-001', slug: 'bug-fixes' }));
+    await seedPlan(workspace, manifest({ id: 'demo', changes: [ch] }));
+
+    const next = recommendNext(await computeProjectStatus(workspace, 'demo'));
+    expect(next.recommended!.startWith).toBe('specs project link CH-001 bug-fixes');
+  });
+
+  it('pede um nome novo quando outro incremento já vinculou aquele nome', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedArchivedChange(workspace, 'auth');
+    // O slug de um incremento e o nome de vínculo de outro são independentes:
+    // CH-001 já reivindicou a change "auth"; o slug de CH-002 também é "auth".
+    const owner = change({
+      id: 'CH-001',
+      slug: 'fundacao',
+      link: { name: 'auth', active_path: null, archive_path: 'spec/changes/archive/2026-09-01-auth', linked_at: '2026-09-01' },
+    });
+    const wants = await withBrief(workspace, 'demo', change({ id: 'CH-002', slug: 'auth' }));
+    await seedPlan(workspace, manifest({ id: 'demo', changes: [owner, wants] }));
+
+    const next = recommendNext(await computeProjectStatus(workspace, 'demo'));
+    expect(next.recommended!.id).toBe('CH-002');
+    expect(next.recommended!.startWith).toBe('specs new change auth-2');
+    expect(next.recommended!.thenLink).toBe('specs project link CH-002 auth-2');
+  });
+
+  it('cria a change quando nada com aquele nome existe', async () => {
+    const workspace = await makePlanWorkspace();
+    const ch = await withBrief(workspace, 'demo', change({ id: 'CH-001', slug: 'novo' }));
+    await seedPlan(workspace, manifest({ id: 'demo', changes: [ch] }));
+    const next = recommendNext(await computeProjectStatus(workspace, 'demo'));
+    expect(next.recommended!.startWith).toBe('specs new change novo');
+    expect(next.recommended!.thenLink).toBe('specs project link CH-001 novo');
+  });
+});
+

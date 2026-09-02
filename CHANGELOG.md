@@ -5,6 +5,36 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.13.0] - 2026-09-02
+
+### Corrigido
+
+- **fix(project): `link` recusava uma change que só existia no archive** — e o
+  erro apontava `specs new change <nome>`, que é exatamente a ação que estraga o
+  estado: o diretório novo e vazio é mascarado pelo archive de mesmo nome
+  (`executionOf` resolve o archive primeiro), então o incremento passa a ser
+  apresentado como **concluído** sem nenhum trabalho por trás. Trabalho
+  finalizado antes do plano não tinha como chegar nele: `adopt` resolve archive,
+  mas cria um incremento novo em vez de vincular o que já existe. `link` passa a
+  resolver o archive do mesmo jeito, escolhendo o mais recente quando há vários.
+- **fix(project): `next` mandava criar uma change que já existia** — `startWith`
+  era sempre `specs new change <slug>`. Quando a change já estava lá, ativa ou
+  arquivada, seguir a sugestão levava ao estado mascarado acima. Agora sugere
+  `specs project link`, e só pede um nome novo quando outro incremento já
+  reivindicou aquele nome.
+
+### Adicionado
+
+- **feat(project): diagnóstico `unclaimed_archive`** — fecha o vão entre
+  `specs status` e `specs project`. Uma change arquivada que nenhum incremento
+  reivindica não conta no progresso do plano; sem o aviso, um painel mostra
+  `0/20` enquanto o outro mostra duas arquivadas, sem nada ligando os dois.
+  Traz `specs project adopt <nome>` como `fix`.
+- **feat(project): diagnóstico `ambiguous_execution`** — um mesmo slug com
+  diretório ativo **e** archive. O estado reportado continua `archived`, como a
+  §7.7 define, mas a colisão deixa de ser silenciosa: o trabalho ativo está
+  invisível no plano.
+
 ## [0.12.3] - 2026-09-02
 
 ### Corrigido

@@ -2,7 +2,7 @@ import path from 'node:path';
 import { SpecError } from '../../util/errors.js';
 import { localDateStamp } from '../../util/date.js';
 import { isDirectory, pathExists, readFileIfExists } from '../../util/fs.js';
-import { ARCHIVE_DIR, CHANGES_DIR, WORKSPACE_DIR, type Workspace } from '../workspace.js';
+import { ARCHIVE_DIR, CHANGES_DIR, WORKSPACE_DIR, listArchivedChanges, type Workspace } from '../workspace.js';
 import { parseProposal } from '../change/model.js';
 import { loadPlan, savePlan } from './repository.js';
 import { nextChangeId, type ChangeLink, type PlanningState, type ProjectChange } from './model.js';
@@ -27,11 +27,28 @@ export interface LinkResult {
   linked: true;
   id: string;
   change: string;
-  activePath: string;
+  /** Null when the link resolved to an archive: there is no active directory. */
+  activePath: string | null;
+  /** Set when the link resolved to an archive instead of an active directory. */
+  archivePath?: string;
   execution: string;
   executionEvidence: string[];
   revision: number;
   diagnostics: unknown[];
+}
+
+/** Newest archive directory answering to `name`, as a project-relative path. */
+async function resolveArchivedDir(
+  workspace: Workspace,
+  name: string
+): Promise<string | undefined> {
+  const pattern = new RegExp(`^\\d{4}-\\d{2}-\\d{2}-${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(-\\d+)?$`);
+  const matches = (await listArchivedChanges(workspace)).filter((entry) => pattern.test(entry));
+  if (matches.length === 0) return undefined;
+  const chosen = [...matches].sort((a, b) => b.localeCompare(a))[0];
+  const dir = safeResolve(workspace.archivePath, chosen);
+  if (dir === undefined || !(await isDirectory(dir))) return undefined;
+  return `${WORKSPACE_DIR}/${CHANGES_DIR}/${ARCHIVE_DIR}/${chosen}`;
 }
 
 export async function linkChange(
@@ -67,11 +84,21 @@ export async function linkChange(
   // A change is a DIRECTORY inside `spec/changes/`. A regular file is not a
   // change, and a symlink that realpaths outside the workspace is not either.
   const changeDir = safeResolve(workspace.changesPath, changeName);
-  if (changeDir === undefined || !(await isDirectory(changeDir))) {
-    throw new SpecError(`spec/changes/${changeName}/ não existe como diretório.`, {
-      code: 'link_target_missing',
-      fix: `specs new change ${changeName}`,
-    });
+  const activeExists = changeDir !== undefined && (await isDirectory(changeDir));
+
+  // Work that is already finished still needs to reach the plan. `link` used to
+  // look only at `spec/changes/<name>/`, so an increment whose change had been
+  // archived could not be linked at all — and the error pointed at
+  // `specs new change <name>`, which creates an empty directory that the archive
+  // then masks (`executionOf` resolves the archive first). The plan would read
+  // the increment as concluded with no work behind it. `adopt` already resolves
+  // an archive; `link` now resolves it the same way.
+  const archived = activeExists ? undefined : await resolveArchivedDir(workspace, changeName);
+  if (!activeExists && archived === undefined) {
+    throw new SpecError(
+      `Não encontrei "${changeName}" em spec/changes/ nem no archive.`,
+      { code: 'link_target_missing', fix: `specs new change ${changeName}` }
+    );
   }
   const owner = manifest.changes.find(
     (entry) => entry.id !== changeId && entry.link?.name === changeName
@@ -85,8 +112,8 @@ export async function linkChange(
 
   const link: ChangeLink = {
     name: changeName,
-    active_path: activePath(changeName),
-    archive_path: null,
+    active_path: activeExists ? activePath(changeName) : null,
+    archive_path: archived ?? null,
     linked_at: localDateStamp(),
   };
   const linked: ProjectChange = { ...change, link };
@@ -101,7 +128,8 @@ export async function linkChange(
     linked: true,
     id: changeId,
     change: changeName,
-    activePath: link.active_path!,
+    activePath: link.active_path,
+    ...(link.archive_path ? { archivePath: link.archive_path } : {}),
     execution: execution.execution,
     executionEvidence: execution.evidence,
     revision: next.revision,

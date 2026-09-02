@@ -142,7 +142,11 @@ Change, criada só por operação explícita — nada é inferido de título, da
 similaridade.
 
 - `link <change-id> <change-name>` — exige o incremento existente e não
-  cancelado nem concluído, `spec/changes/<change-name>/` presente e o nome livre.
+  cancelado nem concluído, o nome livre, e a change presente **como diretório
+  ativo em `spec/changes/` ou no archive**. Vincular a um archive é como um
+  trabalho concluído antes do plano entra no progresso: `active_path` fica
+  `null`, `archive_path` aponta o diretório resolvido (o mais recente, quando há
+  mais de um) e a execução observada já nasce `archived`.
 - `unlink <change-id>` — remove o vínculo; exige `--force` quando a execução
   observada já é `archived`.
 - `adopt <change-name|archive-dir>` — cria uma Project Change (`planning_state:
@@ -266,8 +270,16 @@ com briefs já materializados.
 A detecção de **ciclo** (`dependency_cycle`, com o caminho na mensagem) falha
 antes de qualquer escrita. Os diagnósticos derivados que aparecem em
 `specs project status` — `dangling_link`, `duplicate_link`, `source_changed`,
-`missing_source`, `ambiguous_archive_match` — usam código estável e trazem `fix`
-quando há recuperação óbvia.
+`missing_source`, `ambiguous_archive_match`, `unclaimed_archive`,
+`ambiguous_execution` — usam código estável e trazem `fix` quando há recuperação
+óbvia.
+
+`unclaimed_archive` fecha o vão entre `specs status` e `specs project`: uma
+change arquivada que nenhum incremento reivindica não conta no progresso do
+plano, e sem o aviso o painel mostra `0/20` enquanto o outro mostra duas
+arquivadas. `ambiguous_execution` avisa quando um mesmo slug tem diretório ativo
+**e** archive: `executionOf` resolve o archive primeiro (§7.7), então o trabalho
+ativo fica invisível e o incremento é apresentado como concluído.
 
 ## Limites
 
