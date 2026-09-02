@@ -8,7 +8,7 @@ import { MAX_DELTAS_PER_CHANGE } from '../validate/rules.js';
 import { readDeltaSpecs } from '../change/model.js';
 import { CHANGES_DIR, ARCHIVE_DIR, WORKSPACE_DIR } from '../workspace.js';
 import { sha256, sourceHash, type HashableSource } from './hashes.js';
-import { type PlanManifest, type ProjectChange } from './model.js';
+import { renderManifest, type PlanManifest, type ProjectChange } from './model.js';
 import {
   REQUIRED_PLANNED_CHANGE_SECTIONS,
   PLANNED_CHANGE_SECTIONS,
@@ -39,6 +39,12 @@ interface Ctx {
   id: string;
   paths: PlanPaths;
   strict: boolean;
+  /**
+   * Brief bodies that are not on disk yet, keyed by the manifest-relative path.
+   * Set when validating a state a bundle *proposes*, so `apply --dry-run` can
+   * report the same counts the real apply will produce.
+   */
+  briefs?: Map<string, string>;
 }
 
 /**
@@ -87,6 +93,33 @@ export async function validatePlan(
 
   const manifest = parsed.manifest;
   const rawObject = (parseYaml(raw) ?? {}) as Record<string, unknown>;
+
+  const planIssues: ValidationIssue[] = [];
+  await checkManifest(ctx, manifest, rawObject, planIssues);
+
+  const reports: ValidationReport[] = [buildReport(id, 'plan', planIssues, strict)];
+  for (const change of manifest.changes) {
+    if (!change.planned_change) continue;
+    reports.push(await validatePlannedChange(ctx, manifest, change));
+  }
+  return reports;
+}
+
+/**
+ * Runs the same rules as `validatePlan` against a manifest that exists only in
+ * memory, with `briefs` supplying the bodies a bundle would write. Lets a
+ * `--dry-run` preview report real counts instead of a hardcoded clean bill.
+ */
+export async function validateProposedPlan(
+  projectRoot: string,
+  id: string,
+  manifest: PlanManifest,
+  briefs: Map<string, string>,
+  options: { strict?: boolean } = {}
+): Promise<ValidationReport[]> {
+  const strict = options.strict === true;
+  const ctx: Ctx = { projectRoot, id, paths: planPaths(projectRoot, id), strict, briefs };
+  const rawObject = (parseYaml(renderManifest(manifest)) ?? {}) as Record<string, unknown>;
 
   const planIssues: ValidationIssue[] = [];
   await checkManifest(ctx, manifest, rawObject, planIssues);
@@ -197,7 +230,9 @@ async function checkManifest(
       error(`changes.${change.id}.planned_change.path`, (pathError as Error).message);
       continue;
     }
-    if (!(await pathExists(path.join(ctx.paths.dir, ref.path)))) {
+    // A brief this bundle is about to write counts as present: a preview must
+    // not report an error the real apply will not produce.
+    if (!ctx.briefs?.has(ref.path) && !(await pathExists(path.join(ctx.paths.dir, ref.path)))) {
       error(
         `changes.${change.id}.planned_change.path`,
         `o arquivo ${ref.path} não existe no disco`
@@ -497,7 +532,7 @@ async function validatePlannedChange(
   const filePath = path.join(ctx.paths.dir, ref.path);
   const relative = ref.path;
 
-  const content = await readFileIfExists(filePath);
+  const content = ctx.briefs?.get(relative) ?? (await readFileIfExists(filePath));
   if (content === undefined) {
     issues.push({ level: 'ERROR', path: relative, message: 'arquivo não encontrado no disco' });
     return buildReport(change.id, 'planned-change', issues, ctx.strict);

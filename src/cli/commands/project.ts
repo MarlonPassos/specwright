@@ -10,6 +10,8 @@ import { generatePlannedChanges } from '../../core/project/generate.js';
 import { linkChange, unlinkChange, adoptChange, setPlanningState } from '../../core/project/link.js';
 import { syncPlan } from '../../core/project/sync.js';
 import { applyPlanBundle } from '../../core/project/apply.js';
+import { BUNDLE_VERSION } from '../../core/project/bundle.js';
+import { bundleContract, renderBundleContract } from '../../core/project/bundle-schema.js';
 import { computeImpact } from '../../core/project/impact.js';
 import { loadPlan, savePlan } from '../../core/project/repository.js';
 import { PLANNING_STATES, type PlanningState, type PlanStatusValue } from '../../core/project/model.js';
@@ -431,6 +433,24 @@ export function registerProjectCommands(program: Command): void {
         else printLines([`${result.id}: ${result.from} → ${result.to} (revisão ${result.revision})`]);
       } catch (error) {
         fail(error, { json, payload: { id: null } });
+      }
+    });
+
+  // The bundle contract has to be reachable from inside any project that merely
+  // installs specwright: without it an assistant reverse-engineers the schema by
+  // probing `apply --dry-run` with broken payloads.
+  project
+    .command('bundle-schema')
+    .description('Imprime o contrato do bundle aceito por `specs project apply`')
+    .option('--json', 'Saída em JSON')
+    .action(async function (this: Command) {
+      const json = wantsJson(this);
+      try {
+        const contract = bundleContract(BUNDLE_VERSION);
+        if (json) printJson(contract);
+        else printLines(renderBundleContract(contract));
+      } catch (error) {
+        fail(error, { json });
       }
     });
 

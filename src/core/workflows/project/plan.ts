@@ -32,11 +32,15 @@ ${PROJECT_BOUNDARY}
    trechos para o plano.
 4. Proponha domínios, incrementos, dependências (por ID), milestones e prioridade.
 5. Mostre o resumo, as suposições que fez e as dúvidas críticas que mudam escopo.
-6. \`specs project apply --dry-run --json\` (bundle com \`expectRevision\`).
-7. Espere a aprovação em uma mensagem separada.
-8. \`specs project apply\` sem \`--dry-run\`.
-9. \`specs project validate --strict --json\` e reporte.
-10. Pare e aponte ${commandRef('project-review')}.
+6. \`specs project bundle-schema --json\` — o contrato do bundle. Leia antes de
+   montar o primeiro; não descubra o formato errando contra \`apply\`.
+7. \`specs project apply --dry-run --json\` (bundle com \`expectRevision\`). Um
+   plano novo é UM bundle: \`addChange\` com \`ref\` para cada incremento, depois
+   \`setMilestones\` citando esses mesmos \`ref\`.
+8. Espere a aprovação em uma mensagem separada.
+9. \`specs project apply\` sem \`--dry-run\`.
+10. \`specs project validate --strict --json\` e reporte.
+11. Pare e aponte ${commandRef('project-review')}.
 
 ${PLAN_WRITE_PROTOCOL}
 

@@ -221,10 +221,22 @@ reconcilia o bloco `link` com `spec/changes/` e o archive (idempotente).
 Códigos de erro: `link_target_missing`, `link_already_used`, `invalid_transition`,
 `missing_reason`, `completed_change_protected`.
 
+### `specs project bundle-schema`
+
+Imprime o contrato do bundle aceito por `apply`: raiz, catálogo de operações,
+`PlannedChangeSpec`, regras e um exemplo aplicável. `--json` devolve a mesma
+coisa em forma estruturada.
+
+É o comando que um assistente roda **antes** do primeiro bundle da sessão — sem
+ele o formato só era descobrível por tentativa e erro contra `apply`, e o
+mecanismo `$ref` (a única forma de citar um incremento que o próprio bundle
+cria) não aparecia em nenhuma mensagem de erro.
+
 ### `specs project apply` / `impact` / `list` / `pause` / `resume` / `archive` / `--watch`
 
 `apply` lê um bundle JSON (stdin ou `--file`), valida o estado proposto e grava;
-`--dry-run` imprime `idMap`, diff e impacto sem escrever. `impact --change <id>...`
+`--dry-run` imprime `idMap`, diff e impacto sem escrever, e reporta a **mesma**
+revisão futura e a **mesma** contagem de validação que o `apply` real produz. `impact --change <id>...`
 dá o impacto estrutural determinístico. `list` indexa os planos. `pause --reason`,
 `resume` e `archive` movem o `status` declarado do plano. `specs project --watch
 [--interval <s>]` repinta o dashboard por polling até Ctrl+C (`--watch` + `--json`

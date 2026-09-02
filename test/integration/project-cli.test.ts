@@ -14,6 +14,40 @@ beforeAll(async () => {
 });
 
 describe('specs project — CLI', () => {
+  it('bundle-schema publica o contrato do apply, com exemplo aplicável', async () => {
+    const dir = await initProject();
+    expect((await runCli(['project', 'create', 'demo', '--json'], dir)).code).toBe(0);
+
+    const result = await runCli(['project', 'bundle-schema', '--json'], dir);
+    expect(result.code).toBe(0);
+    const contract = parseJson(result.stdout);
+    expect(contract.bundleVersion).toBe(1);
+    expect((contract.operations as Array<{ op: string }>).map((entry) => entry.op)).toContain(
+      'addChange'
+    );
+    expect(JSON.stringify(contract.rules)).toContain('idMap');
+
+    // The published example must survive a real --dry-run in a real project.
+    await writeFile(path.join(dir, 'docs/PLANO-DE-MELHORIAS.md'), '# melhorias\n');
+    const bundleFile = path.join(dir, 'bundle.json');
+    await writeFile(bundleFile, JSON.stringify(contract.example));
+    const dryRun = await runCli(
+      ['project', 'apply', '--file', bundleFile, '--dry-run', '--json'],
+      dir
+    );
+    expect(dryRun.code).toBe(0);
+    expect(parseJson(dryRun.stdout).idMap).toMatchObject({ $fundacao: 'CH-001' });
+  });
+
+  it('o texto do bundle-schema também sai sem --json', async () => {
+    const dir = await initProject();
+    expect((await runCli(['project', 'create', 'demo', '--json'], dir)).code).toBe(0);
+    const result = await runCli(['project', 'bundle-schema'], dir);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('setMilestones');
+    expect(result.stdout).toContain('$nome');
+  });
+
   it('creates a plan and emits the JSON contract', async () => {
     const dir = await initProject();
     await writeFile(path.join(dir, 'docs/vision.md'), '# Vision\n\nbig doc\n');
