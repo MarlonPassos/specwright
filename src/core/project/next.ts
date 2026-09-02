@@ -48,6 +48,15 @@ function startCommands(
 ): { startWith: string; thenLink: string } {
   const link = `specs project link ${view.id} ${view.slug}`;
   const { active, archivedSlugs } = status.workspaceChanges;
+
+  // Already linked: the work has a home. Point at it, not at linking it again.
+  if (view.link) {
+    return {
+      startWith: `specs status --change ${view.link.name}`,
+      thenLink: `specs archive ${view.link.name}`,
+    };
+  }
+
   const claimedByOther = new Set(
     status.changes.filter((other) => other.id !== view.id && other.link).map((other) => other.link!.name)
   );

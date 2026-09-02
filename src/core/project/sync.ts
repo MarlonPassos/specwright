@@ -1,15 +1,20 @@
 import path from 'node:path';
 import { pathExists } from '../../util/fs.js';
-import { type Workspace } from '../workspace.js';
+import { isDirectory } from '../../util/fs.js';
+import { listChanges, type Workspace } from '../workspace.js';
 import { loadPlan, savePlan } from './repository.js';
 import { readEvidence } from './evidence.js';
 import type { ProjectChange } from './model.js';
 import { safeResolve } from './paths.js';
+import { activePath, resolveArchivedDir } from './link.js';
+import { localDateStamp } from '../../util/date.js';
 
 export interface SyncResult {
   synced: boolean;
   checked: boolean;
   resolved: Array<{ id: string; archivePath: string }>;
+  /** Links created by `--link`, empty unless it was asked for. */
+  linked: Array<{ id: string; change: string; activePath: string | null; archivePath: string | null }>;
   cleared: string[];
   diagnostics: Array<{ level: string; code: string; path: string; message: string; fix?: string }>;
   revision: number;
@@ -18,27 +23,72 @@ export interface SyncResult {
 /**
  * Reconciles the `link` block of vínculos that already exist: fills
  * `archive_path` when an archive resolves, clears `active_path` when the active
- * directory is gone, and reports `dangling_link`. Never creates a link, never
- * adopts, never touches the native change. Idempotent.
+ * directory is gone, and reports `dangling_link`. Never adopts, never touches
+ * the native change. Idempotent.
+ *
+ * A bare `sync` still never invents a link. `link: true` is the explicit,
+ * opt-in operation that claims changes in bulk: for each increment with no
+ * link, a change whose directory name EQUALS the increment's slug — active or
+ * archived, and claimed by nobody — is linked. Exact identifier match only:
+ * nothing is inferred from title, date or similarity. It exists because the
+ * alternative was running `specs project link` once per increment by hand.
  */
 export async function syncPlan(
   workspace: Workspace,
   planId: string,
-  options: { check?: boolean } = {}
+  options: { check?: boolean; link?: boolean } = {}
 ): Promise<SyncResult> {
   const { manifest, paths } = await loadPlan(workspace.projectRoot, planId);
   const check = options.check === true;
 
   const resolved: SyncResult['resolved'] = [];
+  const linked: SyncResult['linked'] = [];
   const cleared: string[] = [];
   const diagnostics: SyncResult['diagnostics'] = [];
+
+  // Names already spoken for, so bulk linking can never steal one.
+  const claimed = new Set(
+    manifest.changes.flatMap((entry) => (entry.link ? [entry.link.name] : []))
+  );
+  const activeNames = options.link ? new Set(await listChanges(workspace)) : new Set<string>();
 
   const nextChanges: ProjectChange[] = [];
   let mutated = false;
 
   for (const change of manifest.changes) {
     if (!change.link) {
-      nextChanges.push(change);
+      const claimable =
+        options.link === true &&
+        change.planning_state !== 'cancelled' &&
+        !claimed.has(change.slug);
+      if (!claimable) {
+        nextChanges.push(change);
+        continue;
+      }
+
+      const activeDir = safeResolve(workspace.changesPath, change.slug);
+      const activeExists = activeDir !== undefined && (await isDirectory(activeDir));
+      const archiveDir = activeExists ? undefined : await resolveArchivedDir(workspace, change.slug);
+      if (!activeExists && !activeNames.has(change.slug) && archiveDir === undefined) {
+        nextChanges.push(change);
+        continue;
+      }
+
+      const created = {
+        name: change.slug,
+        active_path: activeExists ? activePath(change.slug) : null,
+        archive_path: archiveDir ?? null,
+        linked_at: localDateStamp(),
+      };
+      claimed.add(change.slug);
+      linked.push({
+        id: change.id,
+        change: change.slug,
+        activePath: created.active_path,
+        archivePath: created.archive_path,
+      });
+      mutated = true;
+      nextChanges.push({ ...change, link: created });
       continue;
     }
 
@@ -86,13 +136,14 @@ export async function syncPlan(
 
   if (mutated && !check) {
     const next = await savePlan(paths, { ...manifest, changes: nextChanges });
-    return { synced: true, checked: false, resolved, cleared, diagnostics, revision: next.revision };
+    return { synced: true, checked: false, resolved, linked, cleared, diagnostics, revision: next.revision };
   }
 
   return {
     synced: !check && mutated,
     checked: check,
     resolved,
+    linked,
     cleared,
     diagnostics,
     revision: manifest.revision,
