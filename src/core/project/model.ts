@@ -119,6 +119,19 @@ export const PlanManifestSchema = z
   .strict();
 export type PlanManifest = z.infer<typeof PlanManifestSchema>;
 
+/**
+ * The next free Project Change id: `max(N over every CH-N present) + 1`, at
+ * least three digits. Cancelled ids count, so an id is never reused.
+ */
+export function nextChangeId(changes: ProjectChange[]): string {
+  let highest = 0;
+  for (const change of changes) {
+    const match = /^CH-(\d+)$/.exec(change.id);
+    if (match) highest = Math.max(highest, Number(match[1]));
+  }
+  return `CH-${String(highest + 1).padStart(3, '0')}`;
+}
+
 /** Formats a Zod issue as `path.to.field: message`. */
 export function formatZodIssues(error: z.ZodError): Array<{ path: string; message: string }> {
   return error.issues.map((issue) => ({

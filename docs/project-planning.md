@@ -1,9 +1,9 @@
 # Project Planning
 
-> **Status:** Fases 1–2 (opt-in). Modelo, proveniência, validação, grafo, três
-> dimensões de estado, `generate`, `status`, `next`, `show`, dashboard e os seis
-> comandos de harness. Vínculo (`link`/`adopt`/`sync`/`set-state`), `apply`,
-> `impact` e `--watch` chegam nas fases seguintes.
+> **Status:** Fases 1–3 (opt-in). Modelo, proveniência, validação, grafo, três
+> dimensões de estado, `generate`, `status`, `next`, `show`, dashboard, os seis
+> comandos de harness, e vínculo (`link`/`unlink`/`adopt`/`sync`/`set-state`).
+> `apply`, `impact` e `--watch` chegam nas fases seguintes.
 
 O Project Planning adiciona uma camada de **plano** acima da unidade `change`:
 uma forma de decompor um documento grande em incrementos ordenados, rastreáveis e
@@ -100,6 +100,11 @@ specs project next     [<plan-id>] [--json]
 specs project show     [<plan-id>] <change-id> [--json]
 specs project generate [<plan-id>] [--change <id>...] [--milestone <id>]
                                    [--dry-run] [--force] [--expect-revision <n>] [--json]
+specs project link     [<plan-id>] <change-id> <change-name> [--json]
+specs project unlink   [<plan-id>] <change-id> [--force] [--json]
+specs project adopt    [<plan-id>] <change-name|archive-dir> [--json]
+specs project sync     [<plan-id>] [--check] [--json]
+specs project set-state [<plan-id>] <change-id> <state> [--reason <texto>] [--json]
 ```
 
 - `status` — identidade e revisão do plano, progresso geral e por milestone, cada
@@ -114,6 +119,33 @@ specs project generate [<plan-id>] [--change <id>...] [--milestone <id>]
   (`modified`, recusa sem `--force`), projeta o bloco de roadmap em `plan.md`
   preservando o texto fora dos marcadores, e recusa grafo inválido antes de
   qualquer escrita. `--dry-run` não toca no disco.
+
+## Vínculo, adoção e sincronização
+
+O **vínculo** é uma referência 1:1 entre uma Project Change e uma Specwright
+Change, criada só por operação explícita — nada é inferido de título, data ou
+similaridade.
+
+- `link <change-id> <change-name>` — exige o incremento existente e não
+  cancelado nem concluído, `spec/changes/<change-name>/` presente e o nome livre.
+- `unlink <change-id>` — remove o vínculo; exige `--force` quando a execução
+  observada já é `archived`.
+- `adopt <change-name|archive-dir>` — cria uma Project Change (`planning_state:
+  planned`, id novo, brief `missing`) a partir de uma change fora do plano, já
+  vinculada. Não escreve nada dentro da change nativa.
+- `sync [--check]` — reconcilia só o bloco `link`: preenche `archive_path`
+  quando um archive resolve, limpa `active_path` quando o diretório ativo some,
+  reporta `dangling_link`. Nunca cria vínculo, nunca adota, nunca toca a change
+  nativa. Idempotente. `--check` não escreve.
+- `set-state <change-id> <state> [--reason]` — aplica uma transição de
+  `planning_state` validada contra a máquina de §7.6
+  (`idea→planned|cancelled`, `planned→on_hold|cancelled`,
+  `on_hold→planned|cancelled`, sem volta de `cancelled`). `on_hold` e
+  `cancelled` exigem `--reason`.
+
+O `archive_path` persistido é um **atalho de leitura**: `status` resolve o
+archive por padrão a cada execução, então a conclusão nunca depende de `sync`.
+`specs archive` não conhece o plano — não há hook nem campo novo no seu JSON.
 
 ## Comandos de harness
 

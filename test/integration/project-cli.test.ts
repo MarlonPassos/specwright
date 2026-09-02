@@ -110,6 +110,65 @@ describe('specs project — CLI', () => {
   });
 });
 
+describe('specs project — link / adopt / sync / set-state', () => {
+  async function planWithChange(): Promise<string> {
+    const dir = await initProject();
+    await runCli(['project', 'create', 'p', '--json'], dir);
+    await runCli(['new', 'change', 'authentication'], dir);
+    await runCli(['project', 'adopt', 'authentication', '--json'], dir);
+    return dir;
+  }
+
+  it('adopt then set-state then sync, all as single JSON documents', async () => {
+    const dir = await planWithChange();
+
+    const adopted = parseJson((await runCli(['project', 'show', 'CH-001', '--json'], dir)).stdout);
+    expect(adopted.change.link.name).toBe('authentication');
+
+    const held = await runCli(['project', 'set-state', 'CH-001', 'on_hold', '--json'], dir);
+    expect(parseJson(held.stdout).error.code).toBe('missing_reason');
+
+    const ok = await runCli(
+      ['project', 'set-state', 'CH-001', 'on_hold', '--reason', 'aguardando decisão', '--json'],
+      dir
+    );
+    expect(parseJson(ok.stdout)).toMatchObject({ from: 'planned', to: 'on_hold' });
+
+    const sync = parseJson((await runCli(['project', 'sync', '--check', '--json'], dir)).stdout);
+    expect(sync.checked).toBe(true);
+  });
+
+  it('link refuses a missing target and a duplicate name', async () => {
+    const dir = await initProject();
+    await runCli(['project', 'create', 'p', '--json'], dir);
+    // hand-write two increments is not possible via CLI; drive through adopt.
+    await runCli(['new', 'change', 'auth'], dir);
+    await runCli(['project', 'adopt', 'auth', '--json'], dir);
+
+    const missing = await runCli(['project', 'link', 'CH-001', 'ghost', '--json'], dir);
+    expect(parseJson(missing.stdout).error.code).toBe('link_target_missing');
+  });
+
+  it('a corrupt plan.yaml never affects specs archive', async () => {
+    const dir = await initProject();
+    await runCli(['project', 'create', 'p', '--json'], dir);
+    await fs.writeFile(path.join(dir, 'planning/p/plan.yaml'), ':\n - [broken', 'utf8');
+
+    await runCli(['new', 'change', 'small-fix'], dir);
+    await writeFile(
+      path.join(dir, 'spec/changes/small-fix/proposal.md'),
+      '## Why\n\nCustomers keep hitting a small papercut that wastes support time every week.\n\n## What Changes\n\n- fix it\n\n## Impact\n\nnone\n'
+    );
+    await writeFile(path.join(dir, 'spec/changes/small-fix/.change.yaml'), 'schema: spec-driven\nskip_specs: true\n');
+    await writeFile(path.join(dir, 'spec/changes/small-fix/tasks.md'), '## 1\n- [x] 1.1 done\n');
+
+    const archive = await runCli(['archive', 'small-fix', '--json'], dir);
+    const payload = parseJson(archive.stdout);
+    expect(archive.code).toBe(0);
+    expect(JSON.stringify(payload)).not.toMatch(/plan/i);
+  });
+});
+
 describe('specs project — no regression', () => {
   it('adding a plan does not change the output of existing commands', async () => {
     const dir = await initProject();

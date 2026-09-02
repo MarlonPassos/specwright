@@ -9,6 +9,23 @@ versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ### Adicionado
 
+- **feat(project): Project Planning — Fase 3 (vínculo, adoção e sincronização)**
+  - `src/core/project/link.ts` — `linkChange` (vínculo 1:1 com todas as
+    pré-condições: incremento não concluído nem cancelado, change nativa
+    presente, nome livre), `unlinkChange` (exige `--force` quando a execução
+    observada é `archived`), `adoptChange` (cria uma Project Change a partir de
+    uma change fora do plano — ativa ou de archive — sem tocar em nada dentro
+    dela; título derivado do `proposal.md`; id novo além de qualquer cancelado),
+    `setPlanningState` (transição validada contra a máquina de §7.6; `on_hold` e
+    `cancelled` exigem `--reason`).
+  - `src/core/project/sync.ts` — `syncPlan [--check]`: resolve `archive_path`
+    por padrão (`^\d{4}-\d{2}-\d{2}-<name>(-\d+)?$`, escolhe o de maior data e
+    sufixo com `ambiguous_archive_match`), limpa `active_path` quando o
+    diretório ativo some, reporta `dangling_link` (execução `unknown`, nunca
+    `archived`). Nunca cria vínculo, nunca adota, nunca altera a change nativa.
+    Idempotente.
+  - CLI: `specs project link`, `unlink`, `adopt`, `sync`, `set-state`.
+
 - **feat(project): Project Planning — Fase 2 (grafo, estado, materialização, dashboard e comandos)**
   - `src/core/project/graph.ts` — DAG entre Project Changes com ordem topológica
     (desempate por declaração), dependentes, ancestrais, descendentes e detecção

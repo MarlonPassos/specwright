@@ -7,6 +7,9 @@ import { resolvePlanId, listPlanIds } from '../../core/project/paths.js';
 import { computeProjectStatus, showProjectChange, statusPayload } from '../../core/project/status.js';
 import { recommendNext } from '../../core/project/next.js';
 import { generatePlannedChanges } from '../../core/project/generate.js';
+import { linkChange, unlinkChange, adoptChange, setPlanningState } from '../../core/project/link.js';
+import { syncPlan } from '../../core/project/sync.js';
+import { PLANNING_STATES, type PlanningState } from '../../core/project/model.js';
 import type { ValidationReport } from '../../core/validate/report.js';
 import { renderProjectDashboard } from '../project-dashboard-view.js';
 import { fail, printJson, printLines } from '../output.js';
@@ -266,6 +269,134 @@ export function registerProjectCommands(program: Command): void {
         ]);
       } catch (error) {
         fail(error, { json, payload: { generated: false } });
+      }
+    });
+
+  project
+    .command('link [a] [b] [c]')
+    .description('Registra o vínculo 1:1 entre um incremento e uma change nativa')
+    .option('--json', 'Saída em JSON')
+    .action(async function (this: Command, a?: string, b?: string, c?: string) {
+      const json = wantsJson(this);
+      try {
+        const [planId, changeId, changeName] = c ? [a, b, c] : [undefined, a, b];
+        if (!changeId || !changeName) {
+          throw new SpecError('Uso: specs project link <change-id> <change-name>', {
+            code: 'invalid_option',
+          });
+        }
+        const workspace = await requireWorkspace();
+        const id = await resolvePlanId(workspace.projectRoot, planId);
+        const result = await linkChange(workspace, id, changeId, changeName);
+        if (json) printJson(result);
+        else printLines([`Vínculo ${result.id} → ${result.change} (execução: ${result.execution})`]);
+      } catch (error) {
+        fail(error, { json, payload: { linked: false } });
+      }
+    });
+
+  project
+    .command('unlink [a] [b]')
+    .description('Remove o vínculo de um incremento')
+    .option('--force', 'Permite remover mesmo com execução observada archived')
+    .option('--json', 'Saída em JSON')
+    .action(async function (this: Command, a: string | undefined, b: string | undefined, options: { force?: boolean }) {
+      const json = wantsJson(this);
+      try {
+        const [planId, changeId] = b ? [a, b] : [undefined, a];
+        if (!changeId) {
+          throw new SpecError('Uso: specs project unlink <change-id>', { code: 'invalid_option' });
+        }
+        const workspace = await requireWorkspace();
+        const id = await resolvePlanId(workspace.projectRoot, planId);
+        const result = await unlinkChange(workspace, id, changeId, { force: options.force });
+        if (json) printJson(result);
+        else printLines([`Vínculo de ${result.id} (${result.change}) removido.`]);
+      } catch (error) {
+        fail(error, { json, payload: { unlinked: false } });
+      }
+    });
+
+  project
+    .command('adopt [a] [b]')
+    .description('Cria uma Project Change a partir de uma change existente fora do plano')
+    .option('--json', 'Saída em JSON')
+    .action(async function (this: Command, a?: string, b?: string) {
+      const json = wantsJson(this);
+      try {
+        const [planId, target] = b ? [a, b] : [undefined, a];
+        if (!target) {
+          throw new SpecError('Uso: specs project adopt <change-name|archive-dir>', {
+            code: 'invalid_option',
+          });
+        }
+        const workspace = await requireWorkspace();
+        const id = await resolvePlanId(workspace.projectRoot, planId);
+        const result = await adoptChange(workspace, id, target);
+        if (json) printJson(result);
+        else printLines([`${result.id} adotado a partir de "${result.change}" — ${result.title}`]);
+      } catch (error) {
+        fail(error, { json, payload: { adopted: false } });
+      }
+    });
+
+  project
+    .command('sync [plan-id]')
+    .description('Reconcilia os vínculos com spec/changes/ e o archive')
+    .option('--check', 'Reporta o que mudaria sem escrever')
+    .option('--json', 'Saída em JSON')
+    .action(async function (this: Command, planId: string | undefined, options: { check?: boolean }) {
+      const json = wantsJson(this);
+      try {
+        const workspace = await requireWorkspace();
+        const id = await resolvePlanId(workspace.projectRoot, planId);
+        const result = await syncPlan(workspace, id, { check: options.check });
+        if (json) printJson(result);
+        else
+          printLines([
+            options.check ? 'Prévia da sincronização:' : `Sincronizado (revisão ${result.revision}).`,
+            ...result.resolved.map((entry) => `  archive: ${entry.id} → ${entry.archivePath}`),
+            ...result.cleared.map((entry) => `  active limpo: ${entry}`),
+            ...result.diagnostics.map((d) => `  ${d.level} ${d.code} — ${d.message}`),
+          ]);
+      } catch (error) {
+        fail(error, { json, payload: { synced: false } });
+      }
+    });
+
+  project
+    .command('set-state [a] [b] [c]')
+    .description('Aplica uma transição de planning_state validada contra a máquina de estados')
+    .option('--reason <texto>', 'Motivo (obrigatório para on_hold e cancelled)')
+    .option('--json', 'Saída em JSON')
+    .action(async function (this: Command, a: string | undefined, b: string | undefined, c: string | undefined, options: { reason?: string }) {
+      const json = wantsJson(this);
+      try {
+        const [planId, changeId, state] = c ? [a, b, c] : [undefined, a, b];
+        if (!changeId || !state) {
+          throw new SpecError('Uso: specs project set-state <change-id> <state> [--reason]', {
+            code: 'invalid_option',
+          });
+        }
+        if (!(PLANNING_STATES as readonly string[]).includes(state)) {
+          throw new SpecError(
+            `"${state}" não é um planning_state. Use: ${PLANNING_STATES.join(', ')}.`,
+            { code: 'invalid_transition' }
+          );
+        }
+        const workspace = await requireWorkspace();
+        const id = await resolvePlanId(workspace.projectRoot, planId);
+        const result = await setPlanningState(
+          workspace,
+          id,
+          changeId,
+          state as PlanningState,
+          options.reason
+        );
+        if (json) printJson(result);
+        else printLines([`${result.id}: ${result.from} → ${result.to} (revisão ${result.revision})`]);
+      } catch (error) {
+        fail(error, { json, payload: { id: null } });
       }
     });
 }

@@ -106,3 +106,17 @@ plano em `draft` com briefs já materializados.
 | ERROR | Cabeçalho de delta (`## ADDED/MODIFIED/REMOVED/RENAMED Requirements`) |
 | WARNING | Seção recomendada (`Motivação`, `Riscos`, `Fora do escopo`, …) ausente ou vazia |
 | WARNING | Conteúdo editado à mão (`modified`) ou fonte alterada (`outdated`) num incremento `planned` |
+
+## Vínculo (Project Planning)
+
+O `specs project sync` e o `status` reportam, como diagnóstico de leitura:
+
+| Nível | Código | Quando |
+| --- | --- | --- |
+| ERROR | `dangling_link` | o vínculo aponta para um diretório que não existe ativo nem arquivado — a execução fica `unknown`, nunca `archived` |
+| ERROR | `duplicate_link` | dois incrementos usam a mesma change nativa |
+| WARNING | `ambiguous_archive_match` | mais de um diretório de archive casa o slug; escolhe o de maior data e sufixo |
+| WARNING | `source_changed` / `missing_source` | um documento-fonte mudou ou sumiu desde o registro |
+
+Uma change que fica **fora do plano** indefinidamente é válida: não há warning que
+a trate como erro.

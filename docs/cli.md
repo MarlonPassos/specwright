@@ -206,3 +206,17 @@ projeta o roadmap em `plan.md`.
 `specs project` sem subcomando renderiza o dashboard (somente leitura); `--json`
 soma `dashboardSchemaVersion` e `generatedAt` ao payload de `status`. `--json` e
 `--watch` são mutuamente exclusivos (`invalid_option`).
+
+### `specs project link` / `unlink` / `adopt` / `sync` / `set-state`
+
+`link <change-id> <change-name>` registra o vínculo 1:1 (o incremento não pode
+estar concluído nem cancelado; a change nativa precisa existir; o nome não pode
+já estar vinculado). `unlink <change-id>` remove — `--force` quando a execução é
+`archived`. `adopt <change-name|archive-dir>` cria uma Project Change a partir de
+uma change fora do plano, sem tocar em nada dentro dela. `sync [--check]`
+reconcilia o bloco `link` com `spec/changes/` e o archive (idempotente).
+`set-state <change-id> <state> [--reason]` aplica uma transição de
+`planning_state` (`on_hold` e `cancelled` exigem `--reason`).
+
+Códigos de erro: `link_target_missing`, `link_already_used`, `invalid_transition`,
+`missing_reason`, `completed_change_protected`.
