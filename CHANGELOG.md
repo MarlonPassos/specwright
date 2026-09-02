@@ -5,6 +5,37 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.8.0] - 2026-09-01
+
+### Adicionado
+
+- **feat(project): Project Planning — Fase 1 (modelo, proveniência e validação)**
+  - Nova área de planejamento em `planning/<plan-id>/`, fora de `spec/`, com
+    `plan.yaml` (manifesto estruturado), `plan.md`, `architecture.md` e
+    `planned-changes/`. A presença de `planning/<plan-id>/plan.yaml` é a única
+    chave de ativação — nenhuma opção nova em `spec/config.yaml`.
+  - Grupo de CLI `specs project` com dois subcomandos determinísticos:
+    - `specs project create <plan-id> [fontes...] [--name] [--owner] [--json]` —
+      cria o plano em `status: draft`, `revision: 0`, registra `path` e `sha256`
+      de cada fonte; idempotente por recusa (`plan_exists`).
+    - `specs project validate [<plan-id>] [--strict] [--json]` — valida
+      manifesto, Planned Changes, fontes e vínculos nos níveis
+      `ERROR`/`WARNING`/`INFO`, com path do campo e `fix`.
+  - Namespace de biblioteca `src/core/project/` (`model`, `paths`, `hashes`,
+    `repository`, `planned-change`, `templates`, `validate`, `create`),
+    exportado por `src/index.ts`.
+  - Hashes de proveniência (`source_hash`, `content_hash`) normalizados para LF,
+    estáveis entre plataformas e line endings.
+  - `src/util/fs.ts` ganha `writeFileAtomic` e `withStaging` (escrita atômica e
+    staging multi-arquivo); nada existente é alterado.
+
+### Alterado
+
+- **`ValidationReport['type']`** passa a incluir `'plan'` e `'planned-change'`,
+  além de `'change'` e `'spec'`. `formatReports` já imprime `report.type`
+  genericamente, então consumidores da saída humana não são afetados; quem lê o
+  JSON de `validate` passa a ver os dois valores novos apenas para planos.
+
 ## [0.7.2] - 2026-09-01
 
 ### Documentação

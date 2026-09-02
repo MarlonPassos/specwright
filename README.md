@@ -151,6 +151,9 @@ specs show [item]                    Mostra uma change ou uma spec
 specs validate [item]                Valida uma change ou uma spec
 specs schemas                        Lista os schemas de workflow disponíveis
 specs templates                      Mostra o template por trás de cada artefato
+
+specs project create <plan-id>       Cria um plano de projeto em planning/<plan-id>/
+specs project validate [<plan-id>]   Valida o manifesto, os briefs, as fontes e os vínculos
 ```
 
 Todo comando aceita `--json` e imprime um único documento JSON no stdout, em sucesso ou
@@ -187,6 +190,7 @@ aponte o `config.yaml` para ele. Veja [docs/schemas.md](docs/schemas.md).
 - [Harnesses](docs/harnesses.md) — onde ficam os arquivos de comando de cada um
 - [Schemas de workflow](docs/schemas.md)
 - [Regras de validação](docs/validation.md)
+- [Project Planning](docs/project-planning.md) — a camada de plano, opt-in, acima da unidade change
 
 ## Créditos
 

@@ -156,3 +156,39 @@ Uma change ou uma spec. `--type change|spec` desambigua um nome que é os dois;
 
 O `schemas` lista os schemas de workflow disponíveis e marca o ativo. O `templates` mostra
 o template por trás de cada artefato de um schema.
+
+## Project Planning
+
+Opt-in. Sem `planning/<plan-id>/plan.yaml`, esses comandos são a única superfície
+nova e nada mais muda. Referência do formato: [project-planning.md](project-planning.md).
+
+### `specs project create <plan-id> [fontes...]`
+
+Cria `planning/<plan-id>/` com `plan.yaml` (`status: draft`, `revision: 0`),
+`plan.md`, `architecture.md` e `planned-changes/`.
+
+| Opção | Significado |
+| --- | --- |
+| `--name <nome>` | Nome humano do plano (default: o `plan-id`) |
+| `--owner <nome>` | Responsável |
+| `--json` | `{ plan, path, revision, created }`; em falha `{ plan: null, error }` |
+
+Cada fonte é registrada com `path` relativo à raiz e `sha256` do conteúdo. Um
+plano existente falha com `plan_exists` e nada é modificado. Uma fonte com `..`,
+absoluta ou com NUL falha com `unsafe_source_path`.
+
+### `specs project validate [<plan-id>]`
+
+Valida manifesto, Planned Changes, fontes e vínculos.
+
+| Opção | Significado |
+| --- | --- |
+| `--strict` | Trata warnings como falhas |
+| `--json` | `{ valid, strict, reports, summary }`, com `reports[].type` em `plan` ou `planned-change` |
+
+Sem `<plan-id>`: usa o único plano, ou falha com `plan_not_found` / `ambiguous_plan`.
+Sai com `1` quando inválido.
+
+Códigos de erro: `plan_not_found`, `ambiguous_plan`, `plan_exists`, `invalid_plan`,
+`plan_invalid`, `unsupported_plan_version`, `unsafe_source_path`, `unsafe_plan_path`,
+`source_not_found`.

@@ -1,6 +1,6 @@
 {
   "name": "specwright",
-  "version": "0.7.2",
+  "version": "0.8.0",
   "description": "Spec-driven development workflow for AI coding harnesses",
   "keywords": [
     "spec-driven",
