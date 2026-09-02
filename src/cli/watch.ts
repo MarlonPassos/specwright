@@ -18,6 +18,8 @@ export interface WatchOptions {
   intervalMs: number;
   /** Renders one frame. Called once per tick. */
   frame: () => Promise<string>;
+  /** The command named in the "window too small" line. */
+  command?: string;
 }
 
 /**
@@ -25,13 +27,17 @@ export interface WatchOptions {
  * top away, and the next repaint would then start drawing halfway down the
  * previous one. Cutting it is the honest failure.
  */
-export function fitFrame(text: string, rows: number | undefined): string {
+export function fitFrame(
+  text: string,
+  rows: number | undefined,
+  command = 'specs status'
+): string {
   let lines = text.replace(/\n+$/, '').split('\n');
   if (rows && lines.length > rows - 1) {
     const kept = Math.max(rows - 2, 1);
     const hidden = lines.length - kept;
     lines = lines.slice(0, kept);
-    lines.push(` … +${hidden} linha(s) — amplie a janela ou rode 'specs status'`);
+    lines.push(` … +${hidden} linha(s) — amplie a janela ou rode '${command}'`);
   }
   return HOME + lines.join(CLEAR_LINE + '\n') + CLEAR_LINE + CLEAR_BELOW;
 }
@@ -75,7 +81,7 @@ export async function watch(options: WatchOptions): Promise<void> {
     while (!stopped) {
       const text = await options.frame();
       if (tty) {
-        process.stdout.write(fitFrame(text, process.stdout.rows));
+        process.stdout.write(fitFrame(text, process.stdout.rows, options.command));
       } else {
         // Without a terminal there is nothing to repaint over, so the frames
         // stack up as separate snapshots.
