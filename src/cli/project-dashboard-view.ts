@@ -131,14 +131,7 @@ export function renderProjectDashboard(
     ' ' + theme.green + theme.mark.done + theme.off + ' ' + pad('Incrementos', LABEL_WIDTH) +
       progress({ total: counts.total, completed: counts.archived }, theme, theme.green, 'nenhum incremento')
   );
-  // `readiness` keeps being computed for an archived increment (§7.6, cenário D),
-  // so `progress.ready` counts work that is already delivered. Under a label that
-  // says "prontas para COMEÇAR" that number is a lie: use the same eligibility
-  // rule `next` uses, so the summary cannot disagree with PRÓXIMO PASSO.
-  const startable = status.changes.filter(
-    (change) => change.readiness === 'ready' && change.execution !== 'archived'
-  ).length;
-  kv(theme.mark.ready, theme.green, 'Prontas para começar', String(startable));
+  kv(theme.mark.ready, theme.green, 'Prontas para começar', String(counts.ready));
   kv(theme.mark.active, theme.cyan, 'Em implementação', String(counts.inProgress));
   if (counts.blocked > 0) kv(theme.dot.blocked, theme.yellow, 'Bloqueadas', String(counts.blocked));
   const parked = counts.idea + counts.onHold + counts.cancelled;

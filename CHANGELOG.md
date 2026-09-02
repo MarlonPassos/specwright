@@ -5,6 +5,24 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.12.3] - 2026-09-02
+
+### Corrigido
+
+- **fix(project): `progress.ready` e `progress.blocked` contavam trabalho já entregue**
+  — `readiness` continua sendo calculado para um incremento arquivado (§7.6,
+  cenário D), então os contadores somavam o que já estava concluído. No mesmo
+  payload `progress.ready` dizia 1 enquanto `next.parallelReady` vinha vazio.
+
+  O diagrama de archive de §8 fixa o contrato: dois incrementos arquivados e um
+  recém-liberado é `progress.archived=2, progress.ready=1` — não 3. Os dois
+  contadores passam a excluir os arquivados, usando a mesma regra de
+  elegibilidade de `next`. As três dimensões por incremento não mudam: um
+  arquivado segue com `readiness: ready`, como a spec exige.
+
+  Com isso o painel volta a ler `progress.ready` direto, em vez de recalcular a
+  elegibilidade por conta própria.
+
 ## [0.12.2] - 2026-09-02
 
 ### Corrigido

@@ -333,8 +333,13 @@ export async function computeProjectStatus(
     progress: {
       total,
       archived,
-      ready: count((view) => view.readiness === 'ready'),
-      blocked: count((view) => view.readiness === 'blocked'),
+      // `readiness` keeps being computed for an archived increment (§7.6, cenário
+      // D), so counting it raw reports delivered work as outstanding. §8's archive
+      // sequence pins the contract: two increments archived and one newly
+      // unblocked is `archived=2, ready=1`, not 3. Same rule `next` uses for
+      // eligibility, so the payload cannot disagree with its own recommendation.
+      ready: count((view) => view.readiness === 'ready' && view.execution !== 'archived'),
+      blocked: count((view) => view.readiness === 'blocked' && view.execution !== 'archived'),
       inProgress: count((view) => view.execution === 'in_progress' || view.execution === 'verifying'),
       idea: count((view) => view.planningState === 'idea'),
       onHold: count((view) => view.planningState === 'on_hold'),

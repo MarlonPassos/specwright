@@ -228,3 +228,74 @@ describe('recommendNext — ranking', () => {
     expect(JSON.stringify(next)).not.toMatch(/critical.?path|caminhoCritico/i);
   });
 });
+
+describe('progress — conta trabalho pendente, não entregue', () => {
+  it('reproduz o cenário de archive de §8: archived=2, ready=1', async () => {
+    const workspace = await makePlanWorkspace();
+    // CH-001 e CH-002 concluídos; CH-004 dependia de CH-002 e acabou de liberar.
+    const ch1 = await withBrief(
+      workspace,
+      'demo',
+      change({ id: 'CH-001', slug: 'foundation', link: link('foundation') })
+    );
+    const ch2 = await withBrief(
+      workspace,
+      'demo',
+      change({ id: 'CH-002', slug: 'authentication', depends_on: ['CH-001'], link: link('authentication') })
+    );
+    const ch4 = await withBrief(
+      workspace,
+      'demo',
+      change({ id: 'CH-004', slug: 'checkout', depends_on: ['CH-002'] })
+    );
+    await seedPlan(workspace, manifest({ id: 'demo', changes: [ch1, ch2, ch4] }));
+    await seedArchivedChange(workspace, 'foundation');
+    await seedArchivedChange(workspace, 'authentication');
+
+    const status = await computeProjectStatus(workspace, 'demo');
+    expect(status.progress.archived).toBe(2);
+    expect(status.progress.ready).toBe(1);
+
+    // Os arquivados seguem com readiness ready por incremento (§7.6, cenário D).
+    expect(status.changes.find((c) => c.id === 'CH-002')!.readiness).toBe('ready');
+    expect(status.changes.find((c) => c.id === 'CH-002')!.execution).toBe('archived');
+  });
+
+  it('progress.ready nunca discorda de next.parallelReady', async () => {
+    const workspace = await makePlanWorkspace();
+    const done = await withBrief(
+      workspace,
+      'demo',
+      change({ id: 'CH-001', slug: 'done', link: link('done') })
+    );
+    const open = await withBrief(workspace, 'demo', change({ id: 'CH-002', slug: 'open' }));
+    await seedPlan(workspace, manifest({ id: 'demo', changes: [done, open] }));
+    await seedArchivedChange(workspace, 'done');
+
+    const status = await computeProjectStatus(workspace, 'demo');
+    expect(status.progress.ready).toBe(recommendNext(status).parallelReady.length);
+  });
+
+  it('um incremento arquivado com brief quebrado não infla progress.blocked', async () => {
+    const workspace = await makePlanWorkspace();
+    const broken = change({
+      id: 'CH-001',
+      slug: 'gone',
+      link: link('gone'),
+      planned_change: {
+        path: 'planned-changes/CH-001-gone.md',
+        generated_from_plan_revision: 0,
+        source_hash: 'x',
+        content_hash: 'y',
+      },
+    });
+    await seedPlan(workspace, manifest({ id: 'demo', changes: [broken] }));
+    await seedArchivedChange(workspace, 'gone');
+
+    const status = await computeProjectStatus(workspace, 'demo');
+    expect(status.changes[0].execution).toBe('archived');
+    expect(status.progress.blocked).toBe(0);
+    expect(status.progress.archived).toBe(1);
+  });
+});
+
