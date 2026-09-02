@@ -75,7 +75,21 @@ async function resolveArchive(
   const pattern = ARCHIVE_NAME(link.name);
   const all = (await listArchivedChanges(workspace)).filter((name) => pattern.test(name));
   if (all.length === 0) return { all: [] };
-  // Latest by name: the date prefix sorts chronologically, the -N suffix breaks ties.
-  const chosen = [...all].sort((a, b) => b.localeCompare(a))[0];
+  const chosen = [...all].sort(byDateThenSuffix)[0];
   return { chosen: rel(chosen), all: all.map(rel) };
+}
+
+/**
+ * Newest first: the date prefix compares as text (it is zero-padded), the `-N`
+ * collision suffix compares as a NUMBER. A plain string sort would rank
+ * `...-2` above `...-10`, picking the wrong archive.
+ */
+function byDateThenSuffix(a: string, b: string): number {
+  const split = (name: string): [string, number] => {
+    const match = /^(\d{4}-\d{2}-\d{2}-.*?)(?:-(\d+))?$/.exec(name)!;
+    return [match[1], match[2] === undefined ? 1 : Number(match[2])];
+  };
+  const [dateA, suffixA] = split(a);
+  const [dateB, suffixB] = split(b);
+  return dateB.localeCompare(dateA) || suffixB - suffixA || b.localeCompare(a);
 }

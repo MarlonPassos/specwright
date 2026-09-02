@@ -104,6 +104,23 @@ describe('syncPlan', () => {
     expect(reloaded.changes[0].link?.active_path).toBeNull();
   });
 
+  it('picks the highest collision suffix numerically, not lexically (AC-40)', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedArchivedChange(workspace, 'auth', '2026-09-12');
+    for (const suffix of [2, 10]) {
+      await fs.mkdir(path.join(workspace.archivePath, `2026-09-12-auth-${suffix}`), {
+        recursive: true,
+      });
+    }
+    await seedPlan(
+      workspace,
+      manifest({ id: 'demo', changes: [change({ id: 'CH-001', slug: 'auth', link: link('auth') })] })
+    );
+    const result = await syncPlan(workspace, 'demo', {});
+    expect(result.resolved[0].archivePath).toBe('spec/changes/archive/2026-09-12-auth-10');
+    expect(result.diagnostics.some((d) => d.code === 'ambiguous_archive_match')).toBe(true);
+  });
+
   it('reports dangling_link and keeps execution unknown, never archived', async () => {
     const workspace = await makePlanWorkspace();
     await seedPlan(

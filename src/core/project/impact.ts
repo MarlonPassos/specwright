@@ -11,7 +11,12 @@ export interface ImpactResult {
   ancestors: string[];
   milestones: string[];
   linkedChanges: Array<{ id: string; name: string; execution: string; path: string | null }>;
-  sharedCapabilities: string[];
+  /**
+   * One entry per linked change in the affected set. A change whose directory
+   * cannot be resolved appears as `{ capability: null, reason: 'change_dir_missing' }`
+   * — never omitted in silence (§7.12).
+   */
+  sharedCapabilities: Array<{ capability: string | null; change?: string; reason?: string }>;
   affectedPlannedChanges: string[];
   completedReached: string[];
 }
@@ -51,7 +56,7 @@ export async function computeImpact(
   }
 
   const linkedChanges: ImpactResult['linkedChanges'] = [];
-  const sharedCapabilities = new Set<string>();
+  const capabilities = new Map<string, { capability: string | null; change?: string; reason?: string }>();
   for (const change of status.changes) {
     if (!affected.has(change.id) || !change.link) continue;
     const dir = resolveChangeDir(workspace, change.link);
@@ -62,7 +67,16 @@ export async function computeImpact(
       path: dir ? path.relative(workspace.projectRoot, dir).replace(/\\/g, '/') : null,
     });
     if (dir && (await pathExists(dir))) {
-      for (const delta of await readDeltaSpecs(dir)) sharedCapabilities.add(delta.capability);
+      for (const delta of await readDeltaSpecs(dir)) {
+        capabilities.set(delta.capability, { capability: delta.capability });
+      }
+    } else {
+      // The directory is gone: say so instead of dropping the change silently.
+      capabilities.set(`missing:${change.id}`, {
+        capability: null,
+        change: change.id,
+        reason: 'change_dir_missing',
+      });
     }
   }
 
@@ -85,7 +99,7 @@ export async function computeImpact(
     ancestors: [...ancestors],
     milestones: [...milestones],
     linkedChanges,
-    sharedCapabilities: [...sharedCapabilities],
+    sharedCapabilities: [...capabilities.values()],
     affectedPlannedChanges,
     completedReached,
   };

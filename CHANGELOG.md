@@ -7,6 +7,49 @@ versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [0.10.0] - 2026-09-01
 
+### Corrigido
+
+- **fix(project): falhas encontradas em auditoria independente**
+  - **Atomicidade (NFR-07, I-10, AC-21):** `generate` e `apply` validam os
+    marcadores do roadmap de `plan.md` **antes** da primeira escrita. Antes, um
+    marcador desbalanceado só era descoberto depois que os briefs e o
+    `plan.yaml` já tinham sido gravados, deixando o plano meio aplicado.
+  - **Traversal em `adopt` (I-8, NFR-08, FR-06):** `specs project adopt` aceitava
+    um caminho (`../../../fora`), lia conteúdo de fora da raiz e persistia
+    `slug`/`link.name` inseguros no manifesto. Agora exige um **nome** de
+    diretório — slug kebab-case ou `<YYYY-MM-DD>-<slug>[-N]` — e recusa `..`,
+    absoluto, NUL e separadores com `unsafe_plan_path`.
+  - **`renameSlug` perdia o brief (FR-43, AC-50):** o arquivo antigo era apagado
+    e o novo nunca criado, deixando o manifesto apontando para um arquivo
+    inexistente. Agora o conteúdo é carregado para o novo caminho, o `slug:` do
+    frontmatter é reescrito e `content_hash`/`record_hash` são refeitos na mesma
+    transação.
+  - **Precedência do blocker manual (FR-23, §7.7):** um blocker manual agora é a
+    única razão reportada, com `blockedBy` vazio. Antes acumulava com
+    `dependency_pending`.
+  - **`next` recomendava incremento concluído (§7.8):** elegível passa a exigir
+    `readiness: ready` **e** `execution != archived`; o concluído aparece em
+    `excluded` com `archive_resolved`.
+  - **Ordenação de archive (FR-32, AC-40, NFR-03):** o sufixo de colisão é
+    comparado como número. Antes `-2` era escolhido no lugar de `-10`.
+  - **`apply --expect-revision` (FR-39):** a opção não existia na CLI e escapava
+    do contrato `--json` como texto do Commander. Registrada e propagada.
+  - **`impact` e `change_dir_missing` (FR-44, §7.12):** `sharedCapabilities`
+    passa a ser uma lista de entradas; uma change vinculada sem diretório
+    resolvível aparece como `{ capability: null, reason: "change_dir_missing" }`
+    em vez de ser omitida em silêncio. **Mudança de contrato JSON.**
+  - **Regras de §7.17:** `schema_version` do frontmatter de um Planned Change é
+    restrito ao valor conhecido; um incremento `planned` sem materialização
+    produz `planned_change_missing`.
+  - **`generate --force` (AC-14):** o relatório passa a registrar em
+    `diagnostics` que um conteúdo editado à mão foi adotado.
+  - **Escrita concorrente:** `savePlan` relê a revisão no disco imediatamente
+    antes de gravar (compare-and-swap) e falha com `plan_revision_conflict` em
+    vez de sobrescrever a atualização de outro escritor.
+  - Testes: `test/unit/project-transaction.test.ts` e
+    `test/integration/project-lifecycle.test.ts` (exigidos por §12) mais
+    regressão para cada item acima. 326 testes.
+
 ### Adicionado
 
 - **feat(project): Project Planning — Fases 4–5 (bundle, impacto, ciclo de vida e watch)**

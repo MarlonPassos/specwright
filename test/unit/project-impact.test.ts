@@ -62,7 +62,25 @@ describe('computeImpact', () => {
     );
     const impact = await computeImpact(workspace, 'demo', ['CH-001']);
     expect(impact.completedReached).toEqual(['CH-001']);
-    expect(impact.sharedCapabilities).toContain('identity/user-auth');
+    expect(impact.sharedCapabilities.map((entry) => entry.capability)).toContain(
+      'identity/user-auth'
+    );
+  });
+
+  it('declares change_dir_missing instead of dropping the change silently (§7.12)', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedPlan(
+      workspace,
+      manifest({
+        id: 'demo',
+        changes: [change({ id: 'CH-001', slug: 'gone', link: link('gone') })],
+      })
+    );
+    const impact = await computeImpact(workspace, 'demo', ['CH-001']);
+    expect(impact.sharedCapabilities).toEqual([
+      { capability: null, change: 'CH-001', reason: 'change_dir_missing' },
+    ]);
+    expect(impact.linkedChanges).toHaveLength(1);
   });
 
   it('rejects an unknown target', async () => {

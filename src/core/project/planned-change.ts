@@ -13,7 +13,7 @@ const KEBAB_CASE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 
 export const PlannedChangeFrontmatterSchema = z
   .object({
-    schema_version: z.number().int(),
+    schema_version: z.literal(PLANNED_CHANGE_SCHEMA_VERSION),
     id: z.string().regex(CHANGE_ID_PATTERN),
     slug: z.string().regex(KEBAB_CASE),
     title: z.string().min(1),

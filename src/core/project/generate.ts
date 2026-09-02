@@ -9,7 +9,7 @@ import { sha256, sourceHash, recordHash, type HashableSource } from './hashes.js
 import { renderManifest, type PlanManifest, type ProjectChange } from './model.js';
 import { plannedChangeRelPath, resolveWithinRoot } from './paths.js';
 import { renderPlannedChange } from './planned-change.js';
-import { renderRoadmapBlock, spliceRoadmap } from './render.js';
+import { assertRoadmapMarkers, renderRoadmapBlock, spliceRoadmap } from './render.js';
 import { computeProjectStatus, roadmapRows } from './status.js';
 
 export interface GenerateOptions {
@@ -79,6 +79,7 @@ export async function generatePlannedChanges(
   const nextRefs = new Map<string, ProjectChange['planned_change']>();
   const skipped: GenerateResult['skipped'] = [];
   const conflicts: GenerateConflict[] = [];
+  const diagnostics: GenerateResult['diagnostics'] = [];
 
   for (const change of selected) {
     const relPath = plannedChangeRelPath(change.id, change.slug);
@@ -119,6 +120,17 @@ export async function generatePlannedChanges(
         message: 'O arquivo foi editado depois da última materialização e não será sobrescrito.',
       });
       continue;
+    }
+
+    if (state === 'modified' && options.force) {
+      // AC-14: --force adopted a hand-edited brief; the report has to say so.
+      diagnostics.push({
+        level: 'WARNING',
+        code: 'planned_change_modified',
+        id: change.id,
+        path: `${status_rel(workspace, paths.dir)}/${relPath}`,
+        message: `${change.id}: conteúdo editado à mão foi adotado por --force`,
+      });
     }
 
     // Body: keep whatever content already exists; only fall to a skeleton when
@@ -173,7 +185,7 @@ export async function generatePlannedChanges(
       written,
       skipped,
       conflicts: [],
-      diagnostics: [],
+      diagnostics,
     };
   }
 
@@ -187,9 +199,15 @@ export async function generatePlannedChanges(
       written: [],
       skipped,
       conflicts: [],
-      diagnostics: [],
+      diagnostics,
     };
   }
+
+  // Everything that can still fail must fail BEFORE the first byte is written.
+  // An unbalanced roadmap marker used to be discovered only after the briefs and
+  // the manifest had already landed (AC-21, NFR-07).
+  const planDocBefore = await readFileIfExists(paths.planDoc);
+  if (planDocBefore !== undefined) assertRoadmapMarkers(planDocBefore);
 
   // Stage the brief files, then the manifest, then project the roadmap.
   await withStaging(paths.dir, async (stage) => {
@@ -209,11 +227,11 @@ export async function generatePlannedChanges(
   };
   await writeFileAtomic(paths.manifest, renderManifest(nextManifest));
 
-  const planDoc = await readFileIfExists(paths.planDoc);
-  if (planDoc !== undefined) {
+  if (planDocBefore !== undefined) {
+    // Markers were validated above, so this projection cannot fail.
     const status = await computeProjectStatus(workspace, id);
     const block = renderRoadmapBlock({ manifest: nextManifest, rows: roadmapRows(status) });
-    await writeFileAtomic(paths.planDoc, spliceRoadmap(planDoc, block));
+    await writeFileAtomic(paths.planDoc, spliceRoadmap(planDocBefore, block));
   }
 
   return {
@@ -224,7 +242,7 @@ export async function generatePlannedChanges(
     written,
     skipped,
     conflicts: [],
-    diagnostics: [],
+    diagnostics,
   };
 }
 

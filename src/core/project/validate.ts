@@ -173,7 +173,16 @@ async function checkManifest(
   // Planned Change refs and paths
   for (const change of manifest.changes) {
     const ref = change.planned_change;
-    if (!ref) continue;
+    if (!ref) {
+      // §7.17 WARNING 4: a `planned` increment with no materialization at all.
+      if (change.planning_state === 'planned') {
+        warn(
+          `changes.${change.id}.planned_change`,
+          `${change.id} está "planned" sem Planned Change materializado (planned_change_missing)`
+        );
+      }
+      continue;
+    }
     const expected = `${PLANNED_CHANGES_DIR}/${plannedChangeFileName(change.id, change.slug)}`;
     if (ref.path !== expected) {
       error(

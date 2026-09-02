@@ -11,6 +11,7 @@ import { assertTransition, executionOf } from './state.js';
 import { computeProjectStatus } from './status.js';
 
 const KEBAB = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
+const ARCHIVE_DIR_NAME = /^\d{4}-\d{2}-\d{2}-[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 
 function activePath(name: string): string {
   return `${WORKSPACE_DIR}/${CHANGES_DIR}/${name}`;
@@ -157,6 +158,7 @@ export async function adoptChange(
 ): Promise<AdoptResult> {
   const { manifest, paths } = await loadPlan(workspace.projectRoot, planId);
 
+  assertSafeAdoptTarget(target);
   const activeDir = path.join(workspace.changesPath, target);
   const archiveDir = path.join(workspace.archivePath, target);
 
@@ -297,6 +299,28 @@ export async function setPlanningState(
     readiness: view.readiness,
     execution: view.execution,
   };
+}
+
+/**
+ * `adopt` takes a directory NAME, never a path. Anything that could leave
+ * `spec/changes/` or `spec/changes/archive/` is refused before the first `stat`,
+ * so a traversal can never be read from nor persisted into the manifest (I-8).
+ */
+function assertSafeAdoptTarget(target: string): void {
+  const unsafe = (why: string): never => {
+    throw new SpecError(`"${target}" não é um alvo válido para adopt: ${why}.`, {
+      code: 'unsafe_plan_path',
+      fix: 'specs list',
+    });
+  };
+  if (target.includes('\0')) unsafe('contém byte NUL');
+  if (path.isAbsolute(target) || /^[a-zA-Z]:[\\/]/.test(target)) unsafe('é um path absoluto');
+  if (/[\\/]/.test(target)) unsafe('é um nome de diretório, não um caminho');
+  if (target === '.' || target === '..') unsafe('não é um nome de diretório');
+  // Either an active change slug, or an archive directory `<data>-<slug>[-N]`.
+  if (!KEBAB.test(target) && !ARCHIVE_DIR_NAME.test(target)) {
+    unsafe('deve ser um slug kebab-case ou um diretório de archive <YYYY-MM-DD>-<slug>[-N]');
+  }
 }
 
 function firstLine(text: string): string {

@@ -146,6 +146,18 @@ describe('adoptChange', () => {
     });
   });
 
+  it('refuses a target that is a path instead of a directory name (I-8, NFR-08)', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedPlan(workspace, manifest({ id: 'demo', changes: [] }));
+    for (const target of ['../../../fora', '/etc', 'a/b', '..', 'NaoKebab']) {
+      await expect(adoptChange(workspace, 'demo', target)).rejects.toMatchObject({
+        code: 'unsafe_plan_path',
+      });
+    }
+    const { manifest: reloaded } = await loadPlan(workspace.projectRoot, 'demo');
+    expect(reloaded.changes).toEqual([]);
+  });
+
   it('allocates a fresh id past any cancelled one', async () => {
     const workspace = await makePlanWorkspace();
     await seedChange(workspace, 'x');

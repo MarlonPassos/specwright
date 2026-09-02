@@ -16,6 +16,7 @@ export interface NextCandidate {
 export interface ExcludedChange {
   id: string;
   readiness: string;
+  execution: string;
   reasonCodes: string[];
   blockedBy: string[];
 }
@@ -45,8 +46,14 @@ export function recommendNext(status: PlanStatus): NextRecommendation {
     declaration: declarationIndex.get(view.id) ?? 0,
   });
 
+  // Eligible = ready AND not already delivered. `readiness` keeps being computed
+  // for an archived increment (§7.6, cenário D), so filtering on it alone would
+  // recommend work that is already done (§7.8, passo 3).
+  const isEligible = (view: ProjectChangeView) =>
+    view.readiness === 'ready' && view.execution !== 'archived';
+
   const eligible = status.changes
-    .filter((view) => view.readiness === 'ready')
+    .filter(isEligible)
     .sort((a, b) => {
       const ra = rank(a);
       const rb = rank(b);
@@ -73,12 +80,15 @@ export function recommendNext(status: PlanStatus): NextRecommendation {
   const [top, ...rest] = eligible;
 
   const excluded: ExcludedChange[] = status.changes
-    .filter((view) => view.readiness !== 'ready')
+    .filter((view) => !isEligible(view))
     .map((view) => ({
       id: view.id,
       readiness: view.readiness,
-      reasonCodes: view.readinessReasons,
-      blockedBy: view.blockedBy,
+      execution: view.execution,
+      // An archived increment is excluded because it is done, not because it is
+      // blocked; say that instead of repeating its readiness reasons.
+      reasonCodes: view.execution === 'archived' ? ['archive_resolved'] : view.readinessReasons,
+      blockedBy: view.execution === 'archived' ? [] : view.blockedBy,
     }));
 
   return {

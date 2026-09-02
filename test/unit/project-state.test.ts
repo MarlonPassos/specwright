@@ -121,6 +121,16 @@ describe('readinessOf', () => {
     expect(result.blockedBy).toEqual([]);
   });
 
+  it('a manual blocker outranks a pending dependency (§7.7)', () => {
+    const result = readinessOf({
+      change: change({ id: 'CH-003', slug: 'x', manual_blockers: ['imagens'], depends_on: ['CH-001'] }),
+      materialization: 'current',
+      dependencyExecution: deps({ 'CH-001': 'proposed' }),
+    });
+    expect(result.reasons).toEqual(['manual_blocker_present']);
+    expect(result.blockedBy).toEqual([]);
+  });
+
   it('dependency pending is reported with blockedBy', () => {
     const result = readinessOf({
       change: change({ id: 'CH-002', slug: 'x', depends_on: ['CH-001'] }),

@@ -73,6 +73,24 @@ export function renderRoadmapBlock(input: RoadmapInput): string {
 }
 
 /**
+ * Fails when `doc` cannot receive a roadmap projection, WITHOUT writing anything.
+ * Callers run this before the first byte of a mutation reaches the disk, so an
+ * unbalanced marker can never leave a half-applied plan behind (AC-21, NFR-07).
+ */
+export function assertRoadmapMarkers(doc: string): void {
+  const text = normalizeLineEndings(doc);
+  const begins = countOccurrences(text, ROADMAP_BEGIN);
+  const ends = countOccurrences(text, ROADMAP_END);
+  if (begins === 0 && ends === 0) return;
+  if (begins !== 1 || ends !== 1 || text.indexOf(ROADMAP_END) < text.indexOf(ROADMAP_BEGIN)) {
+    throw new SpecError('Os marcadores do roadmap em plan.md estão desbalanceados.', {
+      code: 'roadmap_markers_invalid',
+      fix: 'remova o bloco e rode specs project generate',
+    });
+  }
+}
+
+/**
  * Replaces the roadmap block in `doc` with `block`, preserving every byte
  * outside the markers. Appends the block when the markers are absent; fails with
  * `roadmap_markers_invalid` when they are unbalanced or duplicated.

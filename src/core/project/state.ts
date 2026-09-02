@@ -112,8 +112,14 @@ export function readinessOf(input: ReadinessInput): ReadinessResult {
     return { readiness: 'not_applicable', reasons: ['state_not_eligible'], blockedBy: [] };
   }
 
+  // A manual blocker takes precedence over every other cause (§7.7): it is the
+  // single reported reason, and `blockedBy` stays empty because no dependency is
+  // what is holding the increment back.
+  if (change.manual_blockers.length > 0) {
+    return { readiness: 'blocked', reasons: ['manual_blocker_present'], blockedBy: [] };
+  }
+
   const reasons: string[] = [];
-  if (change.manual_blockers.length > 0) reasons.push('manual_blocker_present');
   if (input.materialization !== 'current') reasons.push(`planned_change_${input.materialization}`);
   if (input.diagnosticBlocking) reasons.push('diagnostic_blocking');
 

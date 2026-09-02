@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { parse as parseYaml } from 'yaml';
 import { SpecError } from '../../util/errors.js';
 import { localDateStamp } from '../../util/date.js';
-import { pathExists, writeFileAtomic } from '../../util/fs.js';
+import { pathExists, readFileIfExists, writeFileAtomic } from '../../util/fs.js';
 import {
   PLAN_SCHEMA_VERSION,
   PlanManifestSchema,
@@ -135,6 +135,22 @@ export async function savePlan(
       `A revisão no disco é ${manifest.revision}, mas o comando esperava ${options.expectRevision}.`,
       { code: 'plan_revision_conflict', fix: 'specs project status --json' }
     );
+  }
+
+  // Compare-and-swap: the caller loaded `manifest` some time ago. Re-read the
+  // revision immediately before writing so a concurrent writer that already
+  // bumped it is reported instead of being silently overwritten.
+  if (!options.keepRevision) {
+    const onDisk = await readFileIfExists(paths.manifest);
+    if (onDisk !== undefined) {
+      const current = parseManifest(onDisk).manifest;
+      if (current && current.revision !== manifest.revision) {
+        throw new SpecError(
+          `O plano mudou para a revisão ${current.revision} enquanto este comando trabalhava na ${manifest.revision}.`,
+          { code: 'plan_revision_conflict', fix: 'specs project status --json' }
+        );
+      }
+    }
   }
 
   const next: PlanManifest = {

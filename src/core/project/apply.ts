@@ -6,7 +6,7 @@ import { type Workspace } from '../workspace.js';
 import { loadPlan } from './repository.js';
 import { computeProjectStatus, roadmapRows } from './status.js';
 import { computeImpact, type ImpactResult } from './impact.js';
-import { renderRoadmapBlock, spliceRoadmap } from './render.js';
+import { assertRoadmapMarkers, renderRoadmapBlock, spliceRoadmap } from './render.js';
 import { sha256, sourceHash, recordHash, type HashableSource } from './hashes.js';
 import { renderManifest } from './model.js';
 import { resolveWithinRoot } from './paths.js';
@@ -21,6 +21,8 @@ import {
 export interface ApplyOptions {
   dryRun?: boolean;
   allowCompleted?: boolean;
+  /** CLI-level guard; must match the revision on disk (FR-39). */
+  expectRevision?: number;
   now?: Date;
 }
 
@@ -44,6 +46,13 @@ export async function applyPlanBundle(
 ): Promise<ApplyResult> {
   const bundle: Bundle = parseBundle(rawBundle);
   const { manifest, paths } = await loadPlan(workspace.projectRoot, planId);
+
+  if (options.expectRevision !== undefined && options.expectRevision !== manifest.revision) {
+    throw new SpecError(
+      `A revisão no disco é ${manifest.revision}, mas o comando esperava ${options.expectRevision}.`,
+      { code: 'plan_revision_conflict', fix: 'specs project status --json' }
+    );
+  }
 
   const status = await computeProjectStatus(workspace, planId);
   const archivedIds = new Set(
@@ -148,12 +157,45 @@ export async function applyPlanBundle(
     };
   }
 
+  // A slug rename moves the brief: carry the existing bytes to the new path and
+  // rewrite the `slug:` in its frontmatter, so every reference moves in the same
+  // transaction. Without this the old file was deleted with nothing written in
+  // its place, and the frontmatter would contradict the manifest (FR-43, AC-50).
+  for (const rename of result.briefRenames) {
+    if (rename.from === rename.to || briefFiles.has(rename.to)) continue;
+    const carried = await readFileIfExists(path.join(paths.dir, rename.from));
+    if (carried === undefined) continue;
+
+    const record = result.manifest.changes.find(
+      (entry) => entry.planned_change?.path === rename.to
+    );
+    const body = record ? rewriteBriefSlug(carried, record.slug) : carried;
+    briefFiles.set(rename.to, body);
+
+    if (record?.planned_change) {
+      record.planned_change = {
+        ...record.planned_change,
+        content_hash: sha256(body),
+        record_hash: recordHash({
+          slug: record.slug,
+          title: record.title,
+          dependsOn: record.depends_on,
+          milestone: record.milestone,
+        }),
+      };
+    }
+  }
+
   // Stage every planning file, then rename atomically.
   const planDocSource =
     result.documents.find((doc) => doc.target === 'plan')?.content ??
     (await readFileIfExists(paths.planDoc)) ??
     '';
   const architectureDoc = result.documents.find((doc) => doc.target === 'architecture')?.content;
+
+  // Fail before the first byte: an unbalanced roadmap marker must not leave a
+  // half-applied plan behind (AC-21, NFR-07).
+  assertRoadmapMarkers(planDocSource);
 
   await withStaging(paths.dir, async (stage) => {
     for (const [relPath, content] of briefFiles) stage(relPath, content);
@@ -191,6 +233,17 @@ export async function applyPlanBundle(
     validation,
     diagnostics,
   };
+}
+
+/** Replaces the `slug:` line inside a brief's frontmatter block. */
+function rewriteBriefSlug(brief: string, slug: string): string {
+  const normalized = brief.replace(/\r\n?/g, '\n');
+  if (!normalized.startsWith('---\n')) return normalized;
+  const end = normalized.indexOf('\n---', 4);
+  if (end === -1) return normalized;
+  const frontmatter = normalized.slice(0, end);
+  const rest = normalized.slice(end);
+  return `${frontmatter.replace(/^slug:.*$/m, `slug: ${slug}`)}${rest}`;
 }
 
 function collectTargets(bundle: Bundle, idMap: Record<string, string>): string[] {

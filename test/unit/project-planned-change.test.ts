@@ -54,6 +54,12 @@ describe('planned change parser', () => {
     expect(parsed.frontmatterError).toMatch(/inválido/);
   });
 
+  it('rejects an unknown frontmatter schema_version (§7.3 regra 2)', () => {
+    const parsed = parsePlannedChange(VALID.replace('schema_version: 1', 'schema_version: 2'));
+    expect(parsed.frontmatter).toBeUndefined();
+    expect(parsed.frontmatterError).toMatch(/schema_version/);
+  });
+
   it('flags a delta header', () => {
     const parsed = parsePlannedChange(`${VALID}\n## ADDED Requirements\n\n### Requirement: x\n`);
     expect(parsed.deltaHeaders).toContain('ADDED Requirements');

@@ -106,7 +106,8 @@ specs project unlink   [<plan-id>] <change-id> [--force] [--json]
 specs project adopt    [<plan-id>] <change-name|archive-dir> [--json]
 specs project sync     [<plan-id>] [--check] [--json]
 specs project set-state [<plan-id>] <change-id> <state> [--reason <texto>] [--json]
-specs project apply    [<plan-id>] [--file <path>|-] [--dry-run] [--allow-completed] [--json]
+specs project apply    [<plan-id>] [--file <path>|-] [--dry-run] [--allow-completed]
+                                   [--expect-revision <n>] [--json]
 specs project impact   [<plan-id>] --change <id>... [--json]
 specs project list     [--json]
 specs project pause    [<plan-id>] --reason <texto> [--json]
@@ -195,8 +196,12 @@ Toda mudança estrutural além dos comandos próprios — `addChange`, `updateCh
 
 `specs project impact --change <id>...` calcula dependentes, ancestrais,
 milestones atingidos, changes vinculadas com o estado resolvido, capabilities
-compartilhadas (`readDeltaSpecs` de cada change vinculada no disco), Planned
-Changes afetados e incrementos concluídos atingidos.
+compartilhadas, Planned Changes afetados e incrementos concluídos atingidos.
+
+`sharedCapabilities` é uma lista de entradas, não de strings: uma change
+vinculada cujo diretório não existe mais aparece como
+`{ "capability": null, "change": "CH-00N", "reason": "change_dir_missing" }` —
+nunca omitida em silêncio.
 
 ## Ciclo de vida do plano
 
