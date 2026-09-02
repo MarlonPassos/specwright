@@ -217,11 +217,14 @@ glifos Unicode, igual a `specs status`.
 ### `specs project link` / `unlink` / `adopt` / `sync` / `set-state`
 
 `link <change-id> <change-name>` registra o vínculo 1:1 (o incremento não pode
-estar concluído nem cancelado; a change nativa precisa existir; o nome não pode
-já estar vinculado). `unlink <change-id>` remove — `--force` quando a execução é
-`archived`. `adopt <change-name|archive-dir>` cria uma Project Change a partir de
-uma change fora do plano, sem tocar em nada dentro dela. `sync [--check]`
-reconcilia o bloco `link` com `spec/changes/` e o archive (idempotente).
+estar concluído nem cancelado; a change precisa existir, **ativa ou no archive**;
+o nome não pode já estar vinculado). `unlink <change-id>` remove — `--force`
+quando a execução é `archived`. `adopt <change-name|archive-dir>` cria uma
+Project Change a partir de uma change fora do plano, sem tocar em nada dentro
+dela. `sync [--check] [--link]` reconcilia o bloco `link` com `spec/changes/` e o
+archive (idempotente); `--link` vincula em lote todo incremento sem vínculo cuja
+change de mesmo nome do slug exista e esteja livre — é a alternativa a repetir
+`specs project link` uma vez por incremento.
 `set-state <change-id> <state> [--reason]` aplica uma transição de
 `planning_state` (`on_hold` e `cancelled` exigem `--reason`).
 

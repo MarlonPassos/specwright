@@ -28,9 +28,19 @@ ${PROJECT_BOUNDARY}
    - Planned Change sem critérios macro;
    - vínculo quebrado, ou change ativa com proposta e sem vínculo;
    - duplicação entre \`plan.md\`, \`architecture.md\` e os Planned Changes.
-3. Se encontrar uma change fora do plano que deveria estar nele, sugira
-   \`specs project adopt <change-name>\`.
-4. Feche apontando ${commandRef('project-refine')} para agir sobre os achados, ou
+3. \`specs project status --json\`. Para cada diagnóstico \`unclaimed_archive\`
+   existe trabalho concluído que o plano não está contando. Rode
+   \`specs project sync --link --check\`: ele lista os incrementos que seriam
+   vinculados a uma change de MESMO nome do slug, ativa ou arquivada. Mostre a
+   lista, pergunte, e depois do sim rode \`specs project sync --link\`.
+   Isso é escrita — vale o protocolo de confirmação.
+4. Sobrou \`unclaimed_archive\` depois disso? A change existe mas nenhum
+   incremento tem aquele slug: sugira \`specs project adopt <change-name>\`,
+   que cria um incremento novo já vinculado.
+5. Um diagnóstico \`ambiguous_execution\` significa que um slug tem diretório
+   ativo E archive. O incremento é apresentado como concluído pelo archive, e o
+   trabalho ativo fica invisível. Aponte isso; não escolha por conta própria.
+6. Feche apontando ${commandRef('project-refine')} para agir sobre os achados, ou
    ${commandRef('project-generate')} se o plano já está pronto para materializar.
 
 ${EVIDENCE_LABELS}

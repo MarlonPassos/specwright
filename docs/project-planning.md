@@ -152,10 +152,17 @@ similaridade.
 - `adopt <change-name|archive-dir>` — cria uma Project Change (`planning_state:
   planned`, id novo, brief `missing`) a partir de uma change fora do plano, já
   vinculada. Não escreve nada dentro da change nativa.
-- `sync [--check]` — reconcilia só o bloco `link`: preenche `archive_path`
-  quando um archive resolve, limpa `active_path` quando o diretório ativo some,
-  reporta `dangling_link`. Nunca cria vínculo, nunca adota, nunca toca a change
-  nativa. Idempotente. `--check` não escreve.
+- `sync [--check] [--link]` — reconcilia só o bloco `link`: preenche
+  `archive_path` quando um archive resolve, limpa `active_path` quando o
+  diretório ativo some, reporta `dangling_link`. Nunca adota, nunca toca a
+  change nativa. Idempotente. `--check` não escreve.
+
+  Um `sync` simples **nunca inventa vínculo**. `--link` é a operação explícita
+  de vincular em lote: para cada incremento sem vínculo, uma change cujo nome de
+  diretório é **igual ao slug** do incremento — ativa ou arquivada, e não
+  reivindicada por ninguém — é vinculada. Só igualdade exata de identificador;
+  nada é inferido de título, data ou semelhança. Incremento cancelado é pulado.
+  Existe para não obrigar um `specs project link` por incremento à mão.
 - `set-state <change-id> <state> [--reason]` — aplica uma transição de
   `planning_state` validada contra a máquina de §7.6
   (`idea→planned|cancelled`, `planned→on_hold|cancelled`,

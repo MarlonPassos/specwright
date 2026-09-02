@@ -397,17 +397,30 @@ export function registerProjectCommands(program: Command): void {
     .command('sync [plan-id]')
     .description('Reconcilia os vínculos com spec/changes/ e o archive')
     .option('--check', 'Reporta o que mudaria sem escrever')
+    .option(
+      '--link',
+      'Vincula incrementos sem vínculo a uma change de MESMO nome do slug, ativa ou arquivada'
+    )
     .option('--json', 'Saída em JSON')
-    .action(async function (this: Command, planId: string | undefined, options: { check?: boolean }) {
+    .action(async function (
+      this: Command,
+      planId: string | undefined,
+      options: { check?: boolean; link?: boolean }
+    ) {
       const json = wantsJson(this);
       try {
         const workspace = await requireWorkspace();
         const id = await resolvePlanId(workspace.projectRoot, planId);
-        const result = await syncPlan(workspace, id, { check: options.check });
+        const result = await syncPlan(workspace, id, { check: options.check, link: options.link });
         if (json) printJson(result);
         else
           printLines([
             options.check ? 'Prévia da sincronização:' : `Sincronizado (revisão ${result.revision}).`,
+            ...result.linked.map(
+              (entry) =>
+                `  vinculado: ${entry.id} → ${entry.change}` +
+                (entry.archivePath ? ' (arquivada)' : '')
+            ),
             ...result.resolved.map((entry) => `  archive: ${entry.id} → ${entry.archivePath}`),
             ...result.cleared.map((entry) => `  active limpo: ${entry}`),
             ...result.diagnostics.map((d) => `  ${d.level} ${d.code} — ${d.message}`),

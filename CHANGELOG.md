@@ -5,6 +5,31 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.14.0] - 2026-09-02
+
+### Adicionado
+
+- **feat(project): `specs project sync --link` vincula em lote** — vincular
+  trabalho já feito exigia um `specs project link CH-NNN <nome>` por incremento,
+  à mão. `--link` percorre os incrementos sem vínculo e reivindica a change cujo
+  nome de diretório é **igual ao slug** — ativa ou arquivada, e livre. Só
+  igualdade exata de identificador: nada é inferido de título, data ou
+  semelhança, e um incremento cancelado é pulado. `--check` mostra a prévia.
+
+  Um `sync` simples continua **nunca inventando vínculo**; `--link` é a operação
+  explícita, como a §7.9 exige, só que uma vez para o plano inteiro em vez de uma
+  vez por incremento.
+
+  `/spec-project-review` passa a conduzir isso: vê `unclaimed_archive`, roda
+  `sync --link --check`, mostra a lista, pergunta, e só então grava.
+
+### Corrigido
+
+- **fix(project): `next` mandava vincular um incremento já vinculado** — o painel
+  sugeria `specs project link CH-002 packaging` para uma change que já estava
+  vinculada e em implementação. Quando o vínculo existe, a recomendação passa a
+  ser `specs status --change <nome>` e depois `specs archive <nome>`.
+
 ## [0.13.0] - 2026-09-02
 
 ### Corrigido

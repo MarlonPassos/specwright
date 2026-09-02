@@ -133,3 +133,110 @@ describe('syncPlan', () => {
     expect(status.changes[0].execution).toBe('unknown');
   });
 });
+
+describe('syncPlan --link — vincular em lote, sem repetir link à mão', () => {
+  it('um sync simples continua nunca inventando vínculo', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedArchivedChange(workspace, 'bug-fixes');
+    await seedPlan(
+      workspace,
+      manifest({ id: 'demo', changes: [change({ id: 'CH-001', slug: 'bug-fixes' })] })
+    );
+    const result = await syncPlan(workspace, 'demo');
+    expect(result.linked).toEqual([]);
+    expect((await loadPlan(workspace.projectRoot, 'demo')).manifest.changes[0].link).toBeNull();
+  });
+
+  it('vincula a arquivada e a ativa cujo nome é igual ao slug', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedArchivedChange(workspace, 'bug-fixes', '2026-09-02');
+    await seedChange(workspace, 'packaging');
+    await seedPlan(
+      workspace,
+      manifest({
+        id: 'demo',
+        changes: [
+          change({ id: 'CH-001', slug: 'bug-fixes' }),
+          change({ id: 'CH-002', slug: 'packaging' }),
+          change({ id: 'CH-003', slug: 'sem-change' }),
+        ],
+      })
+    );
+
+    const result = await syncPlan(workspace, 'demo', { link: true });
+    expect(result.linked).toEqual([
+      { id: 'CH-001', change: 'bug-fixes', activePath: null, archivePath: 'spec/changes/archive/2026-09-02-bug-fixes' },
+      { id: 'CH-002', change: 'packaging', activePath: 'spec/changes/packaging', archivePath: null },
+    ]);
+
+    const status = await computeProjectStatus(workspace, 'demo');
+    expect(status.progress.archived).toBe(1);
+    expect(status.diagnostics.some((d) => d.code === 'unclaimed_archive')).toBe(false);
+    // CH-003 não tinha change alguma: fica intocado.
+    expect(status.changes.find((c) => c.id === 'CH-003')!.execution).toBe('unlinked');
+  });
+
+  it('--check mostra o que faria sem gravar', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedChange(workspace, 'packaging');
+    await seedPlan(
+      workspace,
+      manifest({ id: 'demo', revision: 4, changes: [change({ id: 'CH-001', slug: 'packaging' })] })
+    );
+    const result = await syncPlan(workspace, 'demo', { link: true, check: true });
+    expect(result.linked).toHaveLength(1);
+    expect(result.synced).toBe(false);
+    const { manifest: reloaded } = await loadPlan(workspace.projectRoot, 'demo');
+    expect(reloaded.link ?? reloaded.changes[0].link).toBeNull();
+    expect(reloaded.revision).toBe(4);
+  });
+
+  it('é idempotente: a segunda passada não muda nada', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedChange(workspace, 'packaging');
+    await seedPlan(
+      workspace,
+      manifest({ id: 'demo', changes: [change({ id: 'CH-001', slug: 'packaging' })] })
+    );
+    const first = await syncPlan(workspace, 'demo', { link: true });
+    const second = await syncPlan(workspace, 'demo', { link: true });
+    expect(first.linked).toHaveLength(1);
+    expect(second.linked).toEqual([]);
+    expect(second.revision).toBe(first.revision);
+  });
+
+  it('nunca rouba um nome que outro incremento já reivindicou', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedChange(workspace, 'auth');
+    await seedPlan(
+      workspace,
+      manifest({
+        id: 'demo',
+        changes: [
+          change({
+            id: 'CH-001',
+            slug: 'fundacao',
+            link: { name: 'auth', active_path: 'spec/changes/auth', archive_path: null, linked_at: '2026-09-01' },
+          }),
+          change({ id: 'CH-002', slug: 'auth' }),
+        ],
+      })
+    );
+    const result = await syncPlan(workspace, 'demo', { link: true });
+    expect(result.linked).toEqual([]);
+  });
+
+  it('não vincula um incremento cancelado', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedChange(workspace, 'descartado');
+    await seedPlan(
+      workspace,
+      manifest({
+        id: 'demo',
+        changes: [change({ id: 'CH-001', slug: 'descartado', planning_state: 'cancelled' })],
+      })
+    );
+    expect((await syncPlan(workspace, 'demo', { link: true })).linked).toEqual([]);
+  });
+});
+

@@ -350,3 +350,21 @@ describe('next.startWith — nunca manda criar o que já existe', () => {
   });
 });
 
+describe('next.startWith — incremento já vinculado', () => {
+  it('aponta a change existente, não um link redundante', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedChange(workspace, 'packaging');
+    const ch = await withBrief(
+      workspace,
+      'demo',
+      change({ id: 'CH-001', slug: 'packaging', link: link('packaging') })
+    );
+    await seedPlan(workspace, manifest({ id: 'demo', changes: [ch] }));
+
+    const next = recommendNext(await computeProjectStatus(workspace, 'demo'));
+    expect(next.recommended!.startWith).toBe('specs status --change packaging');
+    expect(next.recommended!.thenLink).toBe('specs archive packaging');
+    expect(JSON.stringify(next.recommended)).not.toContain('specs project link');
+  });
+});
+

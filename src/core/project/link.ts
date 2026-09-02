@@ -14,7 +14,7 @@ import { computeProjectStatus } from './status.js';
 const KEBAB = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 const ARCHIVE_DIR_NAME = /^\d{4}-\d{2}-\d{2}-[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 
-function activePath(name: string): string {
+export function activePath(name: string): string {
   return `${WORKSPACE_DIR}/${CHANGES_DIR}/${name}`;
 }
 
@@ -38,7 +38,7 @@ export interface LinkResult {
 }
 
 /** Newest archive directory answering to `name`, as a project-relative path. */
-async function resolveArchivedDir(
+export async function resolveArchivedDir(
   workspace: Workspace,
   name: string
 ): Promise<string | undefined> {
