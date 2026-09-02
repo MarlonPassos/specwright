@@ -89,6 +89,12 @@ dependência com `execution: archived` e nenhum blocker manual. Um blocker manua
 tem precedência sobre dependência e aparece em `manualBlockers`, com `blockedBy`
 vazio. Nada derivado é gravado — `status` recalcula tudo a cada leitura.
 
+Um incremento concluído **continua** com `readiness: ready` (§7.6, cenário D): a
+conclusão vive em `execution: archived`, e nunca em `planning_state`, que não tem
+valor `done`. Por isso `progress.ready` e `progress.blocked` contam só o que ainda
+não foi entregue — a mesma regra de elegibilidade que `next` usa, para que
+`progress.ready` não discorde de `next.parallelReady` no mesmo payload.
+
 ## Comandos
 
 ```

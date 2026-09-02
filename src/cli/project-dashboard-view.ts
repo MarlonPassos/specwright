@@ -168,9 +168,15 @@ export function renderProjectDashboard(
         '   ' + theme.arrow + ' em paralelo: ' + next.parallelReady.filter((id) => id !== pick.id).join(', ')
       );
     }
+  } else if (counts.total > 0 && counts.archived === counts.total) {
+    lines.push(
+      ' ' + theme.green + theme.mark.done + theme.off + ' Todos os incrementos foram concluídos.'
+    );
   } else {
     lines.push(' ' + theme.dot.blocked + ' Nenhum incremento pronto.');
-    const why = next.excluded.slice(0, 3);
+    // An archived increment is excluded because it is DONE. Listing it here,
+    // under "why nothing is ready", reads as a failure and hides the real cause.
+    const why = next.excluded.filter((item) => item.execution !== 'archived').slice(0, 3);
     for (const item of why) {
       lines.push('   ' + theme.arrow + ' ' + item.id + ': ' + item.reasonCodes.map(describeReason).join('; '));
     }
