@@ -4,6 +4,7 @@ import { pathExists } from '../../util/fs.js';
 import { readDeltaSpecs } from '../change/model.js';
 import { type Workspace } from '../workspace.js';
 import { computeProjectStatus } from './status.js';
+import { safeResolve } from './paths.js';
 
 export interface ImpactResult {
   targets: string[];
@@ -109,7 +110,7 @@ function resolveChangeDir(
   workspace: Workspace,
   link: { name: string; activePath: string | null; archivePath: string | null }
 ): string | undefined {
-  if (link.archivePath) return path.join(workspace.projectRoot, link.archivePath);
-  if (link.activePath) return path.join(workspace.projectRoot, link.activePath);
-  return path.join(workspace.changesPath, link.name);
+  if (link.archivePath) return safeResolve(workspace.projectRoot, link.archivePath);
+  if (link.activePath) return safeResolve(workspace.projectRoot, link.activePath);
+  return safeResolve(workspace.changesPath, link.name);
 }

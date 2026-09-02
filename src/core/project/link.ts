@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { SpecError } from '../../util/errors.js';
 import { localDateStamp } from '../../util/date.js';
-import { pathExists, readFileIfExists } from '../../util/fs.js';
+import { isDirectory, pathExists, readFileIfExists } from '../../util/fs.js';
 import { ARCHIVE_DIR, CHANGES_DIR, WORKSPACE_DIR, type Workspace } from '../workspace.js';
 import { parseProposal } from '../change/model.js';
 import { loadPlan, savePlan } from './repository.js';
@@ -63,8 +63,9 @@ export async function linkChange(
       code: 'invalid_change_name',
     });
   }
-  if (!(await pathExists(path.join(workspace.changesPath, changeName)))) {
-    throw new SpecError(`spec/changes/${changeName}/ não existe.`, {
+  // A change is a DIRECTORY. A regular file with the same name is not a change.
+  if (!(await isDirectory(path.join(workspace.changesPath, changeName)))) {
+    throw new SpecError(`spec/changes/${changeName}/ não existe como diretório.`, {
       code: 'link_target_missing',
       fix: `specs new change ${changeName}`,
     });
@@ -166,7 +167,7 @@ export async function adoptChange(
   let link: ChangeLink;
   let proposalDir: string;
 
-  if (await pathExists(activeDir)) {
+  if (await isDirectory(activeDir)) {
     name = target;
     proposalDir = activeDir;
     link = {
@@ -175,7 +176,7 @@ export async function adoptChange(
       archive_path: null,
       linked_at: localDateStamp(),
     };
-  } else if (await pathExists(archiveDir)) {
+  } else if (await isDirectory(archiveDir)) {
     name = target.replace(/^\d{4}-\d{2}-\d{2}-/, '').replace(/-\d+$/, '');
     proposalDir = archiveDir;
     link = {

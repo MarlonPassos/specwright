@@ -1,4 +1,5 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, open as openFile, rm as removeFile, stat as statFile } from 'node:fs/promises';
+import path from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { SpecError } from '../../util/errors.js';
 import { localDateStamp } from '../../util/date.js';
@@ -113,6 +114,49 @@ export async function loadPlan(projectRoot: string, id: string): Promise<LoadedP
   return { manifest: parsed.manifest, paths, raw };
 }
 
+/** How long a lock file may sit before it is treated as abandoned. */
+const LOCK_STALE_MS = 30_000;
+
+/**
+ * Runs `body` holding an exclusive lock on the plan, so a read-compare-write is
+ * not interleaved with another writer. `wx` fails when the file already exists,
+ * which is the atomic test-and-set the filesystem gives us; a lock older than
+ * `LOCK_STALE_MS` is treated as abandoned by a crashed process.
+ */
+export async function withPlanLock<T>(paths: PlanPaths, body: () => Promise<T>): Promise<T> {
+  const lockPath = path.join(paths.dir, '.plan.lock');
+
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const handle = await openFile(lockPath, 'wx');
+      await handle.writeFile(String(process.pid));
+      await handle.close();
+      break;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+
+      const stats = await statFile(lockPath).catch(() => undefined);
+      if (stats && Date.now() - stats.mtimeMs > LOCK_STALE_MS) {
+        await removeFile(lockPath, { force: true });
+        continue;
+      }
+      if (attempt >= 50) {
+        throw new SpecError('Outro comando está escrevendo neste plano. Tente de novo.', {
+          code: 'plan_locked',
+          fix: 'specs project status --json',
+        });
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  }
+
+  try {
+    return await body();
+  } finally {
+    await removeFile(lockPath, { force: true });
+  }
+}
+
 export interface SaveOptions {
   /** Fail with `plan_revision_conflict` when the on-disk revision differs. */
   expectRevision?: number;
@@ -137,10 +181,15 @@ export async function savePlan(
     );
   }
 
-  // Compare-and-swap: the caller loaded `manifest` some time ago. Re-read the
-  // revision immediately before writing so a concurrent writer that already
-  // bumped it is reported instead of being silently overwritten.
-  if (!options.keepRevision) {
+  if (options.keepRevision) {
+    await writeFileAtomic(paths.manifest, renderManifest(manifest));
+    return manifest;
+  }
+
+  // Compare-and-swap under an exclusive lock: re-read the revision and write
+  // while no other writer can interleave. Without the lock two commands could
+  // both observe the same revision and both write the next one, losing an update.
+  return withPlanLock(paths, async () => {
     const onDisk = await readFileIfExists(paths.manifest);
     if (onDisk !== undefined) {
       const current = parseManifest(onDisk).manifest;
@@ -151,16 +200,13 @@ export async function savePlan(
         );
       }
     }
-  }
 
-  const next: PlanManifest = {
-    ...manifest,
-    revision: options.keepRevision ? manifest.revision : manifest.revision + 1,
-    updated_at: options.keepRevision
-      ? manifest.updated_at
-      : localDateStamp(options.now ?? new Date()),
-  };
-
-  await writeFileAtomic(paths.manifest, renderManifest(next));
-  return next;
+    const next: PlanManifest = {
+      ...manifest,
+      revision: manifest.revision + 1,
+      updated_at: localDateStamp(options.now ?? new Date()),
+    };
+    await writeFileAtomic(paths.manifest, renderManifest(next));
+    return next;
+  });
 }

@@ -418,6 +418,75 @@ async function checkManifest(
   }
 }
 
+/**
+ * Validates a Planned Change BODY against §7.3, with no filesystem access, so
+ * the same rules can run on a proposed tree that has not been written yet.
+ */
+export function validatePlannedChangeContent(
+  content: string,
+  record: { id: string; slug: string },
+  relative: string,
+  options: { strict?: boolean } = {}
+): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const parsed = parsePlannedChange(content);
+
+  if (!parsed.frontmatter) {
+    issues.push({
+      level: 'ERROR',
+      path: relative,
+      message: parsed.frontmatterError ?? 'frontmatter inválido',
+    });
+  } else {
+    if (parsed.frontmatter.id !== record.id) {
+      issues.push({
+        level: 'ERROR',
+        path: `${relative}:id`,
+        message: `frontmatter id "${parsed.frontmatter.id}" diverge do manifesto "${record.id}"`,
+      });
+    }
+    if (parsed.frontmatter.slug !== record.slug) {
+      issues.push({
+        level: 'ERROR',
+        path: `${relative}:slug`,
+        message: `frontmatter slug "${parsed.frontmatter.slug}" diverge do manifesto "${record.slug}"`,
+      });
+    }
+  }
+
+  for (const heading of REQUIRED_PLANNED_CHANGE_SECTIONS) {
+    if (!sectionHasText(parsed.sections, heading)) {
+      issues.push({
+        level: 'ERROR',
+        path: `${relative}:${heading}`,
+        message: `a seção "# ${heading}" está ausente ou vazia`,
+      });
+    }
+  }
+
+  for (const heading of parsed.deltaHeaders) {
+    issues.push({
+      level: 'ERROR',
+      path: `${relative}:${heading}`,
+      message: `Planned Change não pode conter cabeçalho de delta ("${heading}")`,
+    });
+  }
+
+  if (options.strict) {
+    for (const heading of OPTIONAL_STRICT_SECTIONS) {
+      if (!sectionHasText(parsed.sections, heading)) {
+        issues.push({
+          level: 'WARNING',
+          path: `${relative}:${heading}`,
+          message: `a seção "# ${heading}" está ausente ou vazia`,
+        });
+      }
+    }
+  }
+
+  return issues;
+}
+
 async function validatePlannedChange(
   ctx: Ctx,
   manifest: PlanManifest,

@@ -9,7 +9,7 @@ import {
   type ProjectChange,
 } from './model.js';
 import { ProjectGraph } from './graph.js';
-import { plannedChangeRelPath } from './paths.js';
+import { plannedChangeRelPath, resolveWithinRoot } from './paths.js';
 import { renderPlannedChange, type RenderPlannedChangeInput } from './planned-change.js';
 
 export const BUNDLE_VERSION = 1;
@@ -129,6 +129,8 @@ export interface BundleResult {
 }
 
 export interface ApplyContext {
+  /** Project root, so persisted paths can be checked against it before writing. */
+  projectRoot?: string;
   archivedIds: Set<string>;
   allowCompleted: boolean;
   resolveSourceHash: (path: string) => string | undefined;
@@ -405,7 +407,7 @@ export function applyBundle(
 
   // Proposed state must be a DAG, and structurally valid, BEFORE any write.
   ProjectGraph.from(working.changes);
-  assertProposedStateValid(working);
+  assertProposedStateValid(working, ctx.projectRoot);
 
   working.revision = manifest.revision + 1;
   working.updated_at = localDateStamp(ctx.now ?? new Date());
@@ -427,7 +429,7 @@ const KEBAB_SLUG = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
  * already cover: slug shape, `superseded_by` targets, and the two-way
  * increment ↔ milestone consistency. Failing here means nothing is written.
  */
-export function assertProposedStateValid(manifest: PlanManifest): void {
+export function assertProposedStateValid(manifest: PlanManifest, projectRoot?: string): void {
   const ids = new Set(manifest.changes.map((change) => change.id));
 
   for (const change of manifest.changes) {
@@ -442,6 +444,37 @@ export function assertProposedStateValid(manifest: PlanManifest): void {
           code: 'plan_invalid',
         });
       }
+    }
+  }
+
+  // Every persisted path must be safe and relative, in the proposed state, before
+  // a single byte is written (FR-06, NFR-08, I-8).
+  for (let index = 0; index < manifest.source_documents.length; index += 1) {
+    const source = manifest.source_documents[index];
+    try {
+      resolveWithinRoot(projectRoot ?? '.', source.path, 'unsafe_source_path');
+    } catch (error) {
+      throw new SpecError(
+        `source_documents[${index}].path é inseguro: ${(error as Error).message}`,
+        { code: 'unsafe_source_path' }
+      );
+    }
+    if (!source.sha256) {
+      throw new SpecError(
+        `source_documents[${index}] ("${source.path}") não pôde ser lido; nenhum sha256 foi calculado.`,
+        { code: 'plan_invalid', fix: 'confira o caminho do documento-fonte' }
+      );
+    }
+  }
+  for (const change of manifest.changes) {
+    const ref = change.planned_change;
+    if (!ref) continue;
+    const expected = plannedChangeRelPath(change.id, change.slug);
+    if (ref.path !== expected) {
+      throw new SpecError(
+        `planned_change.path de ${change.id} deveria ser "${expected}", mas é "${ref.path}".`,
+        { code: 'unsafe_plan_path' }
+      );
     }
   }
 

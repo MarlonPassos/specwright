@@ -4,6 +4,7 @@ import { type Workspace } from '../workspace.js';
 import { loadPlan, savePlan } from './repository.js';
 import { readEvidence } from './evidence.js';
 import type { ProjectChange } from './model.js';
+import { safeResolve } from './paths.js';
 
 export interface SyncResult {
   synced: boolean;
@@ -42,9 +43,11 @@ export async function syncPlan(
     }
 
     const evidence = await readEvidence(workspace, change.link);
-    const activeExists =
-      change.link.active_path !== null &&
-      (await pathExists(path.join(workspace.projectRoot, change.link.active_path)));
+    const activeAbsolute =
+      change.link.active_path === null
+        ? undefined
+        : safeResolve(workspace.projectRoot, change.link.active_path);
+    const activeExists = activeAbsolute !== undefined && (await pathExists(activeAbsolute));
 
     let link = change.link;
 

@@ -153,6 +153,20 @@ export function resolveWithinRoot(
   return candidate;
 }
 
+/**
+ * `resolveWithinRoot` for a READ path: returns `undefined` instead of throwing
+ * when the declared path escapes the root. A manifest is untrusted input — a
+ * `..` in a persisted path must make the read fail closed, never leak a file
+ * from outside the project (I-8, NFR-08).
+ */
+export function safeResolve(root: string, declared: string): string | undefined {
+  try {
+    return resolveWithinRoot(root, declared);
+  } catch {
+    return undefined;
+  }
+}
+
 function isWithin(root: string, target: string): boolean {
   if (target === root) return true;
   const relative = path.relative(root, target);

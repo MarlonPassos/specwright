@@ -5,6 +5,7 @@ import { type Workspace } from '../workspace.js';
 import { loadPlan } from './repository.js';
 import { ProjectGraph } from './graph.js';
 import { parsePlannedChange } from './planned-change.js';
+import { safeResolve } from './paths.js';
 import { readEvidence } from './evidence.js';
 import { sha256, sourceHash, type HashableSource } from './hashes.js';
 import { resolveWithinRoot } from './paths.js';
@@ -140,7 +141,11 @@ export async function computeProjectStatus(
       materialization.set(change.id, 'missing');
       continue;
     }
-    const briefContent = await readFileIfExists(path.join(paths.dir, ref.path));
+    // A persisted path is untrusted input: a `..` must fail the read closed,
+    // never leak a file from outside the plan directory (I-8, NFR-08).
+    const briefAbsolute = safeResolve(paths.dir, ref.path);
+    const briefContent =
+      briefAbsolute === undefined ? undefined : await readFileIfExists(briefAbsolute);
     materialization.set(
       change.id,
       materializationState({
@@ -449,9 +454,12 @@ export async function showProjectChange(
   let plannedChange: unknown = null;
   const ref = status.manifest.changes.find((entry) => entry.id === changeId)?.planned_change;
   if (ref) {
-    const content = await readFileIfExists(
-      path.join(workspace.projectRoot, status.plan.path, ref.path)
+    const briefAbsolute = safeResolve(
+      path.join(workspace.projectRoot, status.plan.path),
+      ref.path
     );
+    const content =
+      briefAbsolute === undefined ? undefined : await readFileIfExists(briefAbsolute);
     if (content !== undefined) {
       const parsed = parsePlannedChange(content);
       plannedChange = {

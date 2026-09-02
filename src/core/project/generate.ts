@@ -3,11 +3,11 @@ import { SpecError } from '../../util/errors.js';
 import { localDateStamp } from '../../util/date.js';
 import { readFileIfExists, writeFileAtomic, withStaging } from '../../util/fs.js';
 import { type Workspace } from '../workspace.js';
-import { loadPlan } from './repository.js';
+import { loadPlan, withPlanLock, parseManifest } from './repository.js';
 import { ProjectGraph } from './graph.js';
 import { sha256, sourceHash, recordHash, type HashableSource } from './hashes.js';
 import { renderManifest, type PlanManifest, type ProjectChange } from './model.js';
-import { plannedChangeRelPath, resolveWithinRoot } from './paths.js';
+import { plannedChangeRelPath, resolveWithinRoot, safeResolve } from './paths.js';
 import { renderPlannedChange } from './planned-change.js';
 import { assertRoadmapMarkers, renderRoadmapBlock, spliceRoadmap } from './render.js';
 import { computeProjectStatus, roadmapRows } from './status.js';
@@ -83,8 +83,8 @@ export async function generatePlannedChanges(
 
   for (const change of selected) {
     const relPath = plannedChangeRelPath(change.id, change.slug);
-    const absolute = path.join(paths.dir, relPath);
-    const existing = await readFileIfExists(absolute);
+    const absolute = safeResolve(paths.dir, relPath);
+    const existing = absolute === undefined ? undefined : await readFileIfExists(absolute);
     const ref = change.planned_change;
 
     const currentContentHash = existing === undefined ? undefined : sha256(existing);
@@ -209,13 +209,6 @@ export async function generatePlannedChanges(
   const planDocBefore = await readFileIfExists(paths.planDoc);
   if (planDocBefore !== undefined) assertRoadmapMarkers(planDocBefore);
 
-  // Stage the brief files, then the manifest, then project the roadmap.
-  await withStaging(paths.dir, async (stage) => {
-    for (const entry of toWrite.values()) {
-      stage(entry.relPath, entry.content);
-    }
-  });
-
   const nextManifest: PlanManifest = {
     ...manifest,
     revision: manifest.revision + 1,
@@ -225,7 +218,23 @@ export async function generatePlannedChanges(
       return ref ? { ...change, planned_change: ref } : change;
     }),
   };
-  await writeFileAtomic(paths.manifest, renderManifest(nextManifest));
+
+  // Briefs and manifest commit together, under the plan lock, with the revision
+  // re-checked inside it.
+  await withPlanLock(paths, async () => {
+    const onDisk = await readFileIfExists(paths.manifest);
+    const current = onDisk === undefined ? undefined : parseManifest(onDisk).manifest;
+    if (current && current.revision !== manifest.revision) {
+      throw new SpecError(
+        `O plano mudou para a revisão ${current.revision} enquanto este generate trabalhava na ${manifest.revision}.`,
+        { code: 'plan_revision_conflict', fix: 'specs project status --json' }
+      );
+    }
+    await withStaging(paths.dir, async (stage) => {
+      for (const entry of toWrite.values()) stage(entry.relPath, entry.content);
+      stage('plan.yaml', renderManifest(nextManifest));
+    });
+  });
 
   if (planDocBefore !== undefined) {
     // Markers were validated above, so this projection cannot fail.

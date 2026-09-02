@@ -9,6 +9,7 @@ import {
   type Workspace,
 } from '../workspace.js';
 import type { ChangeLink } from './model.js';
+import { safeResolve } from './paths.js';
 
 export interface ChangeEvidence {
   linked: boolean;
@@ -66,8 +67,8 @@ async function resolveArchive(
 
   // An explicit, still-present archive_path wins.
   if (link.archive_path) {
-    const abs = path.join(workspace.projectRoot, link.archive_path);
-    if (await pathExists(abs)) {
+    const abs = safeResolve(workspace.projectRoot, link.archive_path);
+    if (abs !== undefined && (await pathExists(abs))) {
       return { chosen: link.archive_path.replace(/\\/g, '/'), all: [link.archive_path.replace(/\\/g, '/')] };
     }
   }

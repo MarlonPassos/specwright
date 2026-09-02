@@ -9,6 +9,29 @@ versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ### Corrigido
 
+- **fix(project): falhas residuais da reauditoria**
+  - **Validação pré-escrita completa (R-01, §4.1.5, regra 11 de §7.11):** `apply`
+    valida o conteúdo de **todos** os briefs da árvore proposta em memória, antes
+    do primeiro byte. Um bundle com `plannedChange: {}` retornava
+    `applied: true` e deixava o plano inválido no disco; agora falha com
+    `plan_invalid` sem escrever nada.
+  - **Barreira de path global (R-02, I-8, NFR-08):** `resolveWithinRoot` passou a
+    valer para **todo** caminho persistido. `apply` recusa
+    `sourceDocuments: ["../fora.md"]` com `unsafe_source_path` sem gravar (antes
+    gravava e ainda incrementava a revisão), e `status`, `show`, `generate`,
+    `evidence`, `sync` e `impact` leem por `safeResolve`: um `..` no manifesto
+    faz a leitura falhar fechada em vez de vazar arquivo de fora da raiz.
+  - **Lock exclusivo (R-03):** `withPlanLock` usa `open(..., 'wx')` como
+    test-and-set atômico, com liberação de lock abandonado por idade. `savePlan`,
+    `apply` e `generate` fazem o compare-and-swap **dentro** do lock. Antes,
+    dois escritores concorrentes observavam a mesma revisão e ambos gravavam a
+    seguinte, perdendo uma atualização.
+  - **`link` exige diretório (R-04, FR-29):** um arquivo comum com o nome da
+    change era aceito como alvo. `link` e `adopt` passam a usar `isDirectory`.
+  - Testes: `test/unit/project-hardening.test.ts` com regressão para cada item,
+    incluindo dois `savePlan` concorrentes (um vence, o outro recebe
+    `plan_revision_conflict`). 332 testes.
+
 - **fix(project): falhas encontradas em auditoria independente**
   - **Atomicidade (NFR-07, I-10, AC-21):** `generate` e `apply` validam os
     marcadores do roadmap de `plan.md` **antes** da primeira escrita. Antes, um

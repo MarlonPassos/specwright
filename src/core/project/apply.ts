@@ -3,14 +3,14 @@ import { promises as fs } from 'node:fs';
 import { SpecError } from '../../util/errors.js';
 import { readFileIfExists, writeFileAtomic, withStaging } from '../../util/fs.js';
 import { type Workspace } from '../workspace.js';
-import { loadPlan } from './repository.js';
+import { loadPlan, withPlanLock, parseManifest } from './repository.js';
 import { computeProjectStatus, roadmapRows } from './status.js';
 import { computeImpact, type ImpactResult } from './impact.js';
 import { assertRoadmapMarkers, renderRoadmapBlock, spliceRoadmap } from './render.js';
 import { sha256, sourceHash, recordHash, type HashableSource } from './hashes.js';
 import { renderManifest } from './model.js';
-import { resolveWithinRoot } from './paths.js';
-import { validatePlan } from './validate.js';
+import { resolveWithinRoot, safeResolve } from './paths.js';
+import { validatePlan, validatePlannedChangeContent } from './validate.js';
 import {
   applyBundle,
   parseBundle,
@@ -74,6 +74,7 @@ export async function applyPlanBundle(
   const resolveSourceHash = (declared: string): string | undefined => sourceHashes.get(declared);
 
   const result = applyBundle(manifest, bundle, {
+    projectRoot: workspace.projectRoot,
     archivedIds,
     allowCompleted: options.allowCompleted === true,
     resolveSourceHash,
@@ -143,27 +144,14 @@ export async function applyPlanBundle(
     message: `${id} está concluído e foi alterado com --allow-completed`,
   }));
 
-  if (options.dryRun) {
-    return {
-      applied: false,
-      dryRun: true,
-      revision: { from: manifest.revision, to: manifest.revision },
-      idMap: result.idMap,
-      written,
-      removed,
-      impact,
-      validation: { valid: true, errors: 0, warnings: 0 },
-      diagnostics,
-    };
-  }
-
   // A slug rename moves the brief: carry the existing bytes to the new path and
   // rewrite the `slug:` in its frontmatter, so every reference moves in the same
   // transaction. Without this the old file was deleted with nothing written in
   // its place, and the frontmatter would contradict the manifest (FR-43, AC-50).
   for (const rename of result.briefRenames) {
     if (rename.from === rename.to || briefFiles.has(rename.to)) continue;
-    const carried = await readFileIfExists(path.join(paths.dir, rename.from));
+    const carriedFrom = safeResolve(paths.dir, rename.from);
+    const carried = carriedFrom === undefined ? undefined : await readFileIfExists(carriedFrom);
     if (carried === undefined) continue;
 
     const record = result.manifest.changes.find(
@@ -186,6 +174,41 @@ export async function applyPlanBundle(
     }
   }
 
+  // FALHAR ANTES DE GRAVAR (§4.1.5, regra 11 de §7.11): every brief the bundle
+  // would write is validated in memory. A bundle carrying an empty
+  // `plannedChange` used to be committed and only then reported as invalid.
+  const proposedIssues = [];
+  for (const [relPath, content] of briefFiles) {
+    const record = result.manifest.changes.find((entry) => entry.planned_change?.path === relPath);
+    if (!record) continue;
+    proposedIssues.push(
+      ...validatePlannedChangeContent(content, { id: record.id, slug: record.slug }, relPath)
+    );
+  }
+  const blocking = proposedIssues.filter((issue) => issue.level === 'ERROR');
+  if (blocking.length > 0) {
+    throw new SpecError(
+      `O estado proposto é inválido; nada foi escrito:\n${blocking
+        .map((issue) => `  - ${issue.path}: ${issue.message}`)
+        .join('\n')}`,
+      { code: 'plan_invalid', fix: 'specs project validate --json' }
+    );
+  }
+
+  if (options.dryRun) {
+    return {
+      applied: false,
+      dryRun: true,
+      revision: { from: manifest.revision, to: manifest.revision },
+      idMap: result.idMap,
+      written,
+      removed,
+      impact,
+      validation: { valid: true, errors: 0, warnings: 0 },
+      diagnostics,
+    };
+  }
+
   // Stage every planning file, then rename atomically.
   const planDocSource =
     result.documents.find((doc) => doc.target === 'plan')?.content ??
@@ -197,10 +220,22 @@ export async function applyPlanBundle(
   // half-applied plan behind (AC-21, NFR-07).
   assertRoadmapMarkers(planDocSource);
 
-  await withStaging(paths.dir, async (stage) => {
-    for (const [relPath, content] of briefFiles) stage(relPath, content);
-    stage('plan.yaml', renderManifest(result.manifest));
-    if (architectureDoc !== undefined) stage('architecture.md', architectureDoc);
+  // The whole commit runs under the plan lock, and the revision is re-checked
+  // inside it, so a concurrent writer cannot slip between the check and the write.
+  await withPlanLock(paths, async () => {
+    const onDisk = await readFileIfExists(paths.manifest);
+    const current = onDisk === undefined ? undefined : parseManifest(onDisk).manifest;
+    if (current && current.revision !== manifest.revision) {
+      throw new SpecError(
+        `O plano mudou para a revisão ${current.revision} enquanto este apply trabalhava na ${manifest.revision}.`,
+        { code: 'plan_revision_conflict', fix: 'specs project status --json' }
+      );
+    }
+    await withStaging(paths.dir, async (stage) => {
+      for (const [relPath, content] of briefFiles) stage(relPath, content);
+      stage('plan.yaml', renderManifest(result.manifest));
+      if (architectureDoc !== undefined) stage('architecture.md', architectureDoc);
+    });
   });
 
   // Old brief files after a slug rename.
