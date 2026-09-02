@@ -5,6 +5,33 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.12.0] - 2026-09-02
+
+### Alterado
+
+- **feat(cli): o painel de `specs project` adota a linguagem visual de `specs status`**
+  — wordmark, seções ruladas, barras de progresso e marcas por glifo, no lugar
+  das linhas planas `rótulo: valor`. Os incrementos passam a ficar **agrupados
+  pelo estágio** (`EM IMPLEMENTAÇÃO`, `PRONTAS PARA COMEÇAR`, `BLOQUEADAS`, `COM
+  PROBLEMA`, `CONCLUÍDAS`, `FORA DO FLUXO`), como `specs status` já fazia com as
+  changes: numa lista única ordenada por id o leitor precisava varrer tudo para
+  achar as duas linhas acionáveis.
+
+  O painel ganha um bloco `PRÓXIMO PASSO` no topo, milestones com barra, coluna
+  de estado do brief e os códigos de razão traduzidos por `describeReason` —
+  `dependency_pending` vira "pelo menos uma dependência não está concluída".
+
+  `specs project` e `specs project status` aceitam `--no-color`, igual a
+  `specs status`. A dica de janela pequena do `--watch` passa a nomear o comando
+  certo em vez de sempre dizer `specs status`.
+
+### Manutenção
+
+- **refactor(cli): extrai `src/cli/theme.ts`** — tema, glifos, wordmark, `pad`,
+  `clip`, `bar`, `progress`, `ruleLine`, `header` e `frame` passam a ser
+  compartilhados pelos dois painéis, que antes carregavam cópias divergentes da
+  mesma ideia de dashboard. A saída de `specs status` não muda.
+
 ## [0.11.0] - 2026-09-02
 
 ### Adicionado

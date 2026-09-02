@@ -17,6 +17,7 @@ import { loadPlan, savePlan } from '../../core/project/repository.js';
 import { PLANNING_STATES, type PlanningState, type PlanStatusValue } from '../../core/project/model.js';
 import type { ValidationReport } from '../../core/validate/report.js';
 import { renderProjectDashboard } from '../project-dashboard-view.js';
+import type { ViewOptions } from '../theme.js';
 import { watch } from '../watch.js';
 import { fail, printJson, printLines } from '../output.js';
 
@@ -41,6 +42,15 @@ function wantsJson(command: Command): boolean {
   return command.opts().json === true || command.parent?.opts().json === true;
 }
 
+/** Same rules as `specs status`: colour only on a TTY the user has not opted out of. */
+function viewOptions(command: Command): ViewOptions {
+  const noColor = command.opts().color === false || command.parent?.opts().color === false;
+  return {
+    color: !noColor && !process.env.NO_COLOR && Boolean(process.stdout.isTTY),
+    width: process.stdout.columns ?? 80,
+  };
+}
+
 export function registerProjectCommands(program: Command): void {
   const project = program
     .command('project')
@@ -48,9 +58,10 @@ export function registerProjectCommands(program: Command): void {
     .option('--json', 'Saída em JSON')
     .option('--watch', 'Repinta o dashboard por polling até Ctrl+C')
     .option('--interval <segundos>', 'Intervalo do --watch em segundos', '2')
+    .option('--no-color', 'Desenha o painel sem cor nem glifos Unicode')
     .action(async function (
       this: Command,
-      options: { json?: boolean; watch?: boolean; interval?: string }
+      options: { json?: boolean; watch?: boolean; interval?: string; color?: boolean }
     ) {
       try {
         if (options.json && options.watch) {
@@ -68,11 +79,16 @@ export function registerProjectCommands(program: Command): void {
         const id = await resolvePlanId(workspace.projectRoot);
 
         if (options.watch) {
+          const view = viewOptions(this);
           await watch({
             intervalMs: intervalMs(options.interval),
+            command: 'specs project',
             frame: async () => {
               const snapshot = await computeProjectStatus(workspace, id);
-              return renderProjectDashboard(snapshot, recommendNext(snapshot)).join('\n');
+              return renderProjectDashboard(snapshot, recommendNext(snapshot), {
+                ...view,
+                width: process.stdout.columns ?? view.width,
+              });
             },
           });
           return;
@@ -90,7 +106,7 @@ export function registerProjectCommands(program: Command): void {
           });
           return;
         }
-        printLines(renderProjectDashboard(status, next));
+        process.stdout.write(renderProjectDashboard(status, next, viewOptions(this)));
       } catch (error) {
         fail(error, { json: options.json, payload: { plan: null } });
       }
@@ -167,6 +183,7 @@ export function registerProjectCommands(program: Command): void {
     .command('status [plan-id]')
     .description('Progresso, bloqueios, três dimensões por incremento e diagnósticos')
     .option('--json', 'Saída em JSON')
+    .option('--no-color', 'Desenha o painel sem cor nem glifos Unicode')
     .action(async function (this: Command, planId: string | undefined) {
       const json = wantsJson(this);
       try {
@@ -175,7 +192,7 @@ export function registerProjectCommands(program: Command): void {
         const status = await computeProjectStatus(workspace, id);
         const next = recommendNext(status);
         if (json) printJson(statusPayload(status));
-        else printLines(renderProjectDashboard(status, next));
+        else process.stdout.write(renderProjectDashboard(status, next, viewOptions(this)));
       } catch (error) {
         fail(error, { json, payload: { plan: null } });
       }

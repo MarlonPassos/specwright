@@ -207,6 +207,13 @@ projeta o roadmap em `plan.md`.
 soma `dashboardSchemaVersion` e `generatedAt` ao payload de `status`. `--json` e
 `--watch` são mutuamente exclusivos (`invalid_option`).
 
+O painel usa a mesma linguagem visual de `specs status`: wordmark, seções ruladas,
+barras de progresso e marcas por glifo. Os incrementos ficam **agrupados pelo
+estágio** — `EM IMPLEMENTAÇÃO`, `PRONTAS PARA COMEÇAR`, `BLOQUEADAS`, `COM
+PROBLEMA`, `CONCLUÍDAS`, `FORA DO FLUXO` — em vez de uma lista única ordenada por
+id, e os códigos de razão saem traduzidos. `--no-color` desenha sem cor nem
+glifos Unicode, igual a `specs status`.
+
 ### `specs project link` / `unlink` / `adopt` / `sync` / `set-state`
 
 `link <change-id> <change-name>` registra o vínculo 1:1 (o incremento não pode
