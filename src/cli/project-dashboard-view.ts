@@ -131,7 +131,14 @@ export function renderProjectDashboard(
     ' ' + theme.green + theme.mark.done + theme.off + ' ' + pad('Incrementos', LABEL_WIDTH) +
       progress({ total: counts.total, completed: counts.archived }, theme, theme.green, 'nenhum incremento')
   );
-  kv(theme.mark.ready, theme.green, 'Prontas para começar', String(counts.ready));
+  // `readiness` keeps being computed for an archived increment (§7.6, cenário D),
+  // so `progress.ready` counts work that is already delivered. Under a label that
+  // says "prontas para COMEÇAR" that number is a lie: use the same eligibility
+  // rule `next` uses, so the summary cannot disagree with PRÓXIMO PASSO.
+  const startable = status.changes.filter(
+    (change) => change.readiness === 'ready' && change.execution !== 'archived'
+  ).length;
+  kv(theme.mark.ready, theme.green, 'Prontas para começar', String(startable));
   kv(theme.mark.active, theme.cyan, 'Em implementação', String(counts.inProgress));
   if (counts.blocked > 0) kv(theme.dot.blocked, theme.yellow, 'Bloqueadas', String(counts.blocked));
   const parked = counts.idea + counts.onHold + counts.cancelled;
@@ -168,9 +175,15 @@ export function renderProjectDashboard(
         '   ' + theme.arrow + ' em paralelo: ' + next.parallelReady.filter((id) => id !== pick.id).join(', ')
       );
     }
+  } else if (counts.total > 0 && counts.archived === counts.total) {
+    lines.push(
+      ' ' + theme.green + theme.mark.done + theme.off + ' Todos os incrementos foram concluídos.'
+    );
   } else {
     lines.push(' ' + theme.dot.blocked + ' Nenhum incremento pronto.');
-    const why = next.excluded.slice(0, 3);
+    // An archived increment is excluded because it is DONE. Listing it here,
+    // under "why nothing is ready", reads as a failure and hides the real cause.
+    const why = next.excluded.filter((item) => item.execution !== 'archived').slice(0, 3);
     for (const item of why) {
       lines.push('   ' + theme.arrow + ' ' + item.id + ': ' + item.reasonCodes.map(describeReason).join('; '));
     }

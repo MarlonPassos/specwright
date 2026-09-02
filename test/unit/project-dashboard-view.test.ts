@@ -172,3 +172,44 @@ describe('renderProjectDashboard — estrutura visual', () => {
     expect(out).toContain('COM PROBLEMA');
   });
 });
+
+describe('renderProjectDashboard — um plano concluído não se contradiz', () => {
+  async function finishedPlan(): Promise<Workspace> {
+    const workspace = await makePlanWorkspace();
+    const done = await withBrief(
+      workspace,
+      'demo',
+      change({ id: 'CH-001', slug: 'bug-fixes', title: 'Correções', link: link('bug-fixes') })
+    );
+    await seedArchivedChange(workspace, 'bug-fixes');
+    await seedPlan(workspace, manifest({ id: 'demo', status: 'active', changes: [done] }));
+    return workspace;
+  }
+
+  it('não conta um incremento arquivado como "pronta para começar"', async () => {
+    const out = await render(await finishedPlan());
+    expect(out).toMatch(/Prontas para começar\s+0/);
+    expect(out).toContain('CONCLUÍDAS');
+  });
+
+  it('diz que acabou, em vez de "nenhum incremento pronto"', async () => {
+    const out = await render(await finishedPlan());
+    expect(out).toContain('Todos os incrementos foram concluídos.');
+    expect(out).not.toContain('Nenhum incremento pronto.');
+    // `archive_resolved` means DONE; never show it as a reason nothing is ready.
+    expect(out).not.toContain('um diretório de archive foi resolvido');
+  });
+
+  it('com trabalho de verdade parado, ainda explica o porquê', async () => {
+    const workspace = await makePlanWorkspace();
+    const blocked = await withBrief(
+      workspace,
+      'demo',
+      change({ id: 'CH-001', slug: 'x', title: 'X', manual_blockers: ['decisão pendente'] })
+    );
+    await seedPlan(workspace, manifest({ id: 'demo', changes: [blocked] }));
+    const out = await render(workspace);
+    expect(out).toContain('Nenhum incremento pronto.');
+    expect(out).toContain('há um blocker declarado');
+  });
+});

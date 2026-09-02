@@ -5,6 +5,27 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.12.2] - 2026-09-02
+
+### Corrigido
+
+- **fix(cli): o painel se contradizia num plano concluído** — depois de
+  `specs archive`, o incremento era corretamente observado como `execution:
+  archived` e aparecia em `CONCLUÍDAS`, mas o resumo ainda dizia
+  `Prontas para começar 1` e o bloco `PRÓXIMO PASSO` imprimia
+  `Nenhum incremento pronto` seguido de `CH-001: um diretório de archive foi
+  resolvido`. `readiness` continua sendo calculado para um incremento arquivado
+  (§7.6, cenário D) e `progress.ready` conta isso; sob um rótulo que diz
+  "prontas para COMEÇAR" o número mente. O painel passa a usar a mesma regra de
+  elegibilidade de `next` (`ready` **e** não arquivado), a ignorar os arquivados
+  na lista de "por que nada está pronto" — eles são excluídos por estarem
+  prontos, não por estarem travados — e a dizer
+  `Todos os incrementos foram concluídos.` quando é o caso.
+- **fix(project): `stale_plan_status` sugeria o comando errado** — o `fix` era
+  `specs project set-state <id> <estado>`, que move o `planning_state` de um
+  incremento e não toca no status declarado do plano. Passa a apontar
+  `specs project pause | resume | archive, ou um bundle com plan.status`.
+
 ## [0.12.1] - 2026-09-02
 
 ### Corrigido

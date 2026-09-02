@@ -284,7 +284,9 @@ export async function computeProjectStatus(
       code: 'stale_plan_status',
       path: 'status',
       message: `status declarado é "${manifest.status}", mas o derivado é "${derivedStatus}"`,
-      fix: 'specs project set-state <id> <estado>',
+      // `set-state` moves an INCREMENT's planning_state; it cannot touch the
+      // plan's declared status. These are the commands that actually can.
+      fix: 'specs project pause | resume | archive, ou um bundle com plan.status',
     });
   }
 
