@@ -33,6 +33,41 @@ export interface NextRecommendation {
 const CAVEAT =
   'prontas por dependência declarada; o core não prova ausência de conflito de código';
 
+/**
+ * How to start the recommended increment.
+ *
+ * `specs new change <slug>` was emitted unconditionally, so the panel told the
+ * reader to create a change that already existed. Worse, when only an ARCHIVE
+ * carried the slug the new directory was masked by it — `executionOf` resolves
+ * the archive first, so the increment reported `concluída` the moment it was
+ * linked, and the empty change became invisible.
+ */
+function startCommands(
+  view: ProjectChangeView,
+  status: PlanStatus
+): { startWith: string; thenLink: string } {
+  const link = `specs project link ${view.id} ${view.slug}`;
+  const { active, archivedSlugs } = status.workspaceChanges;
+  const claimedByOther = new Set(
+    status.changes.filter((other) => other.id !== view.id && other.link).map((other) => other.link!.name)
+  );
+
+  if (!claimedByOther.has(view.slug) && (active.has(view.slug) || archivedSlugs.has(view.slug))) {
+    // The change already exists — active or archived. Link it; `link` resolves
+    // both. Telling the reader to create it again produces an empty directory
+    // that an archive of the same name then masks.
+    return { startWith: link, thenLink: `specs status --change ${view.slug}` };
+  }
+  if (claimedByOther.has(view.slug)) {
+    // Another increment owns that name; a fresh one is the only way forward.
+    return {
+      startWith: `specs new change ${view.slug}-2`,
+      thenLink: `specs project link ${view.id} ${view.slug}-2`,
+    };
+  }
+  return { startWith: `specs new change ${view.slug}`, thenLink: link };
+}
+
 export function recommendNext(status: PlanStatus): NextRecommendation {
   const { graph, manifest } = status;
   const declarationIndex = new Map(manifest.changes.map((change, index) => [change.id, index]));
@@ -93,13 +128,7 @@ export function recommendNext(status: PlanStatus): NextRecommendation {
 
   return {
     plan: status.plan.id,
-    recommended: top
-      ? {
-          ...toCandidate(top),
-          startWith: `specs new change ${top.slug}`,
-          thenLink: `specs project link ${top.id} ${top.slug}`,
-        }
-      : null,
+    recommended: top ? { ...toCandidate(top), ...startCommands(top, status) } : null,
     alternatives: rest.slice(0, 5).map(toCandidate),
     parallelReady: eligible.map((view) => view.id),
     parallelCaveat: CAVEAT,

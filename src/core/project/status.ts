@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { SpecError } from '../../util/errors.js';
 import { readFileIfExists } from '../../util/fs.js';
-import { type Workspace } from '../workspace.js';
+import { listChanges, listArchivedChanges, type Workspace } from '../workspace.js';
 import { loadPlan } from './repository.js';
 import { ProjectGraph } from './graph.js';
 import { parsePlannedChange } from './planned-change.js';
@@ -103,6 +103,8 @@ export interface PlanStatus {
   diagnostics: DiagnosticView[];
   /** The DAG, kept for `next` so it does not rebuild it. */
   graph: ProjectGraph;
+  /** Change directory names present in the workspace, active and archived. */
+  workspaceChanges: { active: Set<string>; archivedSlugs: Set<string> };
   manifest: PlanManifest;
 }
 
@@ -179,6 +181,7 @@ export async function computeProjectStatus(
   const linkTasks = new Map<string, { total: number; completed: number } | null>();
   const linkArchivePath = new Map<string, string | null>();
   const ambiguousArchive = new Map<string, string[]>();
+  const resumedSlugs = new Map<string, string>();
   for (const id2 of order) {
     const change = byId.get(id2)!;
     const evidence = await readEvidence(workspace, change.link);
@@ -188,6 +191,12 @@ export async function computeProjectStatus(
     linkTasks.set(id2, evidence.tasks ?? null);
     linkArchivePath.set(id2, evidence.archivePath ?? change.link?.archive_path ?? null);
     if (evidence.ambiguousArchive.length > 0) ambiguousArchive.set(id2, evidence.ambiguousArchive);
+    // Both an active directory AND an archive answer to this slug. `executionOf`
+    // reports `archived` (the archive wins, §7.7), which silently presents brand
+    // new work as delivered. Keep the documented state, surface the collision.
+    if (evidence.activeDirExists && evidence.archivePath) {
+      resumedSlugs.set(id2, change.link!.name);
+    }
   }
 
   // Readiness — in topological order, so a dependency is already resolved
@@ -290,6 +299,37 @@ export async function computeProjectStatus(
     });
   }
 
+  // What the workspace actually holds, read once: `next` uses it so it never
+  // proposes creating a change that already exists, and the diagnostics use it
+  // to notice archived work no increment claims.
+  const activeChangeNames = new Set(await listChanges(workspace));
+  const archivedSlugs = new Set(
+    (await listArchivedChanges(workspace)).map((name) => name.replace(/^\d{4}-\d{2}-\d{2}-/, '').replace(/-\d+$/, ''))
+  );
+  const claimedNames = new Set(
+    manifest.changes.flatMap((change) => (change.link ? [change.link.name] : []))
+  );
+  for (const slug of [...archivedSlugs].sort()) {
+    if (claimedNames.has(slug)) continue;
+    diagnostics.push({
+      level: 'WARNING',
+      code: 'unclaimed_archive',
+      path: `spec/changes/archive/${slug}`,
+      message: `a change "${slug}" está arquivada, mas nenhum incremento do plano a reivindica — o progresso do plano não a conta`,
+      fix: `specs project adopt ${slug}`,
+    });
+  }
+
+  for (const [id2, slug] of resumedSlugs) {
+    diagnostics.push({
+      level: 'WARNING',
+      code: 'ambiguous_execution',
+      path: `changes.${id2}.link`,
+      message: `"${slug}" tem um diretório ativo E um archive; ${id2} é reportado como concluído pelo archive, então o trabalho ativo fica invisível`,
+      fix: `specs project unlink ${id2} --force`,
+    });
+  }
+
   const milestones: MilestoneView[] = [...manifest.milestones]
     .sort((a, b) => a.order - b.order)
     .map((milestone) => {
@@ -350,6 +390,7 @@ export async function computeProjectStatus(
     milestones,
     diagnostics,
     graph,
+    workspaceChanges: { active: activeChangeNames, archivedSlugs },
     manifest,
   };
 }
