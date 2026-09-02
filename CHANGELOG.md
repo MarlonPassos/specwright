@@ -5,6 +5,25 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.12.1] - 2026-09-02
+
+### Corrigido
+
+- **fix(project): um título com `:` derrubava o Planned Change** —
+  `renderPlannedChange` montava o frontmatter por concatenação, então
+  `title: Fundação: empacotamento e config` gerava YAML que não parseia e o
+  `apply` recusava o incremento com `plan_invalid`. O frontmatter passa a ser
+  serializado pelo `yaml`, que cita só quando precisa: título simples continua
+  saindo sem aspas, byte a byte igual. Cobre `:`, `#`, aspas, hífen inicial,
+  `{}`/`[]`, `|` e crase.
+- **fix(project): `ref` recusava o kebab-case que todo slug usa** — o padrão era
+  `$[A-Za-z0-9_]+`, então `$bug-fixes` — o ref que qualquer autor escreve, já que
+  os slugs são kebab-case — virava um `ref: Invalid` sem dizer qual caractere era
+  o problema. O padrão passa a aceitar `-`, e tanto `ref` quanto a referência
+  id-ou-ref ganham mensagem própria: `um ref é "$nome" com letras, dígitos, "_"
+  ou "-" (ex.: "$bug-fixes")`. A união zod virou uma regex só, porque união
+  reporta `Invalid` para o conjunto inteiro.
+
 ## [0.12.0] - 2026-09-02
 
 ### Alterado

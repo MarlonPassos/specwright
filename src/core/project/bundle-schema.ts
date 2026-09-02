@@ -37,7 +37,7 @@ const opt = (name: string, type: string, note?: string): BundleField => ({
   ...(note ? { note } : {}),
 });
 
-const REF = '"$nome" (ref deste bundle)';
+const REF = '"$nome" — letras, dígitos, "_" ou "-"';
 const ID_OR_REF = '"CH-NNN" | "$nome"';
 
 export const BUNDLE_OPERATIONS: BundleOperationDoc[] = [
@@ -134,6 +134,7 @@ export const BUNDLE_ROOT_FIELDS: BundleField[] = [
 export const BUNDLE_RULES: string[] = [
   'Você NUNCA escolhe um ID. `addChange` e `splitChange.into` alocam CH-NNN; use `ref` para citá-los no mesmo bundle e leia os IDs reais em `idMap` na resposta.',
   '`ref` é declarado só em `addChange` e `splitChange.into`. `dependsOn`, `rewire` e `milestones[].changes` aceitam um ID real OU um `ref` declarado ANTES, no mesmo bundle.',
+  'Um ref é `$` seguido de letras, dígitos, `_` ou `-`: `$bug-fixes` vale, e espelhar o slug é a convenção mais simples.',
   'Todo objeto é estrito: um campo desconhecido derruba o bundle inteiro com `invalid_bundle`.',
   '`expectRevision` precisa casar a revisão no disco, senão `plan_revision_conflict`.',
   'Nenhuma operação atinge um incremento concluído sem `--allow-completed`.',
