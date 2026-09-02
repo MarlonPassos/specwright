@@ -7,7 +7,7 @@ import { loadPlan } from './repository.js';
 import { computeProjectStatus, roadmapRows } from './status.js';
 import { computeImpact, type ImpactResult } from './impact.js';
 import { renderRoadmapBlock, spliceRoadmap } from './render.js';
-import { sha256, sourceHash, type HashableSource } from './hashes.js';
+import { sha256, sourceHash, recordHash, type HashableSource } from './hashes.js';
 import { renderManifest } from './model.js';
 import { resolveWithinRoot } from './paths.js';
 import { validatePlan } from './validate.js';
@@ -104,6 +104,12 @@ export async function applyPlanBundle(
       generated_from_plan_revision: result.manifest.revision,
       source_hash: currentSourceHash,
       content_hash: sha256(body),
+      record_hash: recordHash({
+        slug: record.slug,
+        title: record.title,
+        dependsOn: record.depends_on,
+        milestone: record.milestone,
+      }),
     };
   }
 

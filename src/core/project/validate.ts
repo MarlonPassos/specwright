@@ -4,6 +4,8 @@ import { parse as parseYaml } from 'yaml';
 import { SpecError } from '../../util/errors.js';
 import { pathExists, readFileIfExists } from '../../util/fs.js';
 import { buildReport, type ValidationIssue, type ValidationReport } from '../validate/report.js';
+import { MAX_DELTAS_PER_CHANGE } from '../validate/rules.js';
+import { readDeltaSpecs } from '../change/model.js';
 import { CHANGES_DIR, ARCHIVE_DIR, WORKSPACE_DIR } from '../workspace.js';
 import { sha256, sourceHash, type HashableSource } from './hashes.js';
 import { type PlanManifest, type ProjectChange } from './model.js';
@@ -40,9 +42,10 @@ interface Ctx {
 }
 
 /**
- * Validates a plan against the graph-independent rules of §7.17: manifest
- * identity, paths, sources, milestones, links and each Planned Change. Cycle
- * detection and derived-state rules land with the graph in Phase 2.
+ * Validates a plan against §7.17: manifest identity, paths, sources, milestones,
+ * links (including cycle detection, oversized and ambiguous-archive) and each
+ * Planned Change. `stale_plan_status` is reported by `status` where the derived
+ * status is already computed.
  */
 export async function validatePlan(
   projectRoot: string,
@@ -247,6 +250,32 @@ async function checkManifest(
       } else if (!value.startsWith(archivePrefix)) {
         error(`changes.${change.id}.link.archive_path`, `deve estar sob ${archivePrefix}`);
       }
+    }
+
+    // oversized_change: the linked change carries more than 10 deltas
+    const linkedDir = link.archive_path
+      ? path.join(ctx.projectRoot, link.archive_path)
+      : link.active_path
+        ? path.join(ctx.projectRoot, link.active_path)
+        : path.join(ctx.projectRoot, WORKSPACE_DIR, CHANGES_DIR, link.name);
+    if (await pathExists(linkedDir)) {
+      const deltas = await readDeltaSpecs(linkedDir);
+      const total = deltas.reduce((count, delta) => count + delta.entries.length, 0);
+      if (total > MAX_DELTAS_PER_CHANGE) {
+        warn(
+          `changes.${change.id}.link`,
+          `a change "${link.name}" tem ${total} deltas (oversized_change; limite ${MAX_DELTAS_PER_CHANGE})`
+        );
+      }
+    }
+
+    // ambiguous_archive_match: more than one archive directory fits the slug
+    const candidates = await archiveCandidates(ctx.projectRoot, link.name);
+    if (candidates.length > 1) {
+      warn(
+        `changes.${change.id}.link`,
+        `mais de um archive candidato para "${link.name}": ${candidates.join(', ')} (ambiguous_archive_match)`
+      );
     }
   }
 
@@ -483,4 +512,18 @@ async function validatePlannedChange(
   }
 
   return buildReport(change.id, 'planned-change', issues, ctx.strict);
+}
+
+async function archiveCandidates(projectRoot: string, name: string): Promise<string[]> {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`^\\d{4}-\\d{2}-\\d{2}-${escaped}(-\\d+)?$`);
+  const base = path.join(projectRoot, WORKSPACE_DIR, CHANGES_DIR, ARCHIVE_DIR);
+  try {
+    return (await fs.readdir(base, { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory() && pattern.test(entry.name))
+      .map((entry) => entry.name)
+      .sort();
+  } catch {
+    return [];
+  }
 }

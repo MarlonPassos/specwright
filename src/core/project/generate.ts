@@ -5,7 +5,7 @@ import { readFileIfExists, writeFileAtomic, withStaging } from '../../util/fs.js
 import { type Workspace } from '../workspace.js';
 import { loadPlan } from './repository.js';
 import { ProjectGraph } from './graph.js';
-import { sha256, sourceHash, type HashableSource } from './hashes.js';
+import { sha256, sourceHash, recordHash, type HashableSource } from './hashes.js';
 import { renderManifest, type PlanManifest, type ProjectChange } from './model.js';
 import { plannedChangeRelPath, resolveWithinRoot } from './paths.js';
 import { renderPlannedChange } from './planned-change.js';
@@ -87,6 +87,12 @@ export async function generatePlannedChanges(
     const ref = change.planned_change;
 
     const currentContentHash = existing === undefined ? undefined : sha256(existing);
+    const currentRecordHash = recordHash({
+      slug: change.slug,
+      title: change.title,
+      dependsOn: change.depends_on,
+      milestone: change.milestone,
+    });
     const state =
       ref === null || existing === undefined
         ? 'missing'
@@ -94,7 +100,9 @@ export async function generatePlannedChanges(
           ? 'modified'
           : currentSourceHash !== ref.source_hash
             ? 'outdated'
-            : 'current';
+            : ref.record_hash !== undefined && ref.record_hash !== currentRecordHash
+              ? 'outdated'
+              : 'current';
 
     if (state === 'current') {
       skipped.push({ id: change.id, reason: 'planned_change_current' });
@@ -131,6 +139,12 @@ export async function generatePlannedChanges(
       generated_from_plan_revision: manifest.revision + 1,
       source_hash: currentSourceHash,
       content_hash: sha256(body),
+      record_hash: recordHash({
+        slug: change.slug,
+        title: change.title,
+        dependsOn: change.depends_on,
+        milestone: change.milestone,
+      }),
     });
   }
 

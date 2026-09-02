@@ -174,6 +174,21 @@ describe('setPlanningState', () => {
     expect(status.changes[0].planningState).toBe('planned');
   });
 
+  it('persists the reason on on_hold / cancelled and clears it on return to planned', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedPlan(
+      workspace,
+      manifest({ id: 'demo', changes: [change({ id: 'CH-001', slug: 'x', planning_state: 'planned' })] })
+    );
+    await setPlanningState(workspace, 'demo', 'CH-001', 'on_hold', 'aguardando decisão de storage');
+    let reloaded = (await loadPlan(workspace.projectRoot, 'demo')).manifest;
+    expect(reloaded.changes[0].reason).toBe('aguardando decisão de storage');
+
+    await setPlanningState(workspace, 'demo', 'CH-001', 'planned');
+    reloaded = (await loadPlan(workspace.projectRoot, 'demo')).manifest;
+    expect(reloaded.changes[0].reason).toBeUndefined();
+  });
+
   it('rejects on_hold without a reason and an out-of-machine transition', async () => {
     const workspace = await makePlanWorkspace();
     await seedPlan(

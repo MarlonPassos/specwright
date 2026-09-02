@@ -160,6 +160,22 @@ describe('computeProjectStatus — three dimensions', () => {
     expect(status.plan.derivedStatus).toBe('active');
   });
 
+  it('reports stale_plan_status when declared and derived diverge (AC-33)', async () => {
+    const workspace = await makePlanWorkspace();
+    const ch = await withBrief(
+      workspace,
+      'demo',
+      change({ id: 'CH-001', slug: 'x', link: link('x') })
+    );
+    await seedArchivedChange(workspace, 'x');
+    await seedPlan(workspace, manifest({ id: 'demo', status: 'draft', changes: [ch] }));
+
+    const status = await computeProjectStatus(workspace, 'demo');
+    expect(status.plan.status).toBe('draft');
+    expect(status.plan.derivedStatus).not.toBe('draft');
+    expect(status.diagnostics.some((d) => d.code === 'stale_plan_status')).toBe(true);
+  });
+
   it('the JSON payload uses camelCase and omits the internal graph', async () => {
     const workspace = await makePlanWorkspace();
     await seedPlan(workspace, manifest({ id: 'demo', changes: [change({ id: 'CH-001', slug: 'x' })] }));

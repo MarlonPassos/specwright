@@ -246,6 +246,15 @@ export async function computeProjectStatus(
   });
 
   const derivedStatus = deriveStatus(manifest, views, diagnostics);
+  if (derivedStatus !== manifest.status) {
+    diagnostics.push({
+      level: 'WARNING',
+      code: 'stale_plan_status',
+      path: 'status',
+      message: `status declarado é "${manifest.status}", mas o derivado é "${derivedStatus}"`,
+      fix: 'specs project set-state <id> <estado>',
+    });
+  }
 
   const milestones: MilestoneView[] = [...manifest.milestones]
     .sort((a, b) => a.order - b.order)

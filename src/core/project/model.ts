@@ -51,6 +51,12 @@ export const PlannedChangeRefSchema = z
     generated_from_plan_revision: z.number().int().nonnegative(),
     source_hash: z.string().min(1),
     content_hash: z.string().min(1),
+    /**
+     * Hash of the record fields that make a brief stale when they change
+     * (slug, title, depends_on, milestone). Optional so plans written before
+     * this field still load; absent means "cannot tell", not "current".
+     */
+    record_hash: z.string().min(1).optional(),
   })
   .strict();
 export type PlannedChangeRef = z.infer<typeof PlannedChangeRefSchema>;
@@ -86,6 +92,12 @@ export const ProjectChangeSchema = z
     manual_blockers: z.array(z.string().min(1)).default([]),
     superseded_by: z.array(changeId).default([]),
     milestone: z.string().min(1).nullable(),
+    /**
+     * The motive recorded by the last `set-state` into `on_hold` or `cancelled`,
+     * for auditability (§7.6). Cleared when the state returns to `planned`.
+     * Optional so plans written before this field still load.
+     */
+    reason: z.string().min(1).optional(),
     planned_change: PlannedChangeRefSchema.nullable(),
     link: ChangeLinkSchema.nullable(),
   })
@@ -180,7 +192,7 @@ export function renderManifest(manifest: PlanManifest): string {
 }
 
 function renderChange(change: ProjectChange): Record<string, unknown> {
-  return {
+  const document: Record<string, unknown> = {
     id: change.id,
     slug: change.slug,
     title: change.title,
@@ -190,12 +202,19 @@ function renderChange(change: ProjectChange): Record<string, unknown> {
     manual_blockers: [...change.manual_blockers],
     superseded_by: [...change.superseded_by],
     milestone: change.milestone,
+  };
+  if (change.reason !== undefined) document.reason = change.reason;
+  return {
+    ...document,
     planned_change: change.planned_change
       ? {
           path: change.planned_change.path,
           generated_from_plan_revision: change.planned_change.generated_from_plan_revision,
           source_hash: change.planned_change.source_hash,
           content_hash: change.planned_change.content_hash,
+          ...(change.planned_change.record_hash !== undefined
+            ? { record_hash: change.planned_change.record_hash }
+            : {}),
         }
       : null,
     link: change.link

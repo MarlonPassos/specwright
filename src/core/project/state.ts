@@ -1,6 +1,7 @@
 import { SpecError } from '../../util/errors.js';
 import type { MaterializationState, PlanningState, Priority, ProjectChange } from './model.js';
 import type { ChangeEvidence } from './evidence.js';
+import { recordHash } from './hashes.js';
 
 export type Readiness = 'ready' | 'blocked' | 'not_applicable';
 export type Execution =
@@ -49,6 +50,16 @@ export function materializationState(input: MaterializationInput): Materializati
   }
   if (input.briefContentSha !== ref.content_hash) return 'modified';
   if (input.currentSourceHash !== ref.source_hash) return 'outdated';
+  // Relevant record change (slug/title/depends_on/milestone) since materialization.
+  if (ref.record_hash !== undefined) {
+    const current = recordHash({
+      slug: input.change.slug,
+      title: input.change.title,
+      dependsOn: input.change.depends_on,
+      milestone: input.change.milestone,
+    });
+    if (current !== ref.record_hash) return 'outdated';
+  }
   return 'current';
 }
 

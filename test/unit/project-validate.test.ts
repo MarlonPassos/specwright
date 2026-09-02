@@ -154,6 +154,29 @@ describe('validatePlan — manifest rules', () => {
     );
   });
 
+  it('warns on an oversized linked change (more than 10 deltas)', async () => {
+    const workspace = await makePlanWorkspace();
+    const changeDir = path.join(workspace.changesPath, 'big');
+    let deltaBody = '## Purpose\n\nUma capacidade com muitos requisitos para o teste de tamanho.\n\n## ADDED Requirements\n\n';
+    for (let i = 1; i <= 12; i += 1) {
+      deltaBody += `### Requirement: R${i}\nThe system SHALL do thing ${i}.\n\n#### Scenario: S${i}\n- **WHEN** x\n- **THEN** y\n\n`;
+    }
+    await writeFile(path.join(changeDir, 'specs', 'big-cap', 'spec.md'), deltaBody);
+    const data = manifest({
+      changes: [
+        change({
+          id: 'CH-001',
+          slug: 'big',
+          link: { name: 'big', active_path: 'spec/changes/big', archive_path: null, linked_at: '2026-09-01' },
+        }),
+      ],
+    });
+    await seedPlan(workspace, data);
+    expect(issues(await validatePlan(workspace.projectRoot, data.id, {}), 'WARNING').join(' ')).toMatch(
+      /oversized_change/
+    );
+  });
+
   it('flags two increments sharing a link name', async () => {
     const workspace = await makePlanWorkspace();
     await fs.mkdir(path.join(workspace.changesPath, 'auth'), { recursive: true });

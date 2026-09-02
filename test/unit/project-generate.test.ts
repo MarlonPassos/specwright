@@ -111,6 +111,31 @@ describe('generatePlannedChanges', () => {
     expect(await fs.readFile(briefPath, 'utf8')).toBe(edited);
   });
 
+  it('marks a brief outdated when a relevant record field changes (title / depends_on)', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedPlan(
+      workspace,
+      manifest({
+        id: 'demo',
+        changes: [
+          change({ id: 'CH-001', slug: 'a' }),
+          change({ id: 'CH-002', slug: 'b', title: 'Antigo' }),
+        ],
+      })
+    );
+    await generatePlannedChanges(workspace, 'demo', { changeIds: ['CH-002'] });
+    expect((await computeProjectStatus(workspace, 'demo')).changes.find((c) => c.id === 'CH-002')!.plannedChange!.state).toBe('current');
+
+    // change the title on disk without regenerating
+    const yaml = path.join(workspace.projectRoot, 'planning/demo/plan.yaml');
+    await fs.writeFile(yaml, (await fs.readFile(yaml, 'utf8')).replace('title: Antigo', 'title: Novo'));
+    expect((await computeProjectStatus(workspace, 'demo')).changes.find((c) => c.id === 'CH-002')!.plannedChange!.state).toBe('outdated');
+
+    // regenerating refreshes record_hash → current again
+    await generatePlannedChanges(workspace, 'demo', { changeIds: ['CH-002'] });
+    expect((await computeProjectStatus(workspace, 'demo')).changes.find((c) => c.id === 'CH-002')!.plannedChange!.state).toBe('current');
+  });
+
   it('detects an outdated brief when the source changes (AC-12)', async () => {
     const workspace = await planWithSource();
     await seedPlan(

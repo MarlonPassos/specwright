@@ -38,6 +38,18 @@ versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
   - Testes de desempenho (200 incrementos: `status`/`next` < 500 ms,
     `generate` < 2 s) e de confidencialidade (marcador de fonte nunca aparece em
     `planning/` nem em saída de comando).
+  - **`planned_change.record_hash`** (opcional): hash de `slug` + `title` +
+    `depends_on` + `milestone`. Uma mudança nesses campos torna o brief
+    `outdated` mesmo com a fonte intacta (§7.5); `priority` e `manual_blockers`
+    não movem o hash. `generate` e `apply` gravam; `status` compara.
+  - **`ProjectChange.reason`** (opcional): o motivo do último `set-state` para
+    `on_hold` ou `cancelled`, gravado para auditoria (§7.6) e limpo ao voltar
+    para `planned`.
+  - `validate` ganha `oversized_change` (change vinculada com mais de 10 deltas,
+    reusa `MAX_DELTAS_PER_CHANGE`) e `ambiguous_archive_match`; `status` ganha o
+    diagnóstico `stale_plan_status`.
+  - Os dois campos novos são opcionais no Zod — planos escritos antes deles
+    continuam carregando sem migração.
 
 - **feat(project): Project Planning — Fase 3 (vínculo, adoção e sincronização)**
   - `src/core/project/link.ts` — `linkChange` (vínculo 1:1 com todas as

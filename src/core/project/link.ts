@@ -272,11 +272,17 @@ export async function setPlanningState(
   }
   assertTransition(from, to);
 
+  const trimmed = reason?.trim();
   const next = await savePlan(paths, {
     ...manifest,
-    changes: manifest.changes.map((entry) =>
-      entry.id === changeId ? { ...entry, planning_state: to } : entry
-    ),
+    changes: manifest.changes.map((entry) => {
+      if (entry.id !== changeId) return entry;
+      const updated = { ...entry, planning_state: to };
+      // The motive is kept only while the increment sits paused or cancelled.
+      if (to === 'planned') delete updated.reason;
+      else if (trimmed) updated.reason = trimmed;
+      return updated;
+    }),
   });
 
   const status = await computeProjectStatus(workspace, planId);
@@ -286,7 +292,7 @@ export async function setPlanningState(
     id: changeId,
     from,
     to,
-    ...(reason?.trim() ? { reason: reason.trim() } : {}),
+    ...(trimmed ? { reason: trimmed } : {}),
     revision: next.revision,
     readiness: view.readiness,
     execution: view.execution,

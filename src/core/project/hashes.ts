@@ -35,3 +35,24 @@ export function sourceHash(sources: HashableSource[]): string {
 export function contentHash(text: string): string {
   return sha256(text);
 }
+
+/**
+ * Hash of the record fields that make a brief `outdated` when they change:
+ * `slug`, `title`, `depends_on` (order-insensitive) and `milestone`. A change to
+ * only `priority` or `manual_blockers` does not move this hash.
+ */
+export function recordHash(fields: {
+  slug: string;
+  title: string;
+  dependsOn: readonly string[];
+  milestone: string | null;
+}): string {
+  return sha256(
+    [
+      fields.slug,
+      fields.title,
+      [...fields.dependsOn].sort().join(','),
+      fields.milestone ?? '',
+    ].join('\n')
+  );
+}
