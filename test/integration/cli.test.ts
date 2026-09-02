@@ -36,6 +36,12 @@ describe('spec CLI', () => {
       'spec-implement',
       'spec-verify',
       'spec-archive',
+      'spec-project-plan',
+      'spec-project-review',
+      'spec-project-generate',
+      'spec-project-status',
+      'spec-project-next',
+      'spec-project-refine',
     ]);
 
     const byId = Object.fromEntries(
@@ -91,7 +97,7 @@ describe('spec CLI', () => {
     const listing = parseJson((await runCli(['init', '.', '--json'], dir)).stdout);
 
     expect(listing.created).toBe(false);
-    expect(listing.files).toHaveLength(28);
+    expect(listing.files).toHaveLength(52);
     for (const file of listing.files) {
       await expect(fs.stat(path.join(dir, file))).resolves.toBeTruthy();
     }

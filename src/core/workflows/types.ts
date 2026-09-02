@@ -8,6 +8,11 @@ export interface WorkflowCommand {
   argumentHint: string;
   /** The instruction body, identical for every harness. */
   body: string;
+  /**
+   * Claude Code `allowed-tools` for this command. When absent the adapter uses
+   * its default (`Bash(specs:*)`). Only commands that must read documents widen it.
+   */
+  allowedTools?: string;
 }
 
 /** What every generated command is called, in every harness. */

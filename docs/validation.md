@@ -68,3 +68,55 @@ cabeçalho de delta trunca a seção de requisitos parseada, um requisito fora d
 O `specs validate --archived` aplica as regras de change a tudo que está sob
 `spec/changes/archive/` e adiciona uma: toda tarefa precisa estar marcada. Serve para uma
 checagem de pre-commit ou CI que pega uma change arquivada com trabalho ainda aberto.
+
+## Project Plan
+
+O `specs project validate` roda sobre `planning/<plan-id>/`. Fase 1 cobre as
+regras que não dependem do grafo (ciclo e estado derivado chegam depois).
+
+### Manifesto — ERROR
+
+| Regra |
+| --- |
+| YAML inválido; `schema_version` ausente ou maior que o suportado |
+| `id` do plano fora de kebab-case, ou diferente do nome do diretório |
+| `id`/`slug` de incremento inválido ou duplicado |
+| `depends_on` cita id inexistente; auto-dependência |
+| `superseded_by` cita id inexistente |
+| `planned_change.path` fora de `planned-changes/`, ou nome diferente de `<id>-<slug>.md` |
+| Arquivo de brief referenciado pelo manifesto não existe |
+| Documento-fonte com `..`, absoluto, NUL, ou fora da raiz do projeto |
+| Milestone inexistente, `id` duplicado, `order` duplicado, membro repetido |
+| Relação incremento ↔ milestone inconsistente em um dos sentidos |
+| Dois incrementos com o mesmo `link.name`; `link.*_path` fora do lugar |
+
+### Manifesto — WARNING (falha só sob `--strict`)
+
+`priority` ausente (default aplicado); `missing_source`; `source_changed`;
+`orphan_planned_change`; `plan.md`/`architecture.md` ausente com incrementos;
+plano em `draft` com briefs já materializados.
+
+## Planned Changes
+
+| Nível | Regra |
+| --- | --- |
+| ERROR | Frontmatter ausente, inválido, ou com `id`/`slug` divergentes do manifesto |
+| ERROR | Nome do arquivo diferente de `<id>-<slug>.md` |
+| ERROR | Seção `Objetivo`, `Escopo` ou `Critérios macro` ausente ou vazia |
+| ERROR | Cabeçalho de delta (`## ADDED/MODIFIED/REMOVED/RENAMED Requirements`) |
+| WARNING | Seção recomendada (`Motivação`, `Riscos`, `Fora do escopo`, …) ausente ou vazia |
+| WARNING | Conteúdo editado à mão (`modified`) ou fonte alterada (`outdated`) num incremento `planned` |
+
+## Vínculo (Project Planning)
+
+O `specs project sync` e o `status` reportam, como diagnóstico de leitura:
+
+| Nível | Código | Quando |
+| --- | --- | --- |
+| ERROR | `dangling_link` | o vínculo aponta para um diretório que não existe ativo nem arquivado — a execução fica `unknown`, nunca `archived` |
+| ERROR | `duplicate_link` | dois incrementos usam a mesma change nativa |
+| WARNING | `ambiguous_archive_match` | mais de um diretório de archive casa o slug; escolhe o de maior data e sufixo |
+| WARNING | `source_changed` / `missing_source` | um documento-fonte mudou ou sumiu desde o registro |
+
+Uma change que fica **fora do plano** indefinidamente é válida: não há warning que
+a trate como erro.

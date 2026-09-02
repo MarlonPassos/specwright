@@ -18,6 +18,7 @@ export * from './core/validate/spec-validator.js';
 export * from './core/validate/change-validator.js';
 export * from './core/archive/merge.js';
 export * from './core/archive/archive.js';
+export * from './core/project/index.js';
 export * from './core/harness/index.js';
 export * from './core/workflows/index.js';
 export * from './core/init.js';

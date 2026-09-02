@@ -4,7 +4,7 @@ import { SpecError } from '../util/errors.js';
 import { ensureDir, pathExists, writeFileEnsured } from '../util/fs.js';
 import { DEFAULT_SCHEMA, loadConfig, renderConfig, type WorkspaceConfig } from './config.js';
 import { allHarnesses, resolveHarnesses, writeHarnessFiles, type GeneratedFile } from './harness/index.js';
-import { workflowCommands } from './workflows/index.js';
+import { allCommands } from './workflows/index.js';
 import { ARCHIVE_DIR, PROJECT_FILE, workspaceAt, type Workspace } from './workspace.js';
 
 export interface InitOptions {
@@ -142,6 +142,6 @@ export async function updateWorkspace(
   return {
     harnesses: adapters.map((adapter) => adapter.id),
     files,
-    commands: workflowCommands().map((command) => command.id),
+    commands: allCommands().map((command) => command.id),
   };
 }

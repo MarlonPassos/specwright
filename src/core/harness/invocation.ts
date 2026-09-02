@@ -1,6 +1,6 @@
 import { SpecError } from '../../util/errors.js';
 import { COMMAND_REF_PATTERN, type WorkflowCommand } from '../workflows/types.js';
-import { workflowCommandIds } from '../workflows/index.js';
+import { allCommandIds } from '../workflows/index.js';
 import type { HarnessAdapter } from './types.js';
 
 /**
@@ -9,7 +9,7 @@ import type { HarnessAdapter } from './types.js';
  * end up telling the user to run a Claude Code slash command.
  */
 export function renderCommandRefs(text: string, adapter: HarnessAdapter): string {
-  const known = workflowCommandIds();
+  const known = allCommandIds();
   return text.replace(COMMAND_REF_PATTERN, (_match, id: string) => {
     if (!known.includes(id)) {
       // A typo here would ship a literal placeholder into a command file, where

@@ -79,3 +79,17 @@ Um adaptador de harness declara o id dele, o nome de exibição, onde os arquivo
 o usuário digita um comando (`invocation`), as variáveis de ambiente que denunciam que ele
 está rodando (`envMarkers`) e como formatar um arquivo. Adicionar um significa adicionar um
 adaptador e registrá-lo — os corpos dos comandos, a CLI e o workflow ficam intocados.
+
+## Catálogo de comandos
+
+O catálogo gerado tem treze comandos, em duas listas:
+
+**Ciclo de change** — `spec-explore`, `spec-propose`, `spec-continue`,
+`spec-revise`, `spec-implement`, `spec-verify`, `spec-archive`.
+
+**Plano de projeto** — `spec-project-plan`, `spec-project-review`,
+`spec-project-generate`, `spec-project-status`, `spec-project-next`,
+`spec-project-refine`.
+
+`specs init`/`update --harnesses all` escrevem 52 arquivos (13 × 4). Os comandos
+de plano são opt-in: sem `planning/<plan-id>/plan.yaml` eles não têm efeito.

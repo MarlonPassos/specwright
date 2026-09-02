@@ -5,6 +5,225 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.10.0] - 2026-09-01
+
+### Corrigido
+
+- **fix(project): falhas da reauditoria de 2026-09-02**
+  - **Brief inválido nunca fica `ready` (R-01, FR-22):** um `content_hash` que
+    confere prova que os bytes são os registrados, **não** que o documento é
+    válido. `status` passa a validar a estrutura do brief e, quando ela falha,
+    emite `planned_change_invalid` (ERROR) e passa `diagnosticBlocking` para a
+    readiness — o incremento vira `blocked` com `diagnostic_blocking`,
+    apresentação `inconsistente`, e `next` nunca o recomenda.
+  - **`apply` valida a árvore proposta inteira (R-01, regra 11 de §7.11):** e não
+    só os briefs que ele próprio escreve. Uma mutação que **toca** um incremento
+    com brief inválido é recusada com `plan_invalid` sem escrever nada; um brief
+    já inválido em outro incremento vira `WARNING` no relatório — o esqueleto que
+    `generate` grava de propósito (§7.5) não trava o fluxo.
+  - **Symlink não cruza mais a fronteira do workspace (R-05, I-8, NFR-08):**
+    `adopt`, `link` e `readEvidence` resolvem o alvo por `safeResolve`/realpath
+    antes de qualquer `stat` ou leitura. Um `spec/changes/<nome>` que aponta para
+    fora do projeto era adotado e copiava um título externo para o manifesto.
+  - **Path de fonte normalizado (R-06, FR-06):** `plan.sourceDocuments` é
+    convertido para a forma POSIX uma vez, no aplicador do bundle; antes um
+    `docs\source.md` era persistido literalmente.
+  - **Commit multi-arquivo com rollback (R-07, NFR-07, AC-49):** `withStaging`
+    ganha pré-checagem (um destino que é diretório é recusado antes do primeiro
+    move), backup de cada destino existente e **rollback** de tudo que já foi
+    movido quando qualquer rename falha. O staging só permanece no disco quando o
+    próprio rollback falha, que é o caso em que §7.13 pede
+    `partial_write_detected`. Antes, uma falha no meio deixava o manifesto na
+    revisão nova e apagava o staging.
+  - Testes: regressão para cada item em `test/unit/project-hardening.test.ts`,
+    incluindo o caso de não-deadlock com o esqueleto. 337 testes.
+
+- **fix(project): falhas residuais da reauditoria**
+  - **Validação pré-escrita completa (R-01, §4.1.5, regra 11 de §7.11):** `apply`
+    valida o conteúdo de **todos** os briefs da árvore proposta em memória, antes
+    do primeiro byte. Um bundle com `plannedChange: {}` retornava
+    `applied: true` e deixava o plano inválido no disco; agora falha com
+    `plan_invalid` sem escrever nada.
+  - **Barreira de path global (R-02, I-8, NFR-08):** `resolveWithinRoot` passou a
+    valer para **todo** caminho persistido. `apply` recusa
+    `sourceDocuments: ["../fora.md"]` com `unsafe_source_path` sem gravar (antes
+    gravava e ainda incrementava a revisão), e `status`, `show`, `generate`,
+    `evidence`, `sync` e `impact` leem por `safeResolve`: um `..` no manifesto
+    faz a leitura falhar fechada em vez de vazar arquivo de fora da raiz.
+  - **Lock exclusivo (R-03):** `withPlanLock` usa `open(..., 'wx')` como
+    test-and-set atômico, com liberação de lock abandonado por idade. `savePlan`,
+    `apply` e `generate` fazem o compare-and-swap **dentro** do lock. Antes,
+    dois escritores concorrentes observavam a mesma revisão e ambos gravavam a
+    seguinte, perdendo uma atualização.
+  - **`link` exige diretório (R-04, FR-29):** um arquivo comum com o nome da
+    change era aceito como alvo. `link` e `adopt` passam a usar `isDirectory`.
+  - Testes: `test/unit/project-hardening.test.ts` com regressão para cada item,
+    incluindo dois `savePlan` concorrentes (um vence, o outro recebe
+    `plan_revision_conflict`). 332 testes.
+
+- **fix(project): falhas encontradas em auditoria independente**
+  - **Atomicidade (NFR-07, I-10, AC-21):** `generate` e `apply` validam os
+    marcadores do roadmap de `plan.md` **antes** da primeira escrita. Antes, um
+    marcador desbalanceado só era descoberto depois que os briefs e o
+    `plan.yaml` já tinham sido gravados, deixando o plano meio aplicado.
+  - **Traversal em `adopt` (I-8, NFR-08, FR-06):** `specs project adopt` aceitava
+    um caminho (`../../../fora`), lia conteúdo de fora da raiz e persistia
+    `slug`/`link.name` inseguros no manifesto. Agora exige um **nome** de
+    diretório — slug kebab-case ou `<YYYY-MM-DD>-<slug>[-N]` — e recusa `..`,
+    absoluto, NUL e separadores com `unsafe_plan_path`.
+  - **`renameSlug` perdia o brief (FR-43, AC-50):** o arquivo antigo era apagado
+    e o novo nunca criado, deixando o manifesto apontando para um arquivo
+    inexistente. Agora o conteúdo é carregado para o novo caminho, o `slug:` do
+    frontmatter é reescrito e `content_hash`/`record_hash` são refeitos na mesma
+    transação.
+  - **Precedência do blocker manual (FR-23, §7.7):** um blocker manual agora é a
+    única razão reportada, com `blockedBy` vazio. Antes acumulava com
+    `dependency_pending`.
+  - **`next` recomendava incremento concluído (§7.8):** elegível passa a exigir
+    `readiness: ready` **e** `execution != archived`; o concluído aparece em
+    `excluded` com `archive_resolved`.
+  - **Ordenação de archive (FR-32, AC-40, NFR-03):** o sufixo de colisão é
+    comparado como número. Antes `-2` era escolhido no lugar de `-10`.
+  - **`apply --expect-revision` (FR-39):** a opção não existia na CLI e escapava
+    do contrato `--json` como texto do Commander. Registrada e propagada.
+  - **`impact` e `change_dir_missing` (FR-44, §7.12):** `sharedCapabilities`
+    passa a ser uma lista de entradas; uma change vinculada sem diretório
+    resolvível aparece como `{ capability: null, reason: "change_dir_missing" }`
+    em vez de ser omitida em silêncio. **Mudança de contrato JSON.**
+  - **Regras de §7.17:** `schema_version` do frontmatter de um Planned Change é
+    restrito ao valor conhecido; um incremento `planned` sem materialização
+    produz `planned_change_missing`.
+  - **`generate --force` (AC-14):** o relatório passa a registrar em
+    `diagnostics` que um conteúdo editado à mão foi adotado.
+  - **Escrita concorrente:** `savePlan` relê a revisão no disco imediatamente
+    antes de gravar (compare-and-swap) e falha com `plan_revision_conflict` em
+    vez de sobrescrever a atualização de outro escritor.
+  - Testes: `test/unit/project-transaction.test.ts` e
+    `test/integration/project-lifecycle.test.ts` (exigidos por §12) mais
+    regressão para cada item acima. 326 testes.
+
+### Adicionado
+
+- **feat(project): Project Planning — Fases 4–5 (bundle, impacto, ciclo de vida e watch)**
+  - `src/core/project/bundle.ts` — Zod do bundle e as dez operações de §7.11
+    (`addChange`, `updateChange`, `setDependencies`, `setBlockers`, `renameSlug`,
+    `replacePlannedChange`, `splitChange`, `mergeChanges`, `setMilestones`,
+    `writeDocument`), com `ref → ID` reprodutível, proteção de histórico
+    (`completed_change_protected`), split que cancela o original com
+    `superseded_by` e exige `rewire` completo (`unmapped_dependents`), merge que
+    recusa entrada concluída (`merge_completed_change`), e validação do estado
+    proposto (`ProjectGraph.from`) antes de qualquer escrita.
+  - `src/core/project/apply.ts` — `specs project apply` (stdin ou `--file`):
+    pipeline `parse → aplicar em memória → validar → impacto → staging → rename
+    atômico → projetar roadmap → revalidar`. `--dry-run` não toca no disco;
+    `--allow-completed` libera uma operação sobre incremento concluído com
+    `WARNING`.
+  - `src/core/project/impact.ts` — `specs project impact --change <id>...`:
+    dependentes, ancestrais, milestones, changes vinculadas com estado resolvido,
+    capabilities compartilhadas, Planned Changes afetados, concluídos atingidos.
+  - `project-refine` ganha o corpo completo (impacto, split/merge/rename,
+    proteção de histórico).
+  - `specs project list`, `pause --reason`, `resume`, `archive` (ciclo de vida do
+    plano) e `specs project --watch [--interval <s>]` (reusa `watch()`).
+  - `apply` valida o estado proposto (grafo + slug, `superseded_by`, consistência
+    incremento↔milestone, `order` duplicado) **antes** de qualquer escrita
+    (`plan_invalid`).
+  - `validate` ganha `high_fanout_change`, `unlinked_active_change` e
+    `partial_write_detected`.
+  - Testes de desempenho (200 incrementos: `status`/`next` < 500 ms,
+    `generate` < 2 s) e de confidencialidade (marcador de fonte nunca aparece em
+    `planning/` nem em saída de comando).
+  - **`planned_change.record_hash`** (opcional): hash de `slug` + `title` +
+    `depends_on` + `milestone`. Uma mudança nesses campos torna o brief
+    `outdated` mesmo com a fonte intacta (§7.5); `priority` e `manual_blockers`
+    não movem o hash. `generate` e `apply` gravam; `status` compara.
+  - **`ProjectChange.reason`** (opcional): o motivo do último `set-state` para
+    `on_hold` ou `cancelled`, gravado para auditoria (§7.6) e limpo ao voltar
+    para `planned`.
+  - `validate` ganha `oversized_change` (change vinculada com mais de 10 deltas,
+    reusa `MAX_DELTAS_PER_CHANGE`) e `ambiguous_archive_match`; `status` ganha o
+    diagnóstico `stale_plan_status`.
+  - Os dois campos novos são opcionais no Zod — planos escritos antes deles
+    continuam carregando sem migração.
+
+- **feat(project): Project Planning — Fase 3 (vínculo, adoção e sincronização)**
+  - `src/core/project/link.ts` — `linkChange` (vínculo 1:1 com todas as
+    pré-condições: incremento não concluído nem cancelado, change nativa
+    presente, nome livre), `unlinkChange` (exige `--force` quando a execução
+    observada é `archived`), `adoptChange` (cria uma Project Change a partir de
+    uma change fora do plano — ativa ou de archive — sem tocar em nada dentro
+    dela; título derivado do `proposal.md`; id novo além de qualquer cancelado),
+    `setPlanningState` (transição validada contra a máquina de §7.6; `on_hold` e
+    `cancelled` exigem `--reason`).
+  - `src/core/project/sync.ts` — `syncPlan [--check]`: resolve `archive_path`
+    por padrão (`^\d{4}-\d{2}-\d{2}-<name>(-\d+)?$`, escolhe o de maior data e
+    sufixo com `ambiguous_archive_match`), limpa `active_path` quando o
+    diretório ativo some, reporta `dangling_link` (execução `unknown`, nunca
+    `archived`). Nunca cria vínculo, nunca adota, nunca altera a change nativa.
+    Idempotente.
+  - CLI: `specs project link`, `unlink`, `adopt`, `sync`, `set-state`.
+
+- **feat(project): Project Planning — Fase 2 (grafo, estado, materialização, dashboard e comandos)**
+  - `src/core/project/graph.ts` — DAG entre Project Changes com ordem topológica
+    (desempate por declaração), dependentes, ancestrais, descendentes e detecção
+    de ciclo com o caminho na mensagem.
+  - `evidence.ts` + `state.ts` — as três dimensões de estado: `planning_state`
+    (persistido), `readiness` (derivado do grafo e da materialização) e
+    `execution` (observado no filesystem da change nativa), com códigos de razão
+    estáveis e apresentação derivada.
+  - `status.ts` — `specs project status`: progresso geral e por milestone, cada
+    incremento com as três dimensões, status derivado do plano e diagnósticos
+    (`dangling_link`, `duplicate_link`, `source_changed`, `missing_source`, …).
+  - `next.ts` — `specs project next`: ranking determinístico de cinco níveis,
+    alternativas, `parallelReady` com ressalva e `excluded` com o código que
+    eliminou cada incremento.
+  - `generate.ts` + `render.ts` — `specs project generate`: materialização
+    seletiva por `--change`/`--milestone`, idempotente, com detecção de fonte
+    alterada e edição humana (conflito de três vias, recusa sem `--force`) e
+    projeção do bloco de roadmap em `plan.md` preservando o texto fora dos
+    marcadores. `--dry-run` não toca no disco.
+  - `specs project show <change-id>` e o dashboard de `specs project` (somente
+    leitura; `--json` e `--watch` mutuamente exclusivos).
+  - Seis comandos de harness gerados para os quatro harnesses (`project-plan`,
+    `-review`, `-generate`, `-status`, `-next`, `-refine`), com `allowed-tools`
+    por comando no Claude Code.
+
+- **feat(project): Project Planning — Fase 1 (modelo, proveniência e validação)**
+  - Nova área de planejamento em `planning/<plan-id>/`, fora de `spec/`, com
+    `plan.yaml` (manifesto estruturado), `plan.md`, `architecture.md` e
+    `planned-changes/`. A presença de `planning/<plan-id>/plan.yaml` é a única
+    chave de ativação — nenhuma opção nova em `spec/config.yaml`.
+  - Grupo de CLI `specs project` com dois subcomandos determinísticos:
+    - `specs project create <plan-id> [fontes...] [--name] [--owner] [--json]` —
+      cria o plano em `status: draft`, `revision: 0`, registra `path` e `sha256`
+      de cada fonte; idempotente por recusa (`plan_exists`).
+    - `specs project validate [<plan-id>] [--strict] [--json]` — valida
+      manifesto, Planned Changes, fontes e vínculos nos níveis
+      `ERROR`/`WARNING`/`INFO`, com path do campo e `fix`.
+  - Namespace de biblioteca `src/core/project/` (`model`, `paths`, `hashes`,
+    `repository`, `planned-change`, `templates`, `validate`, `create`),
+    exportado por `src/index.ts`.
+  - Hashes de proveniência (`source_hash`, `content_hash`) normalizados para LF,
+    estáveis entre plataformas e line endings.
+  - `src/util/fs.ts` ganha `writeFileAtomic` e `withStaging` (escrita atômica e
+    staging multi-arquivo); nada existente é alterado.
+
+### Alterado
+
+- **`ValidationReport['type']`** passa a incluir `'plan'` e `'planned-change'`,
+  além de `'change'` e `'spec'`. `formatReports` já imprime `report.type`
+  genericamente, então consumidores da saída humana não são afetados; quem lê o
+  JSON de `validate` passa a ver os dois valores novos apenas para planos.
+- **Catálogo de comandos gerados** passa de sete para treze. `workflowCommands()`
+  continua devolvendo os sete comandos do ciclo de change; `allCommands()` expõe
+  o conjunto completo (ciclo + seis comandos de plano), e é ele que `init`,
+  `update`, `harnesses` e o writer de harness passam a iterar. `specs init`/
+  `update --harnesses all` escrevem 52 arquivos de comando (antes 28); a escrita
+  é aditiva e nenhum arquivo anterior muda de conteúdo.
+- **`WorkflowCommand`** ganha o campo opcional `allowedTools`; o adapter do
+  Claude Code usa `command.allowedTools ?? 'Bash(specs:*)'`, então os sete
+  comandos existentes mantêm exatamente `Bash(specs:*)`.
+
 ## [0.7.2] - 2026-09-01
 
 ### Documentação

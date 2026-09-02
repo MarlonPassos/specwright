@@ -120,3 +120,23 @@ O diretório da change então vai para `spec/changes/archive/<data>-<nome-da-cha
 | implement | boxes marcados no `tasks.md`, e o código |
 | verify | um relatório; nenhum arquivo muda |
 | archive | `spec/specs/` atualizado, a change em `spec/changes/archive/` |
+
+## Onde o plano encosta no ciclo (opcional)
+
+O [Project Planning](project-planning.md) fica **acima** deste ciclo. Ele decide
+*quais* changes devem existir e em que ordem; o ciclo acima continua respondendo
+*o que* cada change significa e *como* se verifica que foi feita.
+
+- O Planned Change de um incremento entra como **contexto** de `/spec-explore` ou
+  `/spec-propose` — nunca substitui `proposal.md`, `design.md`, os deltas ou
+  `tasks.md`.
+- A passagem é sempre iniciada por uma pessoa. Nenhum comando de plano cria,
+  implementa, verifica ou arquiva uma change.
+- Depois que a change existe, `specs project link <change-id> <change-name>`
+  registra o vínculo 1:1.
+- Quando a change é arquivada pelo ciclo normal, o plano observa o diretório de
+  archive na próxima `specs project status` e recalcula quem ficou pronto — sem
+  hook, sem aviso.
+
+O que o plano **não** faz: gerar código, criar artefatos de change, executar
+agentes em paralelo, guardar estado fora do Git, ou alterar uma change arquivada.

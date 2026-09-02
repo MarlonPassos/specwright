@@ -11,7 +11,7 @@ export interface ValidationIssue {
 export interface ValidationReport {
   /** Item id, e.g. a change name or a capability path. */
   item: string;
-  type: 'change' | 'spec';
+  type: 'change' | 'spec' | 'plan' | 'planned-change';
   valid: boolean;
   issues: ValidationIssue[];
   summary: { errors: number; warnings: number; info: number };

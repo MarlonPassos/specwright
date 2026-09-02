@@ -1,7 +1,7 @@
 import type { Command } from 'commander';
 import { initWorkspace, updateWorkspace } from '../../core/init.js';
 import { allHarnesses, detectHarness, harnessIds } from '../../core/harness/index.js';
-import { workflowCommands, commandName } from '../../core/workflows/index.js';
+import { allCommands, commandName } from '../../core/workflows/index.js';
 import { requireWorkspace } from '../../core/workspace.js';
 import { fail, printJson, printLines } from '../output.js';
 
@@ -32,7 +32,7 @@ export function registerSetupCommands(program: Command): void {
             schema: result.schema,
             harnesses: result.harnesses,
             harness: harness.id,
-            commands: workflowCommands().map((command) => commandName(command.id)),
+            commands: allCommands().map((command) => commandName(command.id)),
             files: result.files.map((file) => file.path),
           });
           return;
@@ -54,7 +54,7 @@ export function registerSetupCommands(program: Command): void {
           '',
           // Named without a prefix: each harness types them the way the table above shows.
           'Comandos gerados:',
-          ...workflowCommands().map(
+          ...allCommands().map(
             (command) => `  ${commandName(command.id).padEnd(16)} ${command.description}`
           ),
           '',
@@ -101,7 +101,7 @@ export function registerSetupCommands(program: Command): void {
     .description('Lista os harnesses suportados e os comandos gerados para eles')
     .option('--json', 'Saída em JSON')
     .action((options: { json?: boolean }) => {
-      const commands = workflowCommands();
+      const commands = allCommands();
 
       if (options.json) {
         printJson({

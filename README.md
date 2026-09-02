@@ -151,6 +151,9 @@ specs show [item]                    Mostra uma change ou uma spec
 specs validate [item]                Valida uma change ou uma spec
 specs schemas                        Lista os schemas de workflow disponíveis
 specs templates                      Mostra o template por trás de cada artefato
+
+specs project create <plan-id>       Cria um plano de projeto em planning/<plan-id>/
+specs project validate [<plan-id>]   Valida o manifesto, os briefs, as fontes e os vínculos
 ```
 
 Todo comando aceita `--json` e imprime um único documento JSON no stdout, em sucesso ou
@@ -187,6 +190,22 @@ aponte o `config.yaml` para ele. Veja [docs/schemas.md](docs/schemas.md).
 - [Harnesses](docs/harnesses.md) — onde ficam os arquivos de comando de cada um
 - [Schemas de workflow](docs/schemas.md)
 - [Regras de validação](docs/validation.md)
+- [Project Planning](docs/project-planning.md) — a camada de plano, opt-in, acima da unidade change
+
+## Planejamento de projeto (opcional)
+
+Para um documento de visão grande, uma migração ou um roadmap de vários módulos, o
+Specwright tem uma camada de **plano** acima da unidade change. É **opt-in duplo**:
+é preciso gerar os comandos novos (`specs update`) **e** criar um plano
+(`specs project create`). Sem `planning/<plan-id>/plan.yaml`, o produto se comporta
+exatamente como antes.
+
+Seis comandos de harness conduzem o plano: `/spec-project-plan` (analisa fontes e
+monta o plano), `/spec-project-review` (valida e critica), `/spec-project-generate`
+(materializa os briefs), `/spec-project-status` (progresso e bloqueios),
+`/spec-project-next` (recomenda o próximo incremento) e `/spec-project-refine`
+(granularidade, split, merge). A CLI determinística por trás deles é o grupo
+`specs project`. Veja [docs/project-planning.md](docs/project-planning.md).
 
 ## Créditos
 

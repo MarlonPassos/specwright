@@ -8,6 +8,12 @@ import { writeChangeMetadata } from './metadata.js';
 
 const CHANGE_ID = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 
+/**
+ * The kebab-case rule for a change slug, exported so Project Planning validates
+ * a Project Change `slug` against exactly the same shape without duplicating it.
+ */
+export const SLUG_PATTERN = CHANGE_ID;
+
 export function assertValidChangeId(id: string): string {
   if (!CHANGE_ID.test(id)) {
     throw new SpecError(

@@ -156,3 +156,78 @@ Uma change ou uma spec. `--type change|spec` desambigua um nome que é os dois;
 
 O `schemas` lista os schemas de workflow disponíveis e marca o ativo. O `templates` mostra
 o template por trás de cada artefato de um schema.
+
+## Project Planning
+
+Opt-in. Sem `planning/<plan-id>/plan.yaml`, esses comandos são a única superfície
+nova e nada mais muda. Referência do formato: [project-planning.md](project-planning.md).
+
+### `specs project create <plan-id> [fontes...]`
+
+Cria `planning/<plan-id>/` com `plan.yaml` (`status: draft`, `revision: 0`),
+`plan.md`, `architecture.md` e `planned-changes/`.
+
+| Opção | Significado |
+| --- | --- |
+| `--name <nome>` | Nome humano do plano (default: o `plan-id`) |
+| `--owner <nome>` | Responsável |
+| `--json` | `{ plan, path, revision, created }`; em falha `{ plan: null, error }` |
+
+Cada fonte é registrada com `path` relativo à raiz e `sha256` do conteúdo. Um
+plano existente falha com `plan_exists` e nada é modificado. Uma fonte com `..`,
+absoluta ou com NUL falha com `unsafe_source_path`.
+
+### `specs project validate [<plan-id>]`
+
+Valida manifesto, Planned Changes, fontes e vínculos.
+
+| Opção | Significado |
+| --- | --- |
+| `--strict` | Trata warnings como falhas |
+| `--json` | `{ valid, strict, reports, summary }`, com `reports[].type` em `plan` ou `planned-change` |
+
+Sem `<plan-id>`: usa o único plano, ou falha com `plan_not_found` / `ambiguous_plan`.
+Sai com `1` quando inválido.
+
+Códigos de erro: `plan_not_found`, `ambiguous_plan`, `plan_exists`, `invalid_plan`,
+`plan_invalid`, `unsupported_plan_version`, `unsafe_source_path`, `unsafe_plan_path`,
+`source_not_found`.
+
+### `specs project status` / `next` / `show` / `generate`
+
+`status` devolve as três dimensões de cada incremento, progresso, milestones
+derivados e diagnósticos. `next` recomenda o próximo incremento com ranking
+determinístico e justifica cada exclusão. `show <change-id>` traz o registro, o
+Planned Change parseado seção por seção, dependências e dependentes resolvidos.
+`generate` materializa os briefs (`--change`, `--milestone`, `--dry-run`,
+`--force`, `--expect-revision`); recusa sobrescrever um brief editado à mão e
+projeta o roadmap em `plan.md`.
+
+`specs project` sem subcomando renderiza o dashboard (somente leitura); `--json`
+soma `dashboardSchemaVersion` e `generatedAt` ao payload de `status`. `--json` e
+`--watch` são mutuamente exclusivos (`invalid_option`).
+
+### `specs project link` / `unlink` / `adopt` / `sync` / `set-state`
+
+`link <change-id> <change-name>` registra o vínculo 1:1 (o incremento não pode
+estar concluído nem cancelado; a change nativa precisa existir; o nome não pode
+já estar vinculado). `unlink <change-id>` remove — `--force` quando a execução é
+`archived`. `adopt <change-name|archive-dir>` cria uma Project Change a partir de
+uma change fora do plano, sem tocar em nada dentro dela. `sync [--check]`
+reconcilia o bloco `link` com `spec/changes/` e o archive (idempotente).
+`set-state <change-id> <state> [--reason]` aplica uma transição de
+`planning_state` (`on_hold` e `cancelled` exigem `--reason`).
+
+Códigos de erro: `link_target_missing`, `link_already_used`, `invalid_transition`,
+`missing_reason`, `completed_change_protected`.
+
+### `specs project apply` / `impact` / `list` / `pause` / `resume` / `archive` / `--watch`
+
+`apply` lê um bundle JSON (stdin ou `--file`), valida o estado proposto e grava;
+`--dry-run` imprime `idMap`, diff e impacto sem escrever. `impact --change <id>...`
+dá o impacto estrutural determinístico. `list` indexa os planos. `pause --reason`,
+`resume` e `archive` movem o `status` declarado do plano. `specs project --watch
+[--interval <s>]` repinta o dashboard por polling até Ctrl+C (`--watch` + `--json`
+→ `invalid_option`).
+
+Formato do bundle e regras: [project-planning.md](project-planning.md).
