@@ -7,6 +7,8 @@ import { recommendNext } from '../core/project/next.js';
 import { listPlanIds, planPaths, safeResolve } from '../core/project/paths.js';
 import { loadPlan } from '../core/project/repository.js';
 import { readFileIfExists } from '../util/fs.js';
+import { listDocuments, readDocument } from '../core/documents.js';
+import { parseTasks } from '../core/change/model.js';
 import { dashboardEnvelope, overviewEnvelope } from '../core/contract.js';
 import { WORKSPACE_DIR, type Workspace } from '../core/workspace.js';
 import { PLANNING_DIR } from '../core/project/paths.js';
@@ -95,6 +97,33 @@ async function projections(workspace: Workspace, planId: string | undefined) {
         markdown: content,
       };
     },
+    /** The catalogue: which documents exist, what each one is for, where it lives. */
+    docs: async () =>
+      dashboardEnvelope({ documents: await listDocuments(workspace, planId) }),
+    /**
+     * One catalogued document. The `id` is a handle, not a path: it is looked up
+     * in the catalogue, so the reader can only reach a file the catalogue itself
+     * published — the same rule the brief route follows.
+     *
+     * `tasks.md` is parsed here as well as returned raw. A checklist read as
+     * prose loses what it is for; the panel shows progress, and the markdown
+     * stays available underneath.
+     */
+    doc: async (id: string) => {
+      const document = await readDocument(workspace, id, planId);
+      if (!document) return { found: false as const, reason: 'not_found' as const };
+      if (document.kind !== 'tasks') return { found: true as const, ...document };
+      const progress = parseTasks(document.markdown);
+      return {
+        found: true as const,
+        ...document,
+        tasks: {
+          total: progress.total,
+          completed: progress.completed,
+          items: progress.tasks,
+        },
+      };
+    },
   };
 }
 
@@ -171,8 +200,28 @@ export async function startServer(
       return;
     }
 
+    if (route === '/api/doc') {
+      const id = url.searchParams.get('id') ?? '';
+      if (id === '' || id.length > 512) {
+        sendJson(response, 400, {
+          error: { code: 'invalid_document_id', message: 'Informe ?id=<id do catálogo>.' },
+        });
+        return;
+      }
+      routes
+        .doc(id)
+        .then((body) => sendJson(response, body.found ? 200 : 404, body))
+        .catch((error: unknown) =>
+          sendJson(response, 500, {
+            error: { code: 'projection_failed', message: (error as Error).message },
+          })
+        );
+      return;
+    }
+
     const handler =
       route === '/api/overview' ? routes.overview
+      : route === '/api/docs' ? routes.docs
       : route === '/api/changes' ? routes.changes
       : route === '/api/plan' ? routes.plan
       : undefined;

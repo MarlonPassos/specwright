@@ -51,7 +51,14 @@ export interface OverviewData {
   };
   /** Work in flight, plan and execution joined. Empty when nothing is running. */
   focus: OverviewFocus[];
-  milestones?: { id: string; name: string; archived: number; total: number }[];
+  milestones?: {
+    id: string;
+    name: string;
+    archived: number;
+    total: number;
+    /** Same derivation the plan status makes, so both screens agree. */
+    derivedStatus: 'not_started' | 'in_progress' | 'completed';
+  }[];
   recommended?: {
     id: string;
     title: string;
@@ -170,6 +177,7 @@ export async function buildOverview(
       name: milestone.name,
       archived: milestone.archived,
       total: milestone.changes.length,
+      derivedStatus: milestone.derivedStatus,
     })),
     ...(next.recommended
       ? {

@@ -5,6 +5,46 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.20.0] - 2026-09-03
+
+### Adicionado
+
+- **feat(server): a tela DOCUMENTOS, com todo artefato do projeto** — `proposal.md`,
+  `design.md`, `tasks.md`, cada delta de spec, cada capacidade viva, `project.md`,
+  `plan.md`, `architecture.md` e os Planned Changes, agrupados como o projeto é
+  organizado e com uma linha dizendo para que cada um serve. Novas rotas
+  `GET /api/docs` (o catálogo) e `GET /api/doc?id=<id>`.
+
+  O `id` é uma **chave de catálogo, não um caminho**: `readDocument` reconstrói o
+  catálogo e procura o id nele, então o leitor só alcança arquivo que o próprio
+  catálogo publicou — nada que venha da query é concatenado a diretório (I-8).
+  Metadado de máquina (`config.yaml`, `.change.yaml`, `plan.yaml`) fica de fora:
+  é estado, não leitura.
+
+- **feat(server): `tasks.md` lido como checklist, não como prosa** — progresso,
+  os grupos que o arquivo declara e recuo por numeração (`1.2` é subtarefa de
+  `1`), com o Markdown logo abaixo. `GET /api/doc` devolve o parse ao lado do
+  texto.
+
+- **feat(server): milestones navegáveis** — clicar num milestone recorta a lista
+  de incrementos do PLANO para os seus, com um chip dizendo qual recorte está
+  ativo; os milestones do RESUMO levam ao mesmo recorte. `buildOverview` passou a
+  carimbar `derivedStatus` em cada milestone, para os dois painéis não derivarem
+  o mesmo estado de formas diferentes.
+
+- **feat(server): busca em CHANGES, PLANO e DOCUMENTOS** — um campo na barra de
+  título da seção, que cresce ao receber foco e filtra enquanto se digita sem
+  perder o cursor. Fora de um `<summary>` de propósito: um input ali dentro
+  abriria e fecharia o acordeão a cada clique.
+
+### Alterado
+
+- **feat(server): os pontos de artefato da tela CHANGES abrem o documento** —
+  `proposal`, `design` e `tasks` viram porta de entrada quando existem; um
+  incremento com change vinculada mostra os artefatos dela ao lado do vínculo.
+- **feat(server): a aba escolhida acompanha voltar e avançar do navegador** — a
+  aba já vivia no hash, mas só era lida no carregamento.
+
 ## [0.19.0] - 2026-09-02
 
 ### Adicionado

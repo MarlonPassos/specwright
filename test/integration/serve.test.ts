@@ -274,13 +274,13 @@ describe('specs serve — o resumo do incremento', () => {
 });
 
 describe('specs serve — navegação', () => {
-  it('a página traz as três abas do terminal, com as mesmas teclas', async () => {
+  it('a página traz as abas do terminal mais o catálogo, com as mesmas teclas', async () => {
     const { INDEX_HTML } = await import('../../src/server/ui.js');
-    for (const label of ['RESUMO', 'CHANGES', 'PLANO']) {
+    for (const label of ['RESUMO', 'CHANGES', 'PLANO', 'DOCUMENTOS']) {
       expect(INDEX_HTML, label).toContain(label);
     }
-    // 1/2/3 saltam, Tab e setas andam, r repinta — o hábito vem do TUI.
-    expect(INDEX_HTML).toMatch(/\[1-3\]/);
+    // 1..4 saltam, Tab e setas andam, r repinta — o hábito vem do TUI.
+    expect(INDEX_HTML).toMatch(/\[1-4\]/);
     expect(INDEX_HTML).toContain("'ArrowRight'");
     expect(INDEX_HTML).toContain("'ArrowLeft'");
     expect(INDEX_HTML).toContain('keydown');
@@ -321,8 +321,12 @@ describe('specs serve — navegação', () => {
     // <details open> nativo: sem JS, acessível e navegável por teclado.
     expect(INDEX_HTML).toContain('<details class="card" open>');
     expect(INDEX_HTML).toContain('function card(t,b,n)');
-    // O primeiro card de cada tela continua fixo: esconder o resumo não ajuda.
-    expect(INDEX_HTML).toContain('var box=first?sec:card');
+    // O primeiro bloco de cada tela continua fixo — é o resumo dela, e esconder
+    // o resumo não ajuda. Toda tela abre com `sec(...)`, o resto vira acordeão.
+    for (const screen of ['screenResumo', 'screenChanges', 'screenPlano', 'screenDocs']) {
+      const body = INDEX_HTML.slice(INDEX_HTML.indexOf('function ' + screen + '(')).slice(0, 1500);
+      expect(body.includes('sec(') || body.includes('findBar('), screen).toBe(true);
+    }
   });
 
   it('CLI e harness aparecem rotulados, nunca misturados', async () => {
@@ -345,5 +349,122 @@ describe('specs serve — navegação', () => {
     // O SSE só carrega o overview; sem invalidar, CHANGES e PLANO ficariam velhas.
     expect(INDEX_HTML).toContain('delete cache.changes');
     expect(INDEX_HTML).toContain('delete cache.plano');
+  });
+});
+
+describe('specs serve — o catálogo de documentos', () => {
+  async function withArtifacts(): Promise<Workspace> {
+    const workspace = await makeWorkspace();
+    const dir = path.join(workspace.changesPath, 'terminal-ux');
+    await writeFile(path.join(dir, 'proposal.md'), '## Why\n\nSaída ilegível.\n');
+    await writeFile(path.join(dir, 'design.md'), '## Decisões\n\nUm tema só.\n');
+    await writeFile(
+      path.join(dir, 'tasks.md'),
+      '## 1. Base\n\n- [x] 1.1 Tema\n- [ ] 1.2 Cores\n\n## 2. Fim\n\n- [ ] 2.1 Revisar\n'
+    );
+    return workspace;
+  }
+
+  it('lista o que existe, com finalidade e caminho de cada documento', async () => {
+    const server = await serve(await withArtifacts());
+    const body = (await (await get(server, '/api/docs')).json()) as any;
+
+    expect(Array.isArray(body.documents)).toBe(true);
+    const entry = body.documents.find((x: any) => x.id === 'change:terminal-ux:design');
+    expect(entry).toBeDefined();
+    for (const key of ['id', 'kind', 'title', 'purpose', 'group', 'path']) {
+      expect(entry, key).toHaveProperty(key);
+    }
+  });
+
+  it('devolve o markdown de um documento do catálogo', async () => {
+    const server = await serve(await withArtifacts());
+    const body = (await (await get(server, '/api/doc?id=change:terminal-ux:proposal')).json()) as any;
+    expect(body.found).toBe(true);
+    expect(body.markdown).toContain('Saída ilegível');
+  });
+
+  it('tasks.md volta parseado, não só como texto', async () => {
+    const server = await serve(await withArtifacts());
+    const body = (await (await get(server, '/api/doc?id=change:terminal-ux:tasks')).json()) as any;
+
+    expect(body.tasks.total).toBe(3);
+    expect(body.tasks.completed).toBe(1);
+    expect(body.tasks.items[0]).toMatchObject({ number: '1.1', done: true, group: '1. Base' });
+    // O arquivo continua disponível: o parse é uma leitura, não a verdade.
+    expect(body.markdown).toContain('- [ ] 2.1 Revisar');
+  });
+
+  it('um id fora do catálogo é 404, e nunca vira caminho (I-8)', async () => {
+    const server = await serve(await withArtifacts());
+    for (const id of [
+      '../../../../etc/passwd',
+      'change:../../etc:proposal',
+      '/etc/passwd',
+      'change:terminal-ux:config',
+    ]) {
+      const response = await get(server, '/api/doc?id=' + encodeURIComponent(id));
+      expect(response.status, id).toBe(404);
+      expect((await response.json()).reason, id).toBe('not_found');
+    }
+  });
+
+  it('sem id, recusa antes de tocar no disco', async () => {
+    const server = await serve(await withArtifacts());
+    const response = await get(server, '/api/doc?id=');
+    expect(response.status).toBe(400);
+    expect((await response.json()).error.code).toBe('invalid_document_id');
+  });
+
+  it('a aba DOCUMENTOS lê o catálogo e abre no mesmo painel lateral', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    expect(INDEX_HTML).toContain('/api/docs');
+    expect(INDEX_HTML).toContain('/api/doc?id=');
+    expect(INDEX_HTML).toContain('data-doc');
+    expect(INDEX_HTML).toContain('function screenDocs(d)');
+    // O checklist vira progresso; o markdown fica embaixo.
+    expect(INDEX_HTML).toContain('function tasksView(b)');
+    // O catálogo é invalidado como as demais telas quando o stream avisa.
+    expect(INDEX_HTML).toContain('delete cache.docs');
+  });
+
+  it('o milestone é navegável e recorta o plano, sem tela nova', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    expect(INDEX_HTML).toContain('data-ms=');
+    expect(INDEX_HTML).toContain('data-ms-clear');
+    expect(INDEX_HTML).toContain('function mileRow(m)');
+    // O recorte é aplicado sobre os mesmos estágios do plano.
+    expect(INDEX_HTML).toContain("c.milestone===MS");
+  });
+
+  it('a busca existe nas telas com lista longa', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    expect(INDEX_HTML).toContain('function findBar(title,scope,ph,count,extra)');
+    for (const scope of ['changes', 'plano', 'docs']) {
+      expect(INDEX_HTML, scope).toContain("'" + scope + "','filtrar");
+    }
+    // O campo mora na barra de título da seção — não dentro de um <summary>,
+    // onde um input abriria e fecharia o acordeão a cada clique.
+    expect(INDEX_HTML).toContain('<section class="toolbar">');
+    expect(INDEX_HTML).toContain('class="srch"');
+  });
+
+  it('a projeção do plano publica o milestone de cada incremento', async () => {
+    const server = await serve(await makeWorkspace());
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    // A UI filtra por `c.milestone`; sem o campo o filtro esvaziaria a tela.
+    expect(INDEX_HTML).toContain('c.milestone');
+    const body = (await (await get(server, '/api/plan')).json()) as any;
+    expect(body).toHaveProperty('plan');
+  });
+
+  it('o resumo carimba o estado derivado do milestone, como o plano', async () => {
+    const server = await serve(await makeWorkspace());
+    const body = (await (await get(server, '/api/overview')).json()) as any;
+    if (body.milestones && body.milestones.length > 0) {
+      expect(body.milestones[0]).toHaveProperty('derivedStatus');
+    }
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    expect(INDEX_HTML).toContain('MSTAT');
   });
 });

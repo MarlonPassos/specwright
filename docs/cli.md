@@ -290,10 +290,13 @@ escreve**, e qualquer método que não seja `GET`/`HEAD` devolve `405 read_only`
 | `GET /api/changes` | `buildDashboard()` |
 | `GET /api/plan` | `statusPayload()` + a recomendação |
 | `GET /api/brief?change=CH-NNN` | o Planned Change do incremento, em Markdown |
+| `GET /api/docs` | o catálogo: todo documento do projeto, com finalidade e caminho |
+| `GET /api/doc?id=<id>` | um documento do catálogo, em Markdown |
 | `GET /api/events` | SSE: um evento `overview` ao conectar e um a cada mudança |
 
-A página tem as **mesmas três telas do terminal** — RESUMO, CHANGES e PLANO —
-trocadas por clique, por `1`/`2`/`3`, por `Tab` e pelas setas; `r` repinta. A aba
+A página tem as **três telas do terminal** — RESUMO, CHANGES e PLANO — mais
+DOCUMENTOS, que só uma página consegue oferecer; trocadas por clique, por
+`1`..`4`, por `Tab` e pelas setas; `r` repinta. A aba
 vive no hash (`#changes`), então recarregar não perde o lugar. Dois temas, escuro
 por padrão como o terminal, com a escolha lembrada no navegador.
 
@@ -317,6 +320,37 @@ leitura de disco.
 O primeiro card de cada tela é fixo; os demais são **acordeões abertos por
 padrão**, com a contagem no cabeçalho — numa tela com vinte incrementos, fechar
 uma seção é a diferença entre ler e rolar.
+
+#### A tela DOCUMENTOS
+
+O catálogo de tudo que se lê no projeto, agrupado como o projeto é organizado:
+`spec/project.md`, cada capacidade viva de `spec/specs/`, os artefatos de cada
+change (`proposal.md`, `design.md`, `tasks.md` e cada delta de spec), o mesmo
+para cada change arquivada, e `plan.md`, `architecture.md` e os Planned Changes
+do plano. Cada entrada mostra **o que é, para que serve e onde mora**.
+
+Metadado de máquina fica de fora — `config.yaml`, `.change.yaml` e `plan.yaml`
+são estado, não leitura, e já chegam ao painel pelas projeções.
+
+O `id` de um documento é uma **chave de catálogo, não um caminho**: `/api/doc`
+reconstrói o catálogo e procura o id nele, então o leitor só alcança arquivo que
+o próprio catálogo publicou. Nada que venha da query é concatenado a diretório
+(I-8); um id desconhecido é `404`.
+
+`tasks.md` volta **parseado**: o painel mostra progresso, os grupos que o próprio
+arquivo declara e o recuo por numeração (`1.2` é subtarefa de `1`), com o
+Markdown logo abaixo. Os pontos de artefato da tela CHANGES abrem o documento
+correspondente, e um incremento com change vinculada mostra os artefatos dela ao
+lado do vínculo.
+
+#### Milestones e busca
+
+Na tela PLANO os **milestones são navegáveis**: clicar num deles recorta a lista
+de incrementos para os seus — mesmas etapas, menos linhas — com um chip dizendo
+qual recorte está ativo. Os milestones do RESUMO levam para o mesmo recorte.
+
+CHANGES, PLANO e DOCUMENTOS têm **busca na barra de título da seção**: o campo
+cresce ao receber foco e filtra enquanto se digita, sem perder o cursor.
 
 O stream observa `spec/` e `planning/` com `fs.watch`, e agrupa a rajada de uma
 escrita atômica num aviso só — `writeFileAtomic` grava em temporário e renomeia,
