@@ -291,6 +291,15 @@ escreve**, e qualquer método que não seja `GET`/`HEAD` devolve `405 read_only`
 | `GET /api/plan` | `statusPayload()` + a recomendação |
 | `GET /api/events` | SSE: um evento `overview` ao conectar e um a cada mudança |
 
+A página tem as **mesmas três telas do terminal** — RESUMO, CHANGES e PLANO —
+trocadas por clique, por `1`/`2`/`3`, por `Tab` e pelas setas; `r` repinta. A aba
+vive no hash (`#changes`), então recarregar não perde o lugar. Dois temas, escuro
+por padrão como o terminal, com a escolha lembrada no navegador.
+
+Todo comando exibido é um **chip clicável que copia para a área de transferência**,
+para colar direto no harness — o comando que avança uma change, os do próximo
+incremento e o `fix` de cada diagnóstico.
+
 O stream observa `spec/` e `planning/` com `fs.watch`, e agrupa a rajada de uma
 escrita atômica num aviso só — `writeFileAtomic` grava em temporário e renomeia,
 o que emite de 3 a 6 eventos por mutação, incluindo o instante em que o arquivo

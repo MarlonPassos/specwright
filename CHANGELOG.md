@@ -16,6 +16,13 @@ versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
   passo de build: `tsc` compila só `src/**/*.ts`, então um `.html` solto exigiria
   entrada em `package.json` `files` e poderia faltar em runtime.
 
+  A página traz as **mesmas três telas do terminal** — RESUMO, CHANGES e PLANO —
+  trocadas por clique, `1`/`2`/`3`, `Tab` e setas, com `r` repintando; a aba vive
+  no hash, então recarregar não perde o lugar. Dois temas, escuro por padrão como
+  o terminal, com a escolha lembrada. Todo comando exibido é um **chip que copia
+  para a área de transferência**, para colar no harness — com plano B por
+  `execCommand` quando o contexto não é seguro e a Clipboard API não existe.
+
   **Zero dependência de runtime nova** — `node:http`, `node:fs` e SSE em texto
   puro. A NFR-11 continua valendo.
 
