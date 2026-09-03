@@ -287,6 +287,7 @@ escreve**, e qualquer método que não seja `GET`/`HEAD` devolve `405 read_only`
 |---|---|
 | `GET /` | a página, embutida no pacote — sem CDN, sem build |
 | `GET /api/overview` | `buildOverview()`, o mesmo payload de `specs watch --json` |
+| — aceita `?harness=<id>` | refaz a projeção com aquele harness (também em `/api/changes` e `/api/events`) |
 | `GET /api/changes` | `buildDashboard()` |
 | `GET /api/plan` | `statusPayload()` + a recomendação |
 | `GET /api/brief?change=CH-NNN` | o Planned Change do incremento, em Markdown |
@@ -357,6 +358,64 @@ arquivo declara e o recuo por numeração (`1.2` é subtarefa de `1`), com o
 Markdown logo abaixo. Os pontos de artefato da tela CHANGES abrem o documento
 correspondente, e um incremento com change vinculada mostra os artefatos dela ao
 lado do vínculo.
+
+#### O grafo de dependências
+
+O botão **⌗ ver o grafo**, na barra de INCREMENTOS, abre o plano desenhado como o
+DAG que ele é — um diálogo por cima da tela, que fecha com `Esc`, sem trocar de
+aba nem alterar a lista.
+
+A **coluna é a ordem de execução**: a camada de um incremento é o caminho *mais
+longo* até ele, então toda aresta anda da esquerda para a direita e cada coluna é
+uma onda do plano (`1ª ONDA`, `2ª ONDA`, …). Dentro da coluna, os nós descem para
+perto das suas dependências (duas passadas de baricentro), o que tira a maior
+parte dos cruzamentos.
+
+| Elemento | Diz |
+|---|---|
+| cor da borda | o estado do incremento, a mesma da lista |
+| fundo preenchido | concluída (change arquivada) |
+| contorno grosso com brilho | em execução agora |
+| seta cheia | dependência já satisfeita |
+| seta tracejada amarela | dependência que **ainda barra** o destino |
+| `!` no canto | há blocker anotado à mão |
+| `M2` no canto | o milestone do incremento |
+
+Clicar num nó **acende a linhagem** — tudo de que ele depende e tudo que ele
+desbloqueia — e apaga o resto; clicar no vazio limpa. Duplo clique abre o resumo
+do incremento no painel lateral. A roda dá zoom no ponteiro, arrastar move, e
+**enquadrar** volta ao enquadramento inicial.
+
+Nada disso pede rota nova: `/api/plan` já publica `dependsOn`, `blockedBy`,
+`unlocks` e o estado de cada incremento, e o core recusa ciclo, auto-dependência
+e dependência inexistente antes de gravar — o desenho não tem o que validar. O
+SVG é escrito à mão porque uma biblioteca de grafo seria a primeira dependência
+de runtime do projeto (NFR-11).
+
+#### O harness dos comandos
+
+O painel roda **fora** do harness: o `specs serve` sobe no terminal, então o
+ambiente do processo raramente diz qual está em uso. Por isso o cabeçalho traz um
+**seletor** e, ao lado dele, de onde veio a escolha:
+
+| Procedência | Significa |
+|---|---|
+| `detectado` | havia marcador de ambiente (`CLAUDECODE`, `CODEX_HOME`, …) |
+| `escolhido aqui` | o leitor pediu no seletor, ou `SPECS_HARNESS` foi definido |
+| `configurado` | veio de `harnesses` no `spec/config.yaml` — o caso comum |
+| `padrão` | não havia nada; é o primeiro suportado |
+
+Trocar o seletor refaz as projeções com `?harness=<id>`: **todo comando é montado
+no servidor**, então o que muda é o payload, não um texto reescrito na página. A
+escolha fica lembrada no navegador, e cada aba pode pedir um harness diferente —
+o stream entrega a cada leitor o quadro do harness dele. Um id não suportado é
+recusado com `400 unknown_harness` em vez de ignorado: ignorar devolveria a
+sintaxe de outro harness sem dizer nada.
+
+O **modelo** em uso não aparece porque nenhum harness o publica: o ambiente do
+Claude Code traz produto e versão (`AI_AGENT=claude-code_2-1-259_agent`) e o
+esforço (`CLAUDE_EFFORT`), nunca o modelo — e Codex, opencode e kiro expõem só
+sandbox e caminhos.
 
 #### Milestones e busca
 

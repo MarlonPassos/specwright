@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { loadConfig, type WorkspaceConfig } from './config.js';
-import { detectHarness } from './harness/current.js';
+import { resolveHarness, type HarnessSource } from './harness/current.js';
+import { harnessIds } from './harness/registry.js';
 import type { HarnessAdapter } from './harness/types.js';
 import { listSpecEntries } from './list.js';
 import {
@@ -38,6 +39,10 @@ export interface DashboardData {
   schema: string;
   /** The harness the commands in this dashboard are spelled for. */
   harness: string;
+  /** Como esse harness foi decidido: pedido, observado, configurado ou padrão. */
+  harnessSource: HarnessSource;
+  /** Todo harness suportado, para o leitor poder pedir outro. */
+  harnesses: string[];
   changes: DashboardChange[];
   specs: { capability: string; requirements: number }[];
   archive: { count: number; last?: string };
@@ -121,7 +126,10 @@ export async function buildDashboard(
   options: DashboardOptions = {}
 ): Promise<DashboardData> {
   const config = await loadConfig(workspace).catch(() => ({ schema: 'spec-driven' }) as WorkspaceConfig);
-  const harness = detectHarness({ ...(options.env ? { env: options.env } : {}), configured: config.harnesses });
+  const { adapter: harness, source: harnessSource } = resolveHarness({
+    ...(options.env ? { env: options.env } : {}),
+    configured: config.harnesses,
+  });
   const ids = await listChanges(workspace);
   const changes: DashboardChange[] = [];
   for (const id of ids) changes.push(await readChange(workspace, id, harness));
@@ -147,6 +155,8 @@ export async function buildDashboard(
     workspace: workspace.root,
     schema: config.schema ?? 'spec-driven',
     harness: harness.id,
+    harnessSource,
+    harnesses: harnessIds(),
     changes,
     specs,
     archive: { count: archived.length, ...(dates.length > 0 ? { last: dates[dates.length - 1] } : {}) },

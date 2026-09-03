@@ -546,3 +546,142 @@ describe('specs serve — a página se explica', () => {
     expect(INDEX_HTML).toContain('specs new change');
   });
 });
+
+describe('specs serve — o harness dos comandos', () => {
+  /** Um ambiente sem marcador nenhum: é assim que o painel sobe de verdade. */
+  const BARE = { ...process.env, CLAUDECODE: '', CLAUDE_CODE_ENTRYPOINT: '', SPECS_HARNESS: '' };
+
+  it('diz de onde veio o harness, em vez de apresentá-lo como observado', async () => {
+    const workspace = await makeWorkspace({ harnesses: 'codex' });
+    const server = await serve(workspace);
+    const body = (await (await get(server, '/api/overview')).json()) as any;
+
+    expect(body.harnesses).toEqual(['claude', 'codex', 'opencode', 'kiro']);
+    expect(['chosen', 'env', 'config', 'default']).toContain(body.harnessSource);
+  });
+
+  it('sem marcador de ambiente, a procedência é a configuração — não uma detecção', async () => {
+    const { buildOverview } = await import('../../src/core/overview.js');
+    const workspace = await makeWorkspace({ harnesses: 'codex' });
+    const data = await buildOverview(workspace, { env: BARE });
+
+    // O `specs serve` sobe no terminal, fora do harness: aqui não há o que detectar.
+    expect(data.harness).toBe('codex');
+    expect(data.harnessSource).toBe('config');
+  });
+
+  it('o leitor pede um harness e todo comando volta na sintaxe dele', async () => {
+    const workspace = await makeWorkspace();
+    await writeFile(path.join(workspace.changesPath, 'alguma', 'proposal.md'), '# x\n');
+    const server = await serve(workspace);
+
+    const body = (await (await get(server, '/api/changes?harness=codex')).json()) as any;
+    expect(body.harness).toBe('codex');
+    expect(body.harnessSource).toBe('chosen');
+    expect(body.changes[0].next.startsWith('$spec-')).toBe(true);
+  });
+
+  it('um harness que não existe é recusado, não ignorado', async () => {
+    const server = await serve(await makeWorkspace());
+    for (const route of ['/api/overview', '/api/changes', '/api/events']) {
+      const response = await get(server, route + '?harness=nao-existe');
+      expect(response.status, route).toBe(400);
+      expect((await response.json()).error.code, route).toBe('unknown_harness');
+    }
+  });
+
+  it('o stream entrega a cada leitor o harness que ele pediu', async () => {
+    const server = await serve(await makeWorkspace());
+    const response = await fetch(server.url + '/api/events?harness=codex');
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+
+    let buffer = '';
+    for (let read = 0; read < 12 && !buffer.includes('event: overview'); read += 1) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+    }
+    await reader.cancel().catch(() => undefined);
+
+    const frame = buffer.slice(buffer.indexOf('data: ') + 6, buffer.indexOf('\n\n', buffer.indexOf('data: ')));
+    expect(JSON.parse(frame).harness).toBe('codex');
+  });
+
+  it('a página traz o seletor e a procedência, e nenhuma reescrita de comando no cliente', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    expect(INDEX_HTML).toContain('id="harness"');
+    expect(INDEX_HTML).toContain('function drawHarness(d)');
+    expect(INDEX_HTML).toContain('HSOURCE');
+    // A escolha vai na query: o servidor remonta as projeções, o cliente não
+    // reescreve comando nenhum — reescrever seria inventar sintaxe na página.
+    expect(INDEX_HTML).toContain("'harness='+encodeURIComponent(HARNESS)");
+    expect(INDEX_HTML).toContain("localStorage.setItem('sw-harness'");
+  });
+});
+
+describe('specs serve — o grafo de dependências', () => {
+  it('abre por cima do plano, sem virar outra tela', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    expect(INDEX_HTML).toContain('id="gmodal"');
+    expect(INDEX_HTML).toContain('id="gopen"');
+    // Esc fecha o grafo antes de qualquer outro atalho, como no painel lateral.
+    expect(INDEX_HTML).toMatch(/Escape'&&E\('gmodal'\)/);
+    // Enquanto ele está aberto, 1..4 não trocam de aba por baixo dele.
+    expect(INDEX_HTML).toContain("E('gmodal').classList.contains('on')||E('drawer')");
+  });
+
+  it('desenha a partir do plano que a tela já carregou, sem rota nova', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    expect(INDEX_HTML).toContain('function graphSvg(changes)');
+    expect(INDEX_HTML).toContain('cache.plano');
+    // Nenhum fetch dedicado: o payload de /api/plan já traz o DAG inteiro.
+    expect(INDEX_HTML).not.toContain("fetch('/api/graph");
+  });
+
+  it('a camada é o caminho mais longo, para a coluna ser a ordem de execução', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    expect(INDEX_HTML).toContain('function graphLayers(changes)');
+    expect(INDEX_HTML).toContain('1+Math.max.apply(null,deps.map(deep))');
+    expect(INDEX_HTML).toContain('ONDA');
+  });
+
+  it('a aresta que ainda barra o destino é desenhada diferente', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    expect(INDEX_HTML).toContain("(n.c.blockedBy||[]).indexOf(dep)>=0");
+    expect(INDEX_HTML).toMatch(/\.gedge\.block\{[^}]*stroke-dasharray/);
+  });
+
+  it('a change em execução se destaca das demais', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    expect(INDEX_HTML).toContain("c.execution==='in_progress'||c.execution==='verifying'");
+    expect(INDEX_HTML).toMatch(/\.gn\.run rect\{/);
+  });
+
+  it('a projeção do plano publica tudo que o grafo desenha', async () => {
+    const workspace = await makeWorkspace();
+    const cli = (args: string[]) => runCli(args, workspace.projectRoot);
+    expect((await cli(['project', 'create', 'demo', '--json'])).code).toBe(0);
+    await writeFile(
+      path.join(workspace.projectRoot, 'g.json'),
+      JSON.stringify({
+        bundleVersion: 1,
+        expectRevision: 0,
+        operations: [
+          { op: 'addChange', ref: '$a', slug: 'base', title: 'Base' },
+          { op: 'addChange', ref: '$b', slug: 'topo', title: 'Topo', dependsOn: ['$a'] },
+        ],
+      })
+    );
+    expect((await cli(['project', 'apply', '--file', 'g.json', '--json'])).code).toBe(0);
+
+    const server = await serve(workspace);
+    const body = (await (await get(server, '/api/plan')).json()) as any;
+    for (const key of ['id', 'title', 'presentation', 'execution', 'milestone', 'dependsOn', 'blockedBy', 'unlocks']) {
+      expect(body.changes[0], key).toHaveProperty(key);
+    }
+    // A aresta e a sua volta: o grafo acende a linhagem nos dois sentidos.
+    expect(body.changes[1].dependsOn).toEqual(['CH-001']);
+    expect(body.changes[0].unlocks).toEqual(['CH-002']);
+  });
+});

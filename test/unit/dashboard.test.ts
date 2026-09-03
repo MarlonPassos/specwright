@@ -70,7 +70,10 @@ describe('dashboard data', () => {
     const data = await buildDashboard(workspace, CLAUDE_ENV);
     // The shape `specs status --json` publishes when no change is named.
     expect(Object.keys(data).sort()).toEqual(
-      ['archive', 'changes', 'harness', 'projectName', 'schema', 'specs', 'totals', 'workspace'].sort()
+      [
+        'archive', 'changes', 'harness', 'harnessSource', 'harnesses',
+        'projectName', 'schema', 'specs', 'totals', 'workspace',
+      ].sort()
     );
     expect(() => JSON.parse(JSON.stringify(data))).not.toThrow();
   });
