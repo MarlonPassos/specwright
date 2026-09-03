@@ -23,12 +23,12 @@ export const INDEX_HTML = String.raw`<!doctype html>
 :root{
   --bg:#0e1a1f; --panel:#132329; --sunken:#0a1418; --line:#1e3640;
   --ink:#dbeef2; --dim:#7fa3ad;
-  --cyan:#38d6e8; --green:#4ade80; --yellow:#fbbf24; --red:#f87171; --violet:#c4b5fd;
+  --cyan:#38d6e8; --green:#4ade80; --yellow:#fbbf24; --red:#f87171;
 }
 :root[data-theme=light]{
   --bg:#f4f7f8; --panel:#ffffff; --sunken:#e6edef; --line:#d3dfe3;
   --ink:#12262d; --dim:#5c7a84;
-  --cyan:#0d8fa3; --green:#15803d; --yellow:#a16207; --red:#b91c1c; --violet:#6d5bb8;
+  --cyan:#0d8fa3; --green:#15803d; --yellow:#a16207; --red:#b91c1c;
 }
 *{box-sizing:border-box;min-width:0}
 html,body{max-width:100%;overflow-x:hidden}
@@ -75,7 +75,6 @@ h2{margin:0 0 12px;font-size:11px;letter-spacing:.19em;color:var(--dim);font-wei
 .t-red{color:var(--red);border-color:var(--red)}
 .t-dim{opacity:.6}
 .grow{flex:1 1 220px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cmd{color:var(--cyan);font-size:12px}
 .cp,.dchip{display:inline-flex;align-items:center;gap:7px;max-width:100%;
   overflow-wrap:anywhere;text-align:left;background:var(--sunken);
   border:1px solid var(--line);border-radius:6px;color:var(--cyan);cursor:pointer;
@@ -133,8 +132,6 @@ section.toolbar{padding:11px 18px}
   color:var(--ink);font:inherit;font-size:12px;transition:width .18s}
 .srch input:focus{width:248px}
 .srch input::placeholder{color:var(--dim)}
-.find input::placeholder{color:var(--dim)}
-.find input:focus{outline:none;border-color:var(--cyan)}
 .chip{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:11px;padding:3px 9px;
   border-radius:99px;border:1px solid var(--cyan);color:var(--cyan);background:none;cursor:pointer}
 .chip:hover{background:var(--sunken)}
