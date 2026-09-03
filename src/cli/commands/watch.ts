@@ -1,12 +1,13 @@
 import type { Command } from 'commander';
 import { SpecError } from '../../util/errors.js';
 import { buildOverview } from '../../core/overview.js';
+import { overviewEnvelope } from '../../core/contract.js';
 import { requireWorkspace } from '../../core/workspace.js';
 import { OVERVIEW_TAB, buildTabs, runPanel } from '../panel.js';
 import type { ViewOptions } from '../theme.js';
 import { fail, printJson } from '../output.js';
 
-export const OVERVIEW_SCHEMA_VERSION = 1;
+export { OVERVIEW_SCHEMA_VERSION } from '../../core/contract.js';
 
 function intervalMs(raw: string | undefined): number {
   const seconds = Number(raw ?? '2');
@@ -51,11 +52,7 @@ export function registerWatchCommands(program: Command): void {
 
         if (options.json) {
           const data = await buildOverview(workspace, { planId });
-          printJson({
-            ...data,
-            overviewSchemaVersion: OVERVIEW_SCHEMA_VERSION,
-            generatedAt: new Date().toISOString(),
-          });
+          printJson(overviewEnvelope(data));
           return;
         }
 
