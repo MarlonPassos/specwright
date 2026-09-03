@@ -5,6 +5,61 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.20.0] - 2026-09-03
+
+### Adicionado
+
+- **feat(server): a tela DOCUMENTOS, com todo artefato do projeto** — `proposal.md`,
+  `design.md`, `tasks.md`, cada delta de spec, cada capacidade viva, `project.md`,
+  `plan.md`, `architecture.md` e os Planned Changes, agrupados como o projeto é
+  organizado e com uma linha dizendo para que cada um serve. Novas rotas
+  `GET /api/docs` (o catálogo) e `GET /api/doc?id=<id>`.
+
+  O `id` é uma **chave de catálogo, não um caminho**: `readDocument` reconstrói o
+  catálogo e procura o id nele, então o leitor só alcança arquivo que o próprio
+  catálogo publicou — nada que venha da query é concatenado a diretório (I-8).
+  Metadado de máquina (`config.yaml`, `.change.yaml`, `plan.yaml`) fica de fora:
+  é estado, não leitura.
+
+- **feat(server): `tasks.md` lido como checklist, não como prosa** — progresso,
+  os grupos que o arquivo declara e recuo por numeração (`1.2` é subtarefa de
+  `1`), com o Markdown logo abaixo. `GET /api/doc` devolve o parse ao lado do
+  texto.
+
+- **feat(server): milestones navegáveis** — clicar num milestone recorta a lista
+  de incrementos do PLANO para os seus, com um chip dizendo qual recorte está
+  ativo; os milestones do RESUMO levam ao mesmo recorte. `buildOverview` passou a
+  carimbar `derivedStatus` em cada milestone, para os dois painéis não derivarem
+  o mesmo estado de formas diferentes.
+
+- **feat(server): busca em CHANGES, PLANO e DOCUMENTOS** — um campo na barra de
+  título da seção, que cresce ao receber foco e filtra enquanto se digita sem
+  perder o cursor. Fora de um `<summary>` de propósito: um input ali dentro
+  abriria e fecharia o acordeão a cada clique.
+
+- **feat(server): as tarefas abertas na própria linha da change** — a tela
+  CHANGES mostra o que falta fazer sem abrir nada, com o checklist inteiro a um
+  clique. `computeStatus` passou a carregar as primeiras tarefas não marcadas
+  (`tasks.open`, no máximo cinco) em vez de jogar fora os itens que já parseou
+  para contar o progresso — mostrá-los não custa uma segunda leitura do arquivo.
+
+### Alterado
+
+- **feat(server): a ordem das abas segue o trabalho** — RESUMO → PLANO → CHANGES
+  → DOCUMENTOS: onde estamos, o que o plano manda fazer, a change que faz, e os
+  documentos que sustentam tudo. As teclas `1`..`4` acompanham.
+- **feat(server): cada card principal se explica** — um glifo `ⓘ` no título abre
+  uma frase dizendo o que aquilo é. Um painel que só mostra números supõe que
+  quem lê já conhece o vocabulário — change, incremento, delta, milestone; a
+  frase resolve quem não conhece sem atrapalhar quem conhece. `CHANGES` fica em
+  inglês de propósito, e a explicação diz por quê: é o mesmo termo de
+  `spec/changes/` e de `specs new change`.
+- **feat(server): os pontos de artefato da tela CHANGES abrem o documento** —
+  `proposal`, `design` e `tasks` viram porta de entrada quando existem; um
+  incremento com change vinculada mostra os artefatos dela ao lado do vínculo.
+- **feat(server): a aba escolhida acompanha voltar e avançar do navegador** — a
+  aba já vivia no hash, mas só era lida no carregamento.
+
 ## [0.19.0] - 2026-09-02
 
 ### Adicionado

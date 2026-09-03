@@ -7,9 +7,10 @@
  * missing at runtime is one less failure mode. No framework, no bundler, no
  * network fetch — NFR-11 holds.
  *
- * Three tabs, the same the terminal panel has, reachable by click, by `1`/`2`/`3`
- * and by Tab — the habit carries over. The tab lives in the hash, so a reload
- * keeps the reader where they were. Dark is the default and mirrors the terminal
+ * Four tabs: the three the terminal panel has, plus the document catalogue that
+ * only a page can offer. Reachable by click, by `1`..`4` and by Tab — the habit
+ * carries over. The tab lives in the hash, so a reload keeps the reader where
+ * they were. Dark is the default and mirrors the terminal
  * theme; the light palette is a token swap on `[data-theme=light]`.
  */
 export const INDEX_HTML = String.raw`<!doctype html>
@@ -70,11 +71,12 @@ h2{margin:0 0 12px;font-size:11px;letter-spacing:.19em;color:var(--dim);font-wei
 .t-dim{opacity:.6}
 .grow{flex:1 1 220px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cmd{color:var(--cyan);font-size:12px}
-.cp{display:inline-flex;align-items:center;gap:7px;max-width:100%;
+.cp,.dchip{display:inline-flex;align-items:center;gap:7px;max-width:100%;
   overflow-wrap:anywhere;text-align:left;background:var(--sunken);
   border:1px solid var(--line);border-radius:6px;color:var(--cyan);cursor:pointer;
   font:inherit;font-size:12px;padding:3px 9px;transition:border-color .15s,color .15s}
-.cp:hover{border-color:var(--cyan)}
+.cp:hover,.dchip:hover{border-color:var(--cyan)}
+.dchip{cursor:pointer}
 .cp svg{width:13px;height:13px;flex:none;opacity:.5;transition:opacity .15s}
 .cp:hover svg{opacity:1}
 .cgroup{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:5px 0 5px 89px}
@@ -95,6 +97,56 @@ h2{margin:0 0 12px;font-size:11px;letter-spacing:.19em;color:var(--dim);font-wei
 .mile{display:flex;gap:12px;align-items:center;padding:6px 0;flex-wrap:wrap}
 .mile .nm{flex:1 1 150px;min-width:0}
 .mile .bar{flex:1;margin:0}
+.mile.pick{cursor:pointer;border-radius:8px;padding:6px 8px;margin:0 -8px}
+.mile.pick:hover{background:var(--sunken)}
+.mile.pick.on{background:var(--sunken);box-shadow:inset 2px 0 0 var(--cyan)}
+/* Explicação do card: um glifo discreto no título, a frase só quando pedida. */
+.hint{position:relative;z-index:6;display:inline-flex;align-items:center;margin-left:8px;
+  color:var(--dim);cursor:help;opacity:.6;transition:opacity .15s,color .15s}
+.hint:hover,.hint:focus{z-index:7}
+.hint:hover,.hint:focus{opacity:1;color:var(--cyan);outline:none}
+.hint svg{width:12px;height:12px}
+.hint::after{content:attr(data-hint);position:absolute;left:0;top:calc(100% + 9px);
+  width:max-content;max-width:min(340px,72vw);
+  background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  padding:9px 12px;color:var(--ink);font:inherit;font-size:12px;font-weight:400;
+  line-height:1.5;letter-spacing:0;text-transform:none;white-space:normal;
+  box-shadow:0 10px 26px rgba(0,0,0,.34);
+  opacity:0;pointer-events:none;transition:opacity .15s}
+.hint:hover::after,.hint:focus::after{opacity:1}
+@media(max-width:640px){.hint::after{left:auto;right:0}}
+section.toolbar{padding:11px 18px}
+.hrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.hrow h2{margin:0}
+.hrow .count{margin-left:auto;color:var(--dim);font-size:11px;letter-spacing:.1em}
+.srch{display:inline-flex;align-items:center;gap:8px;padding:4px 11px;border-radius:99px;
+  border:1px solid var(--line);background:var(--sunken);transition:border-color .15s}
+.srch:focus-within{border-color:var(--cyan)}
+.srch svg{width:13px;height:13px;flex:none;color:var(--dim);opacity:.8}
+.srch:focus-within svg{color:var(--cyan);opacity:1}
+.srch input{width:172px;max-width:46vw;background:none;border:0;outline:none;padding:0;
+  color:var(--ink);font:inherit;font-size:12px;transition:width .18s}
+.srch input:focus{width:248px}
+.srch input::placeholder{color:var(--dim)}
+.find input::placeholder{color:var(--dim)}
+.find input:focus{outline:none;border-color:var(--cyan)}
+.chip{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:11px;padding:3px 9px;
+  border-radius:99px;border:1px solid var(--cyan);color:var(--cyan);background:none;cursor:pointer}
+.chip:hover{background:var(--sunken)}
+.dp{cursor:pointer}
+.dtitle{flex:1 1 190px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dpath{color:var(--dim);font-size:11px;overflow-wrap:anywhere}
+.tk{display:flex;gap:10px;align-items:baseline;padding:4px 0}
+.tk .bx{flex:none;color:var(--dim)}
+.tk.ok .bx{color:var(--green)}
+.tk.ok .txt{color:var(--dim)}
+.tk .no{flex:none;min-width:32px;color:var(--dim);font-size:12px}
+.tk .txt{flex:1 1 200px;overflow-wrap:anywhere}
+.tks{padding:3px 0 6px 89px}
+.tks .tk{padding:2px 0;font-size:12px}
+.tks .tk .bx{font-size:11px}
+.tks .more{margin-top:5px}
+@media(max-width:640px){.tks{padding-left:0}}
 details.card{background:var(--panel);border:1px solid var(--line);border-radius:10px}
 details.card>summary{list-style:none;cursor:pointer;padding:15px 18px;
   font-size:11px;letter-spacing:.19em;color:var(--dim);font-weight:700;
@@ -181,9 +233,70 @@ var CARET='<svg class="caret" viewBox="0 0 24 24" width="12" height="12" fill="n
  * ajuda ninguém. Os demais viram acordeão, abertos por padrão: numa tela com
  * vinte incrementos, poder fechar uma seção é a diferença entre ler e rolar.
  */
-function sec(t,b,n){return '<section><h2>'+esc(t)+'</h2>'+b+'</section>'}
+var ICO_INFO='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
+  +' stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11.2v4.6"/>'
+  +'<path d="M12 8.1v.1"/></svg>';
+
+/**
+ * O que cada bloco é, em uma frase.
+ *
+ * Um painel que só mostra números supõe que quem lê já conhece o vocabulário —
+ * change, incremento, delta, milestone. A frase mora no título do card, atrás
+ * de um glifo, então não atrapalha quem já sabe e resolve quem não sabe.
+ */
+var HINTS={
+  'RESUMO':'Onde o projeto está agora: changes em aberto, o que já pode ser arquivado e quanto do plano foi entregue.',
+  'EM ANDAMENTO':'O trabalho em voo: a change aberta e o incremento do plano que ela realiza, na mesma linha.',
+  'MILESTONES':'Marcos do plano. Cada um agrupa incrementos; clique num para ver só os dele.',
+  'PRÓXIMO PASSO':'O incremento que o plano recomenda começar agora, com o comando já montado.',
+  'DIAGNÓSTICOS':'O que a validação encontrou. Erro impede de seguir; aviso só alerta.',
+
+  'PLANO':'O plano do projeto: incrementos, dependências e milestones, revisados por uma pessoa antes de virarem trabalho.',
+  'INCREMENTOS':'Cada incremento planejado e o estado dele. Um incremento ainda não é uma change: ele vira uma quando o trabalho começa.',
+  'EM IMPLEMENTAÇÃO':'O incremento já virou change e o trabalho está correndo.',
+  'PRONTAS PARA COMEÇAR':'Dependências satisfeitas e briefing atual: dá para abrir a change agora.',
+  'BLOQUEADAS':'Espera outro incremento terminar, ou um impedimento anotado à mão.',
+  'CONCLUÍDAS':'Incremento cuja change já foi arquivada.',
+  'FORA DO FLUXO':'Ideia, pausado ou cancelado: não entra na conta do que falta.',
+
+  'CHANGES':'Uma change é uma alteração em andamento, com seus artefatos: proposta, specs, design e tarefas. O nome fica em inglês porque é o mesmo em spec/changes/ e nos comandos (specs new change).',
+  'EM PLANEJAMENTO':'A change ainda está escrevendo artefatos; falta algo antes de implementar.',
+  'IMPLEMENTANDO':'Artefatos prontos. O que resta é o checklist de tarefas.',
+  'PRONTAS PARA ARQUIVAR':'Toda tarefa marcada. O arquivamento aplica os deltas nas specs e fecha a change.',
+  'COM PROBLEMA':'Não foi possível ler esta change; a mensagem diz o quê.',
+  'CAPACIDADES':'O comportamento que o sistema já tem, acumulado das changes arquivadas. É a verdade viva do projeto.',
+  'ARQUIVO':'Changes concluídas. Os artefatos delas continuam legíveis na tela DOCUMENTOS.',
+
+  'DOCUMENTOS':'Tudo que se lê no projeto, agrupado como ele é organizado. Clique numa linha para abrir.',
+  'Projeto':'O documento que diz o que é o projeto, para quem ele é e sob que restrições.',
+  'Capacidades':'Specs vivas: o comportamento atual do sistema, acumulado.',
+  'Plano':'Os documentos do plano: a visão geral e a arquitetura que ele assume.',
+  'Incrementos planejados':'O briefing de cada incremento, escrito antes de ele virar change.'
+};
+
+/** Grupos cujo título carrega um nome variável, casados pelo prefixo. */
+var HINT_PREFIX=[
+  ['Change · ','Os artefatos desta change: proposta, design, tarefas e os deltas de spec que ela escreve.'],
+  ['Arquivada · ','Os artefatos de uma change já concluída, como ficaram no arquivamento.']
+];
+
+function hintFor(title){
+  if(HINTS[title])return HINTS[title];
+  for(var i=0;i<HINT_PREFIX.length;i++)
+    if(title.indexOf(HINT_PREFIX[i][0])===0)return HINT_PREFIX[i][1];
+  return '';
+}
+
+function hint(title){
+  var text=hintFor(String(title));
+  if(!text)return '';
+  return '<span class="hint" tabindex="0" role="note" data-hint="'+esc(text)+'"'
+    +' aria-label="'+esc(text)+'">'+ICO_INFO+'</span>';
+}
+
+function sec(t,b,n){return '<section><h2>'+esc(t)+hint(t)+'</h2>'+b+'</section>'}
 function card(t,b,n){
-  return '<details class="card" open><summary>'+CARET+esc(t)
+  return '<details class="card" open><summary>'+CARET+esc(t)+hint(t)
     +(n!=null?'<span class="count">'+esc(n)+'</span>':'')
     +'</summary><div class="body">'+b+'</div></details>';
 }
@@ -219,10 +332,42 @@ var STAGES=[['EM IMPLEMENTAÇÃO',['em implementação','proposta']],
             ['COM PROBLEMA',['inconsistente']],['CONCLUÍDAS',['concluída']],
             ['FORA DO FLUXO',['ideia','pausada','cancelada']]];
 
+/*
+ * A ordem é a do trabalho, não a da implementação: onde estamos, o que o plano
+ * manda fazer, a change que faz, e os documentos que sustentam tudo.
+ */
 var TABS=[{id:'resumo',label:'RESUMO',route:'/api/overview'},
+          {id:'plano',label:'PLANO',route:'/api/plan'},
           {id:'changes',label:'CHANGES',route:'/api/changes'},
-          {id:'plano',label:'PLANO',route:'/api/plan'}];
+          {id:'docs',label:'DOCUMENTOS',route:'/api/docs'}];
 var cache={}, active='resumo', latest=null;
+/* Filtro por tela e milestone selecionado: o recorte é do leitor, não do dado. */
+var Q={changes:'',plano:'',docs:''}, MS=null;
+var KIND={project:'projeto',capability:'capacidade',proposal:'proposta',design:'design',
+          tasks:'tarefas',delta:'delta',brief:'brief',plan:'plano',architecture:'arquitetura'};
+var MSTAT={completed:['t-green','concluído'],in_progress:['t-cyan','em andamento'],
+           not_started:['t-dim','não iniciado']};
+
+/**
+ * Busca no próprio título da seção: uma barra fina onde o nome da tela, o que
+ * o filtro deixou e o campo dividem a mesma linha. O campo cresce ao receber
+ * foco, então ocupa pouco enquanto ninguém o usa. Fora de um <summary> de
+ * propósito: um input ali dentro abriria e fecharia o acordeão a cada clique.
+ */
+var ICO_FIND='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"'
+  +' stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.4-3.4"/></svg>';
+
+function findBar(title,scope,ph,count,extra){
+  return '<section class="toolbar"><div class="hrow"><h2>'+esc(title)+hint(title)+'</h2>'+(extra||'')
+    +(count?'<span class="count">'+esc(count)+'</span>':'')
+    +'<label class="srch">'+ICO_FIND+'<input type="text" data-find="'+esc(scope)+'"'
+    +' value="'+esc(Q[scope])+'" placeholder="'+esc(ph)+'" aria-label="'+esc(ph)+'">'
+    +'</label></div></section>';
+}
+function matches(scope,text){
+  var q=Q[scope].trim().toLowerCase();
+  return !q || String(text).toLowerCase().indexOf(q)>=0;
+}
 /* A tela PLANO não carrega o harness; o RESUMO carrega, então herdamos dele. */
 var HARNESS_VERB={explore:'/spec-explore',propose:'/spec-propose'};
 
@@ -253,10 +398,7 @@ function screenResumo(d){
   }).join('') : empty('Nada em andamento.'), f.length||null);
 
   if(d.milestones&&d.milestones.length)
-    out+=card('MILESTONES', d.milestones.map(function(x){
-      return '<div class="mile"><span class="nm">'+esc(x.id)+' '+esc(x.name)+'</span>'
-        +bar(x.archived,x.total)+'<span class="muted sm">'+x.archived+'/'+x.total+'</span></div>';
-    }).join(''), d.milestones.length);
+    out+=card('MILESTONES', d.milestones.map(mileRow).join(''), d.milestones.length);
 
   var n=d.recommended;
   if(n)out+=card('PRÓXIMO PASSO','<div class="row"><span class="id openable" data-brief="'+esc(n.id)+'" title="Ver o resumo">'+esc(n.id)+'</span>'
@@ -270,15 +412,27 @@ function screenResumo(d){
   return out;
 }
 
+/**
+ * Um ponto de artefato que já existe vira porta de entrada para ele: proposal,
+ * design e tasks abrem o documento no mesmo drawer do brief. O artefato "specs"
+ * fica de fora porque é um padrão: vira N deltas, cada um nomeado em DOCUMENTOS.
+ */
+var DOTDOC={proposal:'proposal',design:'design',tasks:'tasks'};
+
 function screenChanges(d){
-  var out='',first=true;
+  var all=d.changes||[];
+  var out=findBar('CHANGES','changes','filtrar changes',
+    all.filter(function(c){return matches('changes',c.id)}).length+' de '+all.length+' ativas');
   PHASES.forEach(function(p){
-    var m=(d.changes||[]).filter(function(c){return c.phase===p[0]});
+    var m=all.filter(function(c){return c.phase===p[0] && matches('changes',c.id)});
     if(!m.length)return;
-    var box=first?sec:card; first=false;
-    out+=box(p[1], m.map(function(c){
+    out+=card(p[1], m.map(function(c){
       var dots=(c.artifacts||[]).map(function(a){
-        return '<span class="d-'+a.state+'" title="'+esc(a.id)+': '+esc(a.state)+'">'+(DOT[a.state]||'·')+'</span>';
+        var kind=DOTDOC[a.id], open=kind&&a.state==='done';
+        return '<span class="d-'+a.state+(open?' dp openable':'')+'"'
+          +(open?' data-doc="change:'+esc(c.id)+':'+kind+'"':'')
+          +' title="'+esc(a.id)+': '+esc(a.state)+(open?' — clique para ler':'')+'">'
+          +(DOT[a.state]||'·')+'</span>';
       }).join('');
       var r='<div class="row"><span class="id">'+esc(c.id)+'</span>'
         +'<span class="dots">'+dots+'</span><span class="grow">';
@@ -288,17 +442,36 @@ function screenChanges(d){
       r+='</div>';
       if(c.error)r+='<div class="sub2" style="color:var(--red)">↳ '+esc(c.error)+'</div>';
       else if(c.blockedBy&&c.blockedBy.length)r+='<div class="sub2">↳ falta '+esc(c.blockedBy.join(', '))+'</div>';
+      r+=openTasks(c);
       if(c.next)r+=group('no harness',[c.next]);
       return r;
     }).join(''), m.length);
   });
-  if(first)out=sec('CHANGES',empty('Nenhuma change ativa.'));
+  if(!all.length)out+=card('ATIVAS',empty('Nenhuma change ativa.'));
   if(d.specs&&d.specs.length)
-    out+=card('CAPACIDADES', d.specs.map(function(s){
-      return '<div class="row"><span class="grow">'+esc(s.capability)+'</span><span class="tag">'+s.requirements+' req.</span></div>';
+    out+=card('CAPACIDADES', d.specs.map(function(x){
+      return '<div class="row">'
+        +'<span class="dtitle openable" data-doc="capability:'+esc(x.capability)+'" title="Ler a spec">'
+        +esc(x.capability)+'</span>'
+        +'<span class="grow muted sm">comportamento atual</span>'
+        +'<span class="tag">'+x.requirements+' req.</span></div>';
     }).join(''), d.specs.length);
-  if(d.archive)out+=card('ARQUIVO','<div class="grid">'+kpi(d.archive.count,'changes arquivadas')+kpi(d.archive.last||'—','última data')+'</div>');
+  if(d.archive)out+=card('ARQUIVO','<div class="grid">'
+    +kpi(d.archive.count,'changes arquivadas')+kpi(d.archive.last||'—','última data')+'</div>'
+    +'<div style="margin:12px 0 0">'
+    +'<button type="button" class="chip" data-goto="docs">ver os documentos das arquivadas →</button></div>');
   return out;
+}
+
+/** Milestone como linha navegável: clicar recorta o PLANO para os seus incrementos. */
+function mileRow(m){
+  var st=MSTAT[m.derivedStatus]||['t-dim',''];
+  return '<div class="mile pick'+(MS===m.id?' on':'')+'" data-ms="'+esc(m.id)+'"'
+    +' title="Ver os incrementos deste milestone" role="button" tabindex="0">'
+    +'<span class="nm"><span class="id" style="display:inline-block">'+esc(m.id)+'</span> '+esc(m.name)+'</span>'
+    +bar(m.archived,m.total)
+    +'<span class="tag '+st[0]+'">'+esc(st[1])+'</span>'
+    +'<span class="muted sm">'+m.archived+'/'+m.total+'</span></div>';
 }
 
 function screenPlano(d){
@@ -309,9 +482,24 @@ function screenPlano(d){
     +'<div class="l muted sm" style="margin-top:10px">incrementos '+(g.archived||0)+'/'+(g.total||0)+' ('+(g.percent||0)+'%)</div>'
     +bar(g.archived||0,g.total||0));
 
+  // O milestone escolhido é um recorte, não outra tela: as mesmas etapas, com
+  // menos incrementos. Assim a relação plano → milestone → incremento fica visível
+  // sem tirar o leitor do lugar.
+  var mile=(d.milestones||[]).filter(function(m){return m.id===MS})[0];
+  if(d.milestones&&d.milestones.length)
+    out+=card('MILESTONES', d.milestones.map(mileRow).join(''), d.milestones.length);
+
+  var visible=(d.changes||[]).filter(function(c){
+    return (!MS || c.milestone===MS) && matches('plano',c.id+' '+c.title+' '+(c.slug||''));
+  });
+  out+=findBar('INCREMENTOS','plano','filtrar incrementos',
+    visible.length+' de '+(d.changes||[]).length+(MS?' neste milestone':''),
+    MS?'<button type="button" class="chip" data-ms-clear="1">'+esc(MS)
+      +(mile?' · '+esc(mile.name):'')+' ✕</button>':'');
+
   var placed={};
   STAGES.forEach(function(s){
-    var m=(d.changes||[]).filter(function(c){return s[1].indexOf(c.presentation)>=0 && !placed[c.id]});
+    var m=visible.filter(function(c){return s[1].indexOf(c.presentation)>=0 && !placed[c.id]});
     if(!m.length)return;
     m.forEach(function(c){placed[c.id]=1});
     out+=card(s[0], m.map(function(c){
@@ -321,10 +509,16 @@ function screenPlano(d){
         +'<span class="tag '+(PRES[c.presentation]||'')+'">'+esc(c.presentation)+'</span>';
       if(c.plannedChange)r+='<span class="tag">brief '+esc(c.plannedChange.state)+'</span>';
       if(c.link&&c.link.tasks)r+='<span class="tag">'+c.link.tasks.completed+'/'+c.link.tasks.total+'</span>';
+      if(c.milestone&&!MS)r+='<span class="tag dp" data-ms="'+esc(c.milestone)+'" title="Filtrar por este milestone">'+esc(c.milestone)+'</span>';
       r+='</div>';
       if(c.blockedBy&&c.blockedBy.length)r+='<div class="sub2">↳ falta '+esc(c.blockedBy.join(', '))+'</div>';
       (c.manualBlockers||[]).forEach(function(b){r+='<div class="sub2" style="color:var(--yellow)">↳ blocker: '+esc(b)+'</div>'});
-      if(c.link)r+='<div class="sub2">↳ vínculo: '+esc(c.link.name)+'</div>';
+      // Quando o incremento virou change, os artefatos dela são o próximo passo
+      // da leitura: proposta → design → tarefas, do lado direito do vínculo.
+      if(c.link){
+        r+='<div class="sub2">↳ vínculo: '+esc(c.link.name)+'</div>';
+        r+=docChips(c.link);
+      }
       if(c.unlocks&&c.unlocks.length&&c.execution!=='archived')r+='<div class="sub2">↳ desbloqueia '+esc(c.unlocks.join(', '))+'</div>';
       // O caminho para começar este incremento, dos dois lados.
       if(c.presentation==='pronta'&&!c.link){
@@ -348,7 +542,93 @@ function screenPlano(d){
   return out;
 }
 
-var RENDER={resumo:screenResumo,changes:screenChanges,plano:screenPlano};
+/**
+ * O catálogo: o que existe, para que serve e onde mora.
+ *
+ * Agrupado como o projeto é organizado — projeto, capacidades, cada change, o
+ * plano, os incrementos — porque a pergunta de quem chega não é "que arquivos
+ * existem" e sim "o que eu leio para entender isto".
+ */
+function screenDocs(d){
+  var all=d.documents||[];
+  var hit=all.filter(function(x){
+    return matches('docs',x.title+' '+x.group+' '+x.path+' '+x.purpose+' '+(KIND[x.kind]||x.kind));
+  });
+  var out=findBar('DOCUMENTOS','docs','filtrar documentos',
+    hit.length+' de '+all.length+' documentos');
+  if(!all.length)return out+card('CATÁLOGO',empty('Nenhum documento no projeto ainda.'));
+  if(!hit.length)return out+card('CATÁLOGO',empty('Nenhum documento bate com o filtro.'));
+
+  var order=[],by={};
+  hit.forEach(function(x){ if(!by[x.group]){by[x.group]=[];order.push(x.group)} by[x.group].push(x) });
+  order.forEach(function(g){
+    out+=card(g, by[g].map(docRow).join(''), by[g].length);
+  });
+  return out;
+}
+
+function docRow(x){
+  return '<div class="row"><span class="tag'+(x.archived?' t-dim':'')+'">'
+    +esc(KIND[x.kind]||x.kind)+'</span>'
+    +'<span class="dtitle openable" data-doc="'+esc(x.id)+'" title="Abrir">'+esc(x.title)+'</span>'
+    +'<span class="grow muted sm">'+esc(x.purpose)+'</span>'
+    +'<span class="dpath">'+esc(x.path)+'</span></div>';
+}
+
+/**
+ * O que falta fazer nesta change, na própria linha dela.
+ *
+ * Só as abertas, porque é isso que responde "o que está em andamento": o que já
+ * foi feito o contador ao lado da barra já diz. A lista é curta de propósito —
+ * o resto se lê no tasks.md, a um clique de distância — para uma tela com vinte
+ * changes continuar sendo uma tela e não um relatório.
+ */
+function openTasks(c){
+  var t=c.tasks;
+  if(!t||!t.total)return '';
+  var open=t.open||[];
+  if(!open.length)return '';
+  var rest=(t.total-t.completed)-open.length;
+  return '<div class="tks">'
+    +open.map(function(x){
+      var depth=x.number?x.number.split('.').length-1:0;
+      return '<div class="tk"'+(depth?' style="padding-left:'+(depth*16)+'px"':'')+'>'
+        +'<span class="bx">○</span><span class="no">'+esc(x.number)+'</span>'
+        +'<span class="txt">'+esc(x.text)+'</span></div>';
+    }).join('')
+    +'<div class="more"><button type="button" class="dchip" data-doc="change:'+esc(c.id)+':tasks"'
+    +' title="Abrir o checklist inteiro">'
+    +(rest>0?'mais '+rest+' — ver as '+t.total+' tarefas':'ver as '+t.total+' tarefas')
+    +'</button></div></div>';
+}
+
+/**
+ * Os artefatos da change que realiza um incremento, ao lado do vínculo.
+ * Só entram os que existem: o catálogo é a fonte, não um palpite sobre o disco.
+ */
+function docChips(link){
+  var base=link.archivePath ? 'archived:'+String(link.archivePath).split('/').pop()
+                            : 'change:'+link.name;
+  var have=['proposal','design','tasks'].filter(function(k){return DOCSET[base+':'+k]});
+  if(!have.length)return '';
+  return '<div class="cgroup"><span class="clabel">documentos</span>'
+    +have.map(function(k){
+      return '<button type="button" class="dchip" data-doc="'+esc(base+':'+k)+'"'
+        +' title="Abrir o documento">'+esc(KIND[k])+'</button>';
+    }).join('')+'</div>';
+}
+
+var RENDER={resumo:screenResumo,changes:screenChanges,plano:screenPlano,docs:screenDocs};
+
+/** Ids do catálogo já conhecidos, para não oferecer um documento que não existe. */
+var DOCSET={};
+function loadCatalogue(then){
+  fetch('/api/docs').then(function(r){return r.json()}).then(function(d){
+    cache.docs=d; DOCSET={};
+    (d.documents||[]).forEach(function(x){DOCSET[x.id]=1});
+    if(then)then();
+  }).catch(function(){if(then)then()});
+}
 
 /* ---------- markdown ---------- */
 
@@ -408,7 +688,60 @@ function md(src){
   return (meta?'<div class="meta">'+esc(meta)+'</div>':'')+html;
 }
 
-/* ---------- drawer do brief ---------- */
+/* ---------- drawer de leitura ---------- */
+
+/**
+ * tasks.md lido como checklist, não como prosa: progresso, agrupamento pelos
+ * cabeçalhos que o arquivo já usa e recuo por numeração: 1.2 é subtarefa de 1.
+ */
+function tasksView(b){
+  var t=b.tasks||{}, items=t.items||[];
+  if(!items.length)return md(b.markdown);
+
+  var h='<div class="meta">'+t.completed+' de '+t.total+' tarefas concluídas</div>'
+    +bar(t.completed,t.total,'cyan');
+  var order=[],by={};
+  items.forEach(function(x){
+    var g=x.group||'TAREFAS';
+    if(!by[g]){by[g]=[];order.push(g)}
+    by[g].push(x);
+  });
+  order.forEach(function(g){
+    var list=by[g], done=list.filter(function(x){return x.done}).length;
+    h+='<h2>'+esc(g)+'  <span class="muted">'+done+'/'+list.length+'</span></h2>';
+    h+=list.map(function(x){
+      var depth=x.number?x.number.split('.').length-1:0;
+      return '<div class="tk'+(x.done?' ok':'')+'"'
+        +(depth?' style="padding-left:'+(depth*20)+'px"':'')+'>'
+        +'<span class="bx">'+(x.done?'●':'○')+'</span>'
+        +'<span class="no">'+esc(x.number)+'</span>'
+        +'<span class="txt">'+esc(x.text)+'</span></div>';
+    }).join('');
+  });
+  return h+'<hr><div class="muted sm">Marcado no próprio tasks.md, pelo harness.</div>';
+}
+
+/** Documento do catálogo no mesmo drawer do brief: uma forma de ler, não duas. */
+var DW=null;
+function openDoc(id){
+  var d=E('drawer');
+  DW=id;
+  E('dw-id').textContent=''; E('dw-title').textContent='';
+  E('dw-body').innerHTML='<p class="muted">carregando...</p>';
+  d.classList.add('on'); E('scrim').classList.add('on'); d.setAttribute('aria-hidden','false');
+  E('dw-close').focus();
+  fetch('/api/doc?id='+encodeURIComponent(id)).then(function(r){return r.json()}).then(function(b){
+    if(DW!==id)return;
+    if(!b.found){
+      E('dw-body').innerHTML='<p class="muted">Este documento ainda não existe no projeto.</p>';
+      return;
+    }
+    E('dw-id').textContent=KIND[b.kind]||b.kind;
+    E('dw-title').textContent=b.title;
+    E('dw-body').innerHTML=(b.tasks?tasksView(b):md(b.markdown))
+      +'<div class="meta" style="margin-top:20px;border:0">'+esc(b.path)+'</div>';
+  }).catch(function(){if(DW===id)E('dw-body').innerHTML='<p class="muted">Falha ao carregar.</p>'});
+}
 
 function closeDrawer(){
   E('drawer').classList.remove('on'); E('scrim').classList.remove('on');
@@ -416,6 +749,7 @@ function closeDrawer(){
 }
 function openBrief(id){
   var d=E('drawer');
+  DW=null;
   E('dw-id').textContent=id; E('dw-title').textContent='';
   E('dw-body').innerHTML='<p class="muted">carregando...</p>';
   d.classList.add('on'); E('scrim').classList.add('on'); d.setAttribute('aria-hidden','false');
@@ -440,6 +774,14 @@ addEventListener('click',function(e){
   var t=e.target.closest('[data-brief]'); if(!t)return;
   e.preventDefault(); openBrief(t.dataset.brief);
 });
+addEventListener('click',function(e){
+  var t=e.target.closest('[data-doc]'); if(!t)return;
+  e.preventDefault(); openDoc(t.dataset.doc);
+});
+/* O glifo mora dentro do <summary>: sem isto, ler a explicação fecharia o card. */
+addEventListener('click',function(e){
+  if(e.target.closest('.hint')){e.preventDefault(); e.stopPropagation()}
+});
 
 /* ---------- abas ---------- */
 
@@ -450,21 +792,61 @@ function drawTabs(){
   }).join('');
 }
 
+/** Repinta a tela ativa com o que já está em cache: usado pelos filtros. */
+function render(id){
+  if(!cache[id])return;
+  E('screen').innerHTML=RENDER[id](cache[id]); stamp(cache[id]);
+}
+
 function show(id,force){
   var tab=TABS.filter(function(t){return t.id===id})[0]; if(!tab)return;
   active=id; drawTabs();
   if(location.hash.slice(1)!==id)history.replaceState(null,'','#'+id);
-  if(cache[id]&&!force){E('screen').innerHTML=RENDER[id](cache[id]);stamp(cache[id]);return}
+  if(cache[id]&&!force){render(id);return}
   fetch(tab.route).then(function(r){return r.json()}).then(function(d){
     cache[id]=d;
+    if(id==='docs'){DOCSET={};(d.documents||[]).forEach(function(x){DOCSET[x.id]=1})}
     if(active===id){E('screen').innerHTML=RENDER[id](d);stamp(d)}
   }).catch(function(){if(active===id)E('screen').innerHTML=sec(tab.label,empty('Falha ao carregar.'))});
 }
 
+/* O filtro é do leitor: repinta a tela e devolve o cursor onde ele estava. */
+addEventListener('input',function(e){
+  var el=e.target.closest?e.target.closest('[data-find]'):null; if(!el)return;
+  var scope=el.dataset.find, at=el.selectionStart;
+  if(Q[scope]===undefined)return;
+  Q[scope]=el.value;
+  render(active);
+  var back=document.querySelector('[data-find="'+scope+'"]');
+  if(back){back.focus(); try{back.setSelectionRange(at,at)}catch(err){}}
+});
+
+/* Projeto → milestone → incremento: um clique, sem sair da tela do plano. */
+addEventListener('click',function(e){
+  var clear=e.target.closest('[data-ms-clear]');
+  if(clear){e.preventDefault(); MS=null; render('plano'); return}
+  var pick=e.target.closest('[data-ms]');
+  if(pick){
+    e.preventDefault();
+    MS=(MS===pick.dataset.ms)?null:pick.dataset.ms;
+    if(active==='plano')render('plano'); else show('plano');
+    return;
+  }
+  var go=e.target.closest('[data-goto]');
+  if(go){e.preventDefault(); show(go.dataset.goto)}
+});
+addEventListener('keydown',function(e){
+  if(e.key!=='Enter'&&e.key!==' ')return;
+  var pick=e.target.closest?e.target.closest('[data-ms]'):null; if(!pick)return;
+  e.preventDefault();
+  MS=(MS===pick.dataset.ms)?null:pick.dataset.ms;
+  if(active==='plano')render('plano'); else show('plano');
+});
+
 function stamp(d){
   var v=d.overviewSchemaVersion||d.dashboardSchemaVersion;
   E('foot').textContent=(d.generatedAt?'atualizado '+new Date(d.generatedAt).toLocaleTimeString():'')
-    +(v?'  ·  schema v'+v:'')+'  ·  1 2 3 ou Tab trocam de tela  ·  clique num comando para copiar, num incremento para ler o resumo';
+    +(v?'  ·  schema v'+v:'')+'  ·  1 2 3 4 ou Tab trocam de tela  ·  clique num comando para copiar, num incremento ou documento para ler';
 }
 
 /* Copiar é a ponte entre o painel e o harness: o comando sai daqui e é colado lá. */
@@ -509,7 +891,7 @@ addEventListener('keydown',function(e){
   if(e.metaKey||e.ctrlKey||e.altKey)return;
   if(E('drawer').classList.contains('on'))return;
   var i=TABS.map(function(t){return t.id}).indexOf(active);
-  if(/^[1-3]$/.test(e.key)){e.preventDefault();show(TABS[+e.key-1].id)}
+  if(/^[1-4]$/.test(e.key)&&TABS[+e.key-1]){e.preventDefault();show(TABS[+e.key-1].id)}
   else if(e.key==='Tab'||e.key==='ArrowRight'){e.preventDefault();show(TABS[(i+1)%TABS.length].id)}
   else if(e.key==='ArrowLeft'){e.preventDefault();show(TABS[(i+TABS.length-1)%TABS.length].id)}
   else if(e.key==='r'||e.key==='R'){e.preventDefault();show(active,true)}
@@ -548,11 +930,21 @@ es.addEventListener('overview',function(ev){
     if(/propose$/.test(verb))HARNESS_VERB.propose=verb;
   });
   // O stream só carrega o RESUMO; as outras telas recarregam sob demanda.
-  delete cache.changes; delete cache.plano;
-  show(active,active!=='resumo');
+  delete cache.changes; delete cache.plano; delete cache.docs;
+  // O catálogo muda quando um artefato nasce, e os chips do PLANO dependem dele:
+  // recarrega primeiro, repinta depois, para a tela não mostrar um catálogo velho.
+  loadCatalogue(function(){ show(active, active!=='resumo'&&active!=='docs') });
 });
 
-show(['resumo','changes','plano'].indexOf(location.hash.slice(1))>=0?location.hash.slice(1):'resumo');
+/* Voltar e avançar do navegador acompanham a aba, já que ela vive no hash. */
+addEventListener('hashchange',function(){
+  var id=location.hash.slice(1);
+  if(id&&id!==active&&TABS.map(function(t){return t.id}).indexOf(id)>=0)show(id);
+});
+
+show(TABS.map(function(t){return t.id}).indexOf(location.hash.slice(1))>=0?location.hash.slice(1):'resumo');
+// A primeira pintura não espera o catálogo; quem depende dele se repinta ao chegar.
+loadCatalogue(function(){ if(active==='plano')render('plano') });
 </script>
 </body>
 </html>

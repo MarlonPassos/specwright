@@ -70,7 +70,8 @@ describe('change lifecycle', () => {
     status = await computeStatus(context);
     expect(status.ready).toBe(true);
     expect(status.applyBlockedBy).toEqual([]);
-    expect(status.tasks).toEqual({ total: 1, completed: 0 });
+    expect(status.tasks).toMatchObject({ total: 1, completed: 0 });
+    expect(status.tasks?.open).toHaveLength(1);
 
     const changes = await listChangeEntries(workspace);
     expect(changes).toEqual([

@@ -44,7 +44,10 @@ describe('buildOverview', () => {
     // A aresta que nenhum dos dois painéis desenhava.
     expect(data.focus[0].change?.id).toBe('fund-refactor');
     expect(data.focus[0].increment).toMatchObject({ id: 'CH-019', milestone: 'M1' });
-    expect(data.milestones).toEqual([{ id: 'M1', name: 'Fundação', archived: 0, total: 1 }]);
+    // O estado derivado acompanha o milestone para o painel não recalcular.
+    expect(data.milestones).toEqual([
+      { id: 'M1', name: 'Fundação', archived: 0, total: 1, derivedStatus: 'not_started' },
+    ]);
   });
 
   it('mostra a change que nenhum incremento reivindica, e o incremento sem change', async () => {
