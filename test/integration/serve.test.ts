@@ -468,3 +468,43 @@ describe('specs serve — o catálogo de documentos', () => {
     expect(INDEX_HTML).toContain('MSTAT');
   });
 });
+
+describe('specs serve — a página se explica', () => {
+  it('as abas seguem a ordem do trabalho: onde estamos, o plano, a change, os documentos', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    const order = [...INDEX_HTML.matchAll(/label:'([A-ZÁÉÍÓÚÇ]+)'/g)].map((m) => m[1]);
+    expect(order).toEqual(['RESUMO', 'PLANO', 'CHANGES', 'DOCUMENTOS']);
+  });
+
+  it('todo card principal carrega uma frase dizendo o que ele é', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    // Os títulos fixos das quatro telas, e os grupos de nome variável.
+    for (const title of [
+      'RESUMO', 'EM ANDAMENTO', 'MILESTONES', 'PRÓXIMO PASSO', 'DIAGNÓSTICOS',
+      'PLANO', 'INCREMENTOS', 'PRONTAS PARA COMEÇAR', 'BLOQUEADAS', 'CONCLUÍDAS',
+      'CHANGES', 'EM PLANEJAMENTO', 'IMPLEMENTANDO', 'PRONTAS PARA ARQUIVAR',
+      'CAPACIDADES', 'ARQUIVO', 'DOCUMENTOS',
+    ]) {
+      expect(INDEX_HTML, title).toContain("'" + title + "':'");
+    }
+    expect(INDEX_HTML).toContain("['Change · '");
+    expect(INDEX_HTML).toContain("['Arquivada · '");
+    // A explicação também é lida por leitor de tela, não só no hover.
+    expect(INDEX_HTML).toContain('aria-label="');
+    expect(INDEX_HTML).toContain('role="note"');
+  });
+
+  it('ler a explicação não fecha o acordeão em que ela mora', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    // O glifo fica dentro do <summary>: sem isto, o clique alternaria o card.
+    expect(INDEX_HTML).toMatch(/closest\('\.hint'\)[^]{0,80}stopPropagation/);
+  });
+
+  it('CHANGES continua em inglês, e a explicação diz por quê', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    // O termo é o mesmo em spec/changes/ e nos comandos; traduzir só na tela
+    // obrigaria o leitor a traduzir de volta para digitar.
+    expect(INDEX_HTML).toContain("label:'CHANGES'");
+    expect(INDEX_HTML).toContain('specs new change');
+  });
+});

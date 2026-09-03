@@ -39,6 +39,15 @@ versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ### Alterado
 
+- **feat(server): a ordem das abas segue o trabalho** — RESUMO → PLANO → CHANGES
+  → DOCUMENTOS: onde estamos, o que o plano manda fazer, a change que faz, e os
+  documentos que sustentam tudo. As teclas `1`..`4` acompanham.
+- **feat(server): cada card principal se explica** — um glifo `ⓘ` no título abre
+  uma frase dizendo o que aquilo é. Um painel que só mostra números supõe que
+  quem lê já conhece o vocabulário — change, incremento, delta, milestone; a
+  frase resolve quem não conhece sem atrapalhar quem conhece. `CHANGES` fica em
+  inglês de propósito, e a explicação diz por quê: é o mesmo termo de
+  `spec/changes/` e de `specs new change`.
 - **feat(server): os pontos de artefato da tela CHANGES abrem o documento** —
   `proposal`, `design` e `tasks` viram porta de entrada quando existem; um
   incremento com change vinculada mostra os artefatos dela ao lado do vínculo.

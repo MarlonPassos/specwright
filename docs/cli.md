@@ -294,9 +294,17 @@ escreve**, e qualquer método que não seja `GET`/`HEAD` devolve `405 read_only`
 | `GET /api/doc?id=<id>` | um documento do catálogo, em Markdown |
 | `GET /api/events` | SSE: um evento `overview` ao conectar e um a cada mudança |
 
-A página tem as **três telas do terminal** — RESUMO, CHANGES e PLANO — mais
+A página tem as **três telas do terminal** — RESUMO, PLANO e CHANGES — mais
 DOCUMENTOS, que só uma página consegue oferecer; trocadas por clique, por
-`1`..`4`, por `Tab` e pelas setas; `r` repinta. A aba
+`1`..`4`, por `Tab` e pelas setas; `r` repinta. A ordem é a do trabalho: onde
+estamos, o que o plano manda fazer, a change que faz, e os documentos que
+sustentam tudo.
+
+Cada card principal traz um glifo `ⓘ` no título com **uma frase dizendo o que
+aquilo é** — change, incremento, delta, milestone e capacidade em uma linha cada,
+para quem ainda não tem o vocabulário. `CHANGES` fica em inglês de propósito: é o
+mesmo termo de `spec/changes/` e de `specs new change`, e traduzir só na tela
+obrigaria a traduzir de volta na hora de digitar. A aba
 vive no hash (`#changes`), então recarregar não perde o lugar. Dois temas, escuro
 por padrão como o terminal, com a escolha lembrada no navegador.
 

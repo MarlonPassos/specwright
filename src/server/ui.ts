@@ -100,6 +100,21 @@ h2{margin:0 0 12px;font-size:11px;letter-spacing:.19em;color:var(--dim);font-wei
 .mile.pick{cursor:pointer;border-radius:8px;padding:6px 8px;margin:0 -8px}
 .mile.pick:hover{background:var(--sunken)}
 .mile.pick.on{background:var(--sunken);box-shadow:inset 2px 0 0 var(--cyan)}
+/* Explicação do card: um glifo discreto no título, a frase só quando pedida. */
+.hint{position:relative;z-index:6;display:inline-flex;align-items:center;margin-left:8px;
+  color:var(--dim);cursor:help;opacity:.6;transition:opacity .15s,color .15s}
+.hint:hover,.hint:focus{z-index:7}
+.hint:hover,.hint:focus{opacity:1;color:var(--cyan);outline:none}
+.hint svg{width:12px;height:12px}
+.hint::after{content:attr(data-hint);position:absolute;left:0;top:calc(100% + 9px);
+  width:max-content;max-width:min(340px,72vw);
+  background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  padding:9px 12px;color:var(--ink);font:inherit;font-size:12px;font-weight:400;
+  line-height:1.5;letter-spacing:0;text-transform:none;white-space:normal;
+  box-shadow:0 10px 26px rgba(0,0,0,.34);
+  opacity:0;pointer-events:none;transition:opacity .15s}
+.hint:hover::after,.hint:focus::after{opacity:1}
+@media(max-width:640px){.hint::after{left:auto;right:0}}
 section.toolbar{padding:11px 18px}
 .hrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .hrow h2{margin:0}
@@ -213,9 +228,70 @@ var CARET='<svg class="caret" viewBox="0 0 24 24" width="12" height="12" fill="n
  * ajuda ninguém. Os demais viram acordeão, abertos por padrão: numa tela com
  * vinte incrementos, poder fechar uma seção é a diferença entre ler e rolar.
  */
-function sec(t,b,n){return '<section><h2>'+esc(t)+'</h2>'+b+'</section>'}
+var ICO_INFO='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
+  +' stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11.2v4.6"/>'
+  +'<path d="M12 8.1v.1"/></svg>';
+
+/**
+ * O que cada bloco é, em uma frase.
+ *
+ * Um painel que só mostra números supõe que quem lê já conhece o vocabulário —
+ * change, incremento, delta, milestone. A frase mora no título do card, atrás
+ * de um glifo, então não atrapalha quem já sabe e resolve quem não sabe.
+ */
+var HINTS={
+  'RESUMO':'Onde o projeto está agora: changes em aberto, o que já pode ser arquivado e quanto do plano foi entregue.',
+  'EM ANDAMENTO':'O trabalho em voo: a change aberta e o incremento do plano que ela realiza, na mesma linha.',
+  'MILESTONES':'Marcos do plano. Cada um agrupa incrementos; clique num para ver só os dele.',
+  'PRÓXIMO PASSO':'O incremento que o plano recomenda começar agora, com o comando já montado.',
+  'DIAGNÓSTICOS':'O que a validação encontrou. Erro impede de seguir; aviso só alerta.',
+
+  'PLANO':'O plano do projeto: incrementos, dependências e milestones, revisados por uma pessoa antes de virarem trabalho.',
+  'INCREMENTOS':'Cada incremento planejado e o estado dele. Um incremento ainda não é uma change: ele vira uma quando o trabalho começa.',
+  'EM IMPLEMENTAÇÃO':'O incremento já virou change e o trabalho está correndo.',
+  'PRONTAS PARA COMEÇAR':'Dependências satisfeitas e briefing atual: dá para abrir a change agora.',
+  'BLOQUEADAS':'Espera outro incremento terminar, ou um impedimento anotado à mão.',
+  'CONCLUÍDAS':'Incremento cuja change já foi arquivada.',
+  'FORA DO FLUXO':'Ideia, pausado ou cancelado: não entra na conta do que falta.',
+
+  'CHANGES':'Uma change é uma alteração em andamento, com seus artefatos: proposta, specs, design e tarefas. O nome fica em inglês porque é o mesmo em spec/changes/ e nos comandos (specs new change).',
+  'EM PLANEJAMENTO':'A change ainda está escrevendo artefatos; falta algo antes de implementar.',
+  'IMPLEMENTANDO':'Artefatos prontos. O que resta é o checklist de tarefas.',
+  'PRONTAS PARA ARQUIVAR':'Toda tarefa marcada. O arquivamento aplica os deltas nas specs e fecha a change.',
+  'COM PROBLEMA':'Não foi possível ler esta change; a mensagem diz o quê.',
+  'CAPACIDADES':'O comportamento que o sistema já tem, acumulado das changes arquivadas. É a verdade viva do projeto.',
+  'ARQUIVO':'Changes concluídas. Os artefatos delas continuam legíveis na tela DOCUMENTOS.',
+
+  'DOCUMENTOS':'Tudo que se lê no projeto, agrupado como ele é organizado. Clique numa linha para abrir.',
+  'Projeto':'O documento que diz o que é o projeto, para quem ele é e sob que restrições.',
+  'Capacidades':'Specs vivas: o comportamento atual do sistema, acumulado.',
+  'Plano':'Os documentos do plano: a visão geral e a arquitetura que ele assume.',
+  'Incrementos planejados':'O briefing de cada incremento, escrito antes de ele virar change.'
+};
+
+/** Grupos cujo título carrega um nome variável, casados pelo prefixo. */
+var HINT_PREFIX=[
+  ['Change · ','Os artefatos desta change: proposta, design, tarefas e os deltas de spec que ela escreve.'],
+  ['Arquivada · ','Os artefatos de uma change já concluída, como ficaram no arquivamento.']
+];
+
+function hintFor(title){
+  if(HINTS[title])return HINTS[title];
+  for(var i=0;i<HINT_PREFIX.length;i++)
+    if(title.indexOf(HINT_PREFIX[i][0])===0)return HINT_PREFIX[i][1];
+  return '';
+}
+
+function hint(title){
+  var text=hintFor(String(title));
+  if(!text)return '';
+  return '<span class="hint" tabindex="0" role="note" data-hint="'+esc(text)+'"'
+    +' aria-label="'+esc(text)+'">'+ICO_INFO+'</span>';
+}
+
+function sec(t,b,n){return '<section><h2>'+esc(t)+hint(t)+'</h2>'+b+'</section>'}
 function card(t,b,n){
-  return '<details class="card" open><summary>'+CARET+esc(t)
+  return '<details class="card" open><summary>'+CARET+esc(t)+hint(t)
     +(n!=null?'<span class="count">'+esc(n)+'</span>':'')
     +'</summary><div class="body">'+b+'</div></details>';
 }
@@ -251,9 +327,13 @@ var STAGES=[['EM IMPLEMENTAÇÃO',['em implementação','proposta']],
             ['COM PROBLEMA',['inconsistente']],['CONCLUÍDAS',['concluída']],
             ['FORA DO FLUXO',['ideia','pausada','cancelada']]];
 
+/*
+ * A ordem é a do trabalho, não a da implementação: onde estamos, o que o plano
+ * manda fazer, a change que faz, e os documentos que sustentam tudo.
+ */
 var TABS=[{id:'resumo',label:'RESUMO',route:'/api/overview'},
-          {id:'changes',label:'CHANGES',route:'/api/changes'},
           {id:'plano',label:'PLANO',route:'/api/plan'},
+          {id:'changes',label:'CHANGES',route:'/api/changes'},
           {id:'docs',label:'DOCUMENTOS',route:'/api/docs'}];
 var cache={}, active='resumo', latest=null;
 /* Filtro por tela e milestone selecionado: o recorte é do leitor, não do dado. */
@@ -273,7 +353,7 @@ var ICO_FIND='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-
   +' stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.4-3.4"/></svg>';
 
 function findBar(title,scope,ph,count,extra){
-  return '<section class="toolbar"><div class="hrow"><h2>'+esc(title)+'</h2>'+(extra||'')
+  return '<section class="toolbar"><div class="hrow"><h2>'+esc(title)+hint(title)+'</h2>'+(extra||'')
     +(count?'<span class="count">'+esc(count)+'</span>':'')
     +'<label class="srch">'+ICO_FIND+'<input type="text" data-find="'+esc(scope)+'"'
     +' value="'+esc(Q[scope])+'" placeholder="'+esc(ph)+'" aria-label="'+esc(ph)+'">'
@@ -664,6 +744,10 @@ addEventListener('click',function(e){
 addEventListener('click',function(e){
   var t=e.target.closest('[data-doc]'); if(!t)return;
   e.preventDefault(); openDoc(t.dataset.doc);
+});
+/* O glifo mora dentro do <summary>: sem isto, ler a explicação fecharia o card. */
+addEventListener('click',function(e){
+  if(e.target.closest('.hint')){e.preventDefault(); e.stopPropagation()}
 });
 
 /* ---------- abas ---------- */
