@@ -47,6 +47,16 @@ ${CLI_NOTE}
    quando a change comprovadamente não altera nenhum comportamento observável (refatoração,
    tooling, docs) - nunca para escapar da validação.
 
+   Se a saída trouxer a chave \`plan\`, o projeto tem um plano e um incremento dele planeja
+   exatamente este slug. Rode o \`plan.fix\` que veio junto:
+
+   \`\`\`bash
+   specs project link "<CH-NNN>" "<nome>"
+   \`\`\`
+   Sem esse vínculo o plano não enxerga esta change: nem enquanto ela anda, nem depois de
+   arquivada. Diga ao usuário qual incremento você vinculou. Sem a chave \`plan\`, siga em
+   frente - o projeto não tem plano, ou nenhum incremento reivindica este nome.
+
 4. **Escreva a proposta**
 
 ${ARTIFACT_RULES.split('\n').map((line) => (line ? `   ${line}` : '')).join('\n')}

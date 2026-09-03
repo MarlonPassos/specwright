@@ -1,6 +1,7 @@
 import type { Command } from 'commander';
 import { SpecError } from '../../util/errors.js';
 import { createChange } from '../../core/change/create.js';
+import { adviseLink } from '../../core/project/advice.js';
 import { computeStatus, resolveChangeContext } from '../../core/change/status.js';
 import { buildInstructions, RESERVED_INSTRUCTION_IDS } from '../../core/change/instructions.js';
 import { archiveChange } from '../../core/archive/archive.js';
@@ -104,6 +105,12 @@ export function registerWorkflowCommands(program: Command): void {
           skipSpecs: options.skipSpecs,
         });
 
+        // A change whose name is a planned increment's slug is almost always
+        // that increment being started. Saying so here is the only moment the
+        // connection is obvious; nothing later in the change lifecycle mentions
+        // the plan, and unlinked work is invisible to it even after archiving.
+        const advice = await adviseLink(workspace.projectRoot, created.id);
+
         if (options.json) {
           printJson({
             change: created.id,
@@ -111,6 +118,7 @@ export function registerWorkflowCommands(program: Command): void {
             workspace: workspace.root,
             schema: created.schema,
             next: created.next,
+            ...(advice ? { plan: advice } : {}),
           });
           return;
         }
@@ -118,6 +126,9 @@ export function registerWorkflowCommands(program: Command): void {
         printLines([
           `Change "${created.id}" criada (schema: ${created.schema})`,
           `  ${created.dir}`,
+          ...(advice
+            ? [`Plano "${advice.plan}": ${advice.change} planeja este slug. Vincule: ${advice.fix}`]
+            : []),
           `Próximo${created.next.length === 1 ? ' artefato' : 's artefatos'}: ${created.next.join(', ')}`,
           `Rode: specs instructions ${created.next[0] ?? '<artefato>'} --change ${created.id} --json`,
         ]);
@@ -304,6 +315,9 @@ export function registerWorkflowCommands(program: Command): void {
                 `  Atualizadas: ${result.updatedSpecs.join(', ') || 'nenhuma'}`,
                 `  Aposentadas: ${result.retiredSpecs.join(', ') || 'nenhuma'}`,
               ]),
+          ...(result.plan
+            ? [`  Plano "${result.plan.plan}": ${result.plan.change} vinculado e concluído.`]
+            : []),
         ]);
       } catch (error) {
         fail(error, { json: options.json, payload: { change: null } });

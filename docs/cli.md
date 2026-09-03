@@ -60,6 +60,10 @@ Cria `spec/changes/<name>/` com os metadados dela. O nome precisa ser kebab-case
 | `--goal <text>` | Objetivo registrado nos metadados da change |
 | `--skip-specs` | Declara que a change não altera nenhum comportamento observável |
 
+Num projeto com [plano](project-planning.md), se algum incremento sem vínculo
+planeja exatamente este slug, a saída ganha um bloco `plan` com o
+`specs project link` a rodar. É só um aviso: o plano não é escrito aqui.
+
 ### `specs status`
 
 Sem argumentos, desenha o painel do projeto: resumo, changes agrupadas pela fase do
@@ -128,6 +132,11 @@ Aplica os deltas da change nas specs do workspace e a move para o arquivo.
 | `--skip-specs` | Não aplicar os deltas |
 | `--no-validate` | Arquivar sem validar antes |
 | `--force` | Arquivar apesar de tarefas não marcadas |
+
+Num projeto com [plano](project-planning.md), o arquivamento fecha o vínculo já
+previsto — o incremento sem vínculo cujo `slug` é igual ao nome da change — e o
+reporta no bloco `plan`. Um plano ausente ou ilegível não muda o arquivamento em
+nada.
 
 ## Inspeção
 

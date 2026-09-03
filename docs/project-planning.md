@@ -171,7 +171,63 @@ similaridade.
 
 O `archive_path` persistido é um **atalho de leitura**: `status` resolve o
 archive por padrão a cada execução, então a conclusão nunca depende de `sync`.
-`specs archive` não conhece o plano — não há hook nem campo novo no seu JSON.
+
+### O fechamento no `archive`
+
+`specs archive` **não depende** do plano: plano ausente, ilegível ou que recuse a
+escrita não muda o arquivamento em nada, e o comando nunca falha por causa dele.
+O que ele faz, ao final e como efeito melhor-esforço, é **fechar um vínculo já
+previsto** — o incremento sem vínculo, não cancelado, cujo `slug` é **igual** ao
+nome da change. Só identidade exata, o mesmo critério de `sync --link`. Nada é
+criado: nem incremento, nem adoção, nem transição de `planning_state`.
+
+Quando fecha, o JSON traz um bloco `plan`:
+
+```json
+{
+  "change": "fund-empacotamento",
+  "archivedAs": "2026-09-02-fund-empacotamento",
+  "plan": {
+    "plan": "lista-tarefas",
+    "change": "CH-018",
+    "archivePath": "spec/changes/archive/2026-09-02-fund-empacotamento",
+    "revision": 5
+  }
+}
+```
+
+Num projeto sem `planning/` a chave nunca aparece. É a exceção deliberada à
+regra do vínculo explícito, e existe porque o esquecimento era silencioso: a
+change ia até o archive e o plano seguia mostrando o incremento como pendente.
+
+### O aviso do `new change`
+
+O vínculo é explícito, e nada no ciclo de vida da change o cria sozinho. Só que
+o vão é silencioso: uma change criada com o slug de um incremento planejado,
+trabalhada e arquivada, nunca chega ao plano, e nenhum passo do caminho diz
+isso. `specs new change <nome>` fecha esse vão **falando**, não escrevendo:
+quando algum plano carrega um incremento sem vínculo com aquele slug exato, a
+saída ganha um bloco `plan`.
+
+```json
+{
+  "change": "fund-empacotamento",
+  "next": ["proposal"],
+  "plan": {
+    "plan": "lista-tarefas",
+    "change": "CH-018",
+    "slug": "fund-empacotamento",
+    "title": "Empacotamento e entry point",
+    "fix": "specs project link CH-018 fund-empacotamento"
+  }
+}
+```
+
+Nada é gravado no plano, e o `fix` é o comando que o usuário — ou o
+`/spec-propose`, que passa a lê-lo — decide rodar. O bloco só aparece com plano
+presente e incremento livre: sem `planning/`, com plano ilegível, com o
+incremento já vinculado ou cancelado, a saída é a de sempre. Um plano quebrado
+nunca muda o que um comando de workspace faz.
 
 ## Mutação por bundle (`apply`)
 
