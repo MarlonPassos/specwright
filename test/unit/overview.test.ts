@@ -160,7 +160,11 @@ describe('buildOverview — a recomendação nos dois idiomas', () => {
     await seedPlan(workspace, manifest({ id: 'demo', changes: [ch] }));
 
     const data = await buildOverview(workspace, { planId: 'demo' });
-    expect(data.recommended!.harnessCommands).toEqual(['/spec-explore', '/spec-propose']);
+    // Montado: quem lê não precisa lembrar o id nem o slug.
+    expect(data.recommended!.harnessCommands).toEqual([
+      '/spec-explore CH-001 human-dates',
+      '/spec-propose CH-001 human-dates',
+    ]);
     expect(data.recommended!.commands).toEqual([
       'specs new change human-dates',
       'specs project link CH-001 human-dates',

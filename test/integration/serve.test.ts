@@ -2,7 +2,7 @@ import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import { startServer, type RunningServer } from '../../src/server/serve.js';
-import { makeWorkspace, writeFile } from '../helpers/workspace.js';
+import { makeWorkspace, runCli, writeFile } from '../helpers/workspace.js';
 import type { Workspace } from '../../src/core/workspace.js';
 
 let running: RunningServer | undefined;
@@ -189,6 +189,87 @@ describe('specs serve — a página e a projeção não podem divergir', () => {
     expect(body.plan).toBeNull();
     // A UI cai na mensagem quando `plan` é nulo; sem ela a tela ficaria vazia.
     expect(body.message).toBeTruthy();
+  });
+});
+
+describe('specs serve — o resumo do incremento', () => {
+  /** A plan with one increment whose brief is materialized on disk. */
+  async function planWithBrief(): Promise<Workspace> {
+    const workspace = await makeWorkspace();
+    const cli = (args: string[]) => runCli(args, workspace.projectRoot);
+    expect((await cli(['project', 'create', 'demo', '--json'])).code).toBe(0);
+    const bundle = JSON.stringify({
+      bundleVersion: 1,
+      expectRevision: 0,
+      operations: [
+        {
+          op: 'addChange',
+          slug: 'terminal-ux',
+          title: 'UX de terminal',
+          plannedChange: {
+            objetivo: 'Deixar a saída legível.',
+            escopo: ['cores', 'painel de hoje'],
+            criteriosMacro: ['sem quebra de layout'],
+          },
+        },
+      ],
+    });
+    await writeFile(path.join(workspace.projectRoot, 'b.json'), bundle);
+    expect((await cli(['project', 'apply', '--file', 'b.json', '--json'])).code).toBe(0);
+    return workspace;
+  }
+
+  it('devolve o markdown do brief pelo id do incremento', async () => {
+    const server = await serve(await planWithBrief());
+    const body = (await (await get(server, '/api/brief?change=CH-001')).json()) as any;
+    expect(body.found).toBe(true);
+    expect(body.id).toBe('CH-001');
+    expect(body.title).toBe('UX de terminal');
+    expect(body.path).toContain('CH-001-terminal-ux.md');
+    expect(body.markdown).toContain('# Objetivo');
+  });
+
+  it('recusa um id que não é CH-NNN, sem tocar no disco', async () => {
+    const server = await serve(await planWithBrief());
+    for (const bad of ['../../etc/passwd', '..%2f..%2fetc', 'CH-1', 'nao-existe', '']) {
+      const response = await get(server, '/api/brief?change=' + encodeURIComponent(bad));
+      expect(response.status, bad).toBe(400);
+      expect((await response.json()).error.code).toBe('invalid_change_id');
+    }
+  });
+
+  it('um incremento inexistente é 404, não 500', async () => {
+    const server = await serve(await planWithBrief());
+    const response = await get(server, '/api/brief?change=CH-999');
+    expect(response.status).toBe(404);
+    expect((await response.json()).reason).toBe('change_not_found');
+  });
+
+  it('sem plano, diz que não há plano em vez de quebrar', async () => {
+    const server = await serve(await makeWorkspace());
+    const response = await get(server, '/api/brief?change=CH-001');
+    expect(response.status).toBe(404);
+    expect((await response.json()).reason).toBe('no_plan');
+  });
+
+  it('a página traz o leitor de markdown e o painel lateral', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    expect(INDEX_HTML).toContain('id="drawer"');
+    expect(INDEX_HTML).toContain('function md(src)');
+    expect(INDEX_HTML).toContain('data-brief');
+    expect(INDEX_HTML).toContain('/api/brief?change=');
+    // O markdown é escapado antes de virar HTML: arquivo do projeto ainda é entrada.
+    expect(INDEX_HTML).toMatch(/function inline\(t\)\{[^}]*esc\(t\)/);
+    // Esc fecha o painel antes de qualquer atalho de aba.
+    expect(INDEX_HTML).toContain("e.key==='Escape'");
+  });
+
+  it('o comando do harness já vem montado com id e slug', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    expect(INDEX_HTML).toContain("var arg=' '+c.id+' '+c.slug");
+    expect(INDEX_HTML).toContain('HARNESS_VERB.propose+arg');
+    // O verbo vem do payload, porque o Codex usa $spec-* em vez de /spec-*.
+    expect(INDEX_HTML).toContain('HARNESS_VERB.explore=verb');
   });
 });
 

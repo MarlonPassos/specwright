@@ -4,7 +4,9 @@ import { buildDashboard } from '../core/dashboard.js';
 import { buildOverview } from '../core/overview.js';
 import { computeProjectStatus, statusPayload } from '../core/project/status.js';
 import { recommendNext } from '../core/project/next.js';
-import { listPlanIds } from '../core/project/paths.js';
+import { listPlanIds, planPaths, safeResolve } from '../core/project/paths.js';
+import { loadPlan } from '../core/project/repository.js';
+import { readFileIfExists } from '../util/fs.js';
 import { dashboardEnvelope, overviewEnvelope } from '../core/contract.js';
 import { WORKSPACE_DIR, type Workspace } from '../core/workspace.js';
 import { PLANNING_DIR } from '../core/project/paths.js';
@@ -60,6 +62,39 @@ async function projections(workspace: Workspace, planId: string | undefined) {
         recommended: recommendNext(status).recommended,
       });
     },
+    /**
+     * The brief of one increment, as written on disk.
+     *
+     * The path comes from the manifest, never from the query: `change` selects a
+     * record, and the record carries where its brief lives. Taking a path from
+     * the caller would hand the reader of a loopback port a file reader for the
+     * whole disk. `safeResolve` is the second gate, in case a manifest itself
+     * carries a path that escapes the plan directory.
+     */
+    brief: async (changeId: string) => {
+      const ids = await listPlanIds(workspace.projectRoot);
+      const id = planId ?? (ids.length === 1 ? ids[0] : undefined);
+      if (id === undefined) return { found: false, reason: 'no_plan' as const };
+
+      const { manifest } = await loadPlan(workspace.projectRoot, id);
+      const record = manifest.changes.find((entry) => entry.id === changeId);
+      if (!record) return { found: false, reason: 'change_not_found' as const };
+      if (!record.planned_change) return { found: false, reason: 'not_materialized' as const };
+
+      const absolute = safeResolve(planPaths(workspace.projectRoot, id).dir, record.planned_change.path);
+      const content = absolute === undefined ? undefined : await readFileIfExists(absolute);
+      if (content === undefined) return { found: false, reason: 'missing_on_disk' as const };
+
+      return {
+        found: true,
+        id: record.id,
+        slug: record.slug,
+        title: record.title,
+        path: record.planned_change.path,
+        state: record.planned_change.record_hash === undefined ? null : undefined,
+        markdown: content,
+      };
+    },
   };
 }
 
@@ -114,6 +149,25 @@ export async function startServer(
       void routes.overview().then((data) => {
         response.write(`event: overview\ndata: ${JSON.stringify(data)}\n\n`);
       });
+      return;
+    }
+
+    if (route === '/api/brief') {
+      const changeId = url.searchParams.get('change') ?? '';
+      if (!/^CH-\d{3,}$/.test(changeId)) {
+        sendJson(response, 400, {
+          error: { code: 'invalid_change_id', message: 'Informe ?change=CH-NNN.' },
+        });
+        return;
+      }
+      routes
+        .brief(changeId)
+        .then((body) => sendJson(response, body.found ? 200 : 404, body))
+        .catch((error: unknown) =>
+          sendJson(response, 500, {
+            error: { code: 'projection_failed', message: (error as Error).message },
+          })
+        );
       return;
     }
 

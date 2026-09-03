@@ -105,6 +105,39 @@ details.card>summary .caret{transition:transform .18s;flex:none;opacity:.6}
 details.card[open]>summary .caret{transform:rotate(90deg)}
 details.card>summary .count{margin-left:auto;font-weight:400;letter-spacing:0;opacity:.75}
 details.card>.body{padding:0 18px 15px}
+.openable{cursor:pointer;text-decoration:underline;text-decoration-style:dotted;
+  text-underline-offset:3px;text-decoration-color:var(--line)}
+.openable:hover{text-decoration-color:var(--cyan)}
+#scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;
+  transition:opacity .2s;z-index:8}
+#scrim.on{opacity:1;pointer-events:auto}
+#drawer{position:fixed;top:0;right:0;bottom:0;width:min(720px,100%);z-index:9;
+  background:var(--panel);border-left:1px solid var(--line);
+  transform:translateX(100%);transition:transform .22s;display:flex;flex-direction:column}
+#drawer.on{transform:translateX(0)}
+#drawer .head{display:flex;align-items:center;gap:12px;padding:16px 20px;
+  border-bottom:1px solid var(--line);flex-wrap:wrap}
+#drawer .head .id{min-width:0}
+#drawer .head button{background:none;border:1px solid var(--line);color:var(--dim);
+  cursor:pointer;border-radius:6px;padding:4px 10px;font:inherit;font-size:12px;margin-left:auto}
+#drawer .head button:hover{color:var(--ink);border-color:var(--cyan)}
+#drawer .md{overflow:auto;padding:6px 22px 28px;line-height:1.65}
+.md h1{font-size:17px;margin:22px 0 8px;color:var(--cyan);letter-spacing:.04em}
+.md h2{font-size:14px;margin:20px 0 6px;color:var(--ink);letter-spacing:0}
+.md h3{font-size:13px;margin:16px 0 6px;color:var(--dim);letter-spacing:.06em}
+.md p{margin:8px 0}
+.md ul,.md ol{margin:8px 0;padding-left:22px}
+.md li{margin:3px 0}
+.md code{background:var(--sunken);border:1px solid var(--line);border-radius:4px;
+  padding:1px 5px;font-size:12px;color:var(--cyan)}
+.md pre{background:var(--sunken);border:1px solid var(--line);border-radius:8px;
+  padding:12px 14px;overflow:auto;margin:10px 0}
+.md pre code{background:none;border:0;padding:0;color:var(--ink)}
+.md blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 0 2px 14px;color:var(--dim)}
+.md hr{border:0;border-top:1px solid var(--line);margin:18px 0}
+.md a{color:var(--cyan)}
+.md strong{color:var(--ink)}
+.md .meta{color:var(--dim);font-size:12px;padding:10px 0 4px;border-bottom:1px solid var(--line)}
 footer{padding:12px 22px 24px;color:var(--dim);font-size:12px;text-align:center}
 @media(max-width:640px){.id,.dots{min-width:0}.mile .nm{min-width:0}.sub2{padding-left:0}}
 </style>
@@ -122,6 +155,15 @@ footer{padding:12px 22px 24px;color:var(--dim);font-size:12px;text-align:center}
 <main id="screen"></main>
 <footer id="foot"></footer>
 <div id="toast" role="status" aria-live="polite"></div>
+<div id="scrim"></div>
+<aside id="drawer" aria-hidden="true">
+  <div class="head">
+    <span class="id" id="dw-id"></span>
+    <span class="grow" id="dw-title"></span>
+    <button type="button" id="dw-close">fechar (Esc)</button>
+  </div>
+  <div class="md" id="dw-body"></div>
+</aside>
 <script>
 var E=function(i){return document.getElementById(i)};
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML}
@@ -182,7 +224,7 @@ var TABS=[{id:'resumo',label:'RESUMO',route:'/api/overview'},
           {id:'plano',label:'PLANO',route:'/api/plan'}];
 var cache={}, active='resumo', latest=null;
 /* A tela PLANO não carrega o harness; o RESUMO carrega, então herdamos dele. */
-var HARNESS_OPEN=['/spec-explore','/spec-propose'];
+var HARNESS_VERB={explore:'/spec-explore',propose:'/spec-propose'};
 
 /* ---------- telas ---------- */
 
@@ -200,8 +242,10 @@ function screenResumo(d){
   var f=d.focus||[];
   out+=card('EM ANDAMENTO', f.length? f.map(function(x){
     var ch=x.change,inc=x.increment,r='<div class="row">';
-    r+='<span class="id">'+esc(inc?inc.id:(ch?ch.id:'—'))+'</span>';
-    r+='<span class="grow">'+esc(inc?inc.title:(ch?ch.id:''))+'</span>';
+    r+= inc ? '<span class="id openable" data-brief="'+esc(inc.id)+'">'+esc(inc.id)+'</span>'
+            : '<span class="id">'+esc(ch?ch.id:'—')+'</span>';
+    r+= inc ? '<span class="grow openable" data-brief="'+esc(inc.id)+'" title="Ver o resumo">'+esc(inc.title)+'</span>'
+            : '<span class="grow">'+esc(ch?ch.id:'')+'</span>';
     if(inc)r+='<span class="tag '+(PRES[inc.presentation]||'')+'">'+esc(inc.presentation)+'</span>';
     if(ch&&ch.tasks&&ch.tasks.total>0)r+='<span class="tag">'+ch.tasks.completed+'/'+ch.tasks.total+'</span>';
     if(ch)r+=cmd(ch.next);
@@ -215,7 +259,8 @@ function screenResumo(d){
     }).join(''), d.milestones.length);
 
   var n=d.recommended;
-  if(n)out+=card('PRÓXIMO PASSO','<div class="row"><span class="id">'+esc(n.id)+'</span><span class="grow">'+esc(n.title)+'</span></div>'
+  if(n)out+=card('PRÓXIMO PASSO','<div class="row"><span class="id openable" data-brief="'+esc(n.id)+'" title="Ver o resumo">'+esc(n.id)+'</span>'
+    +'<span class="grow openable" data-brief="'+esc(n.id)+'">'+esc(n.title)+'</span></div>'
     +(n.reasons||[]).map(function(r){return '<div class="sub2">↳ '+esc(r)+'</div>'}).join('')
     +group('no harness',n.harnessCommands)+group('no terminal',n.commands));
 
@@ -270,7 +315,9 @@ function screenPlano(d){
     if(!m.length)return;
     m.forEach(function(c){placed[c.id]=1});
     out+=card(s[0], m.map(function(c){
-      var r='<div class="row"><span class="id">'+esc(c.id)+'</span><span class="grow">'+esc(c.title)+'</span>'
+      var open=c.plannedChange?' openable" data-brief="'+esc(c.id)+'"':'"';
+      var r='<div class="row"><span class="id'+open+' title="Ver o resumo">'+esc(c.id)+'</span>'
+        +'<span class="grow'+open+'>'+esc(c.title)+'</span>'
         +'<span class="tag '+(PRES[c.presentation]||'')+'">'+esc(c.presentation)+'</span>';
       if(c.plannedChange)r+='<span class="tag">brief '+esc(c.plannedChange.state)+'</span>';
       if(c.link&&c.link.tasks)r+='<span class="tag">'+c.link.tasks.completed+'/'+c.link.tasks.total+'</span>';
@@ -281,7 +328,9 @@ function screenPlano(d){
       if(c.unlocks&&c.unlocks.length&&c.execution!=='archived')r+='<div class="sub2">↳ desbloqueia '+esc(c.unlocks.join(', '))+'</div>';
       // O caminho para começar este incremento, dos dois lados.
       if(c.presentation==='pronta'&&!c.link){
-        r+=group('no harness',HARNESS_OPEN);
+        // Montado com o incremento e o slug: quem lê não precisa lembrar de nada.
+        var arg=' '+c.id+' '+c.slug;
+        r+=group('no harness',[HARNESS_VERB.explore+arg,HARNESS_VERB.propose+arg]);
         r+=group('no terminal',['specs new change '+c.slug,'specs project link '+c.id+' '+c.slug]);
       } else if(c.link&&c.execution!=='archived'){
         r+=group('no terminal',['specs status --change '+c.link.name]);
@@ -300,6 +349,97 @@ function screenPlano(d){
 }
 
 var RENDER={resumo:screenResumo,changes:screenChanges,plano:screenPlano};
+
+/* ---------- markdown ---------- */
+
+/**
+ * O suficiente para um brief: título, ênfase, código, lista, citação e regra.
+ * Escapa tudo primeiro — o arquivo é do projeto, mas nada garante que só o
+ * autor escreveu nele, e HTML cru vindo de arquivo é injeção esperando acontecer.
+ */
+function md(src){
+  var text=String(src).replace(/\r\n?/g,'\n');
+  var meta='';
+  // O frontmatter é metadado, não prosa: sai da leitura e vira legenda.
+  var fm=/^---\n([\s\S]*?)\n---\n?/.exec(text);
+  if(fm){ meta=fm[1].split('\n').filter(Boolean).join('  ·  '); text=text.slice(fm[0].length) }
+
+  var blocks=[], code=[];
+  text=text.replace(/\u0060\u0060\u0060([a-z]*)\n([\s\S]*?)\u0060\u0060\u0060/g,function(_m,lang,body){
+    code.push('<pre><code>'+esc(body.replace(/\n$/,''))+'</code></pre>');
+    return '\u0000CODE'+(code.length-1)+'\u0000';
+  });
+
+  function inline(t){
+    return esc(t)
+      .replace(/\u0060([^\u0060]+)\u0060/g,'<code>$1</code>')
+      .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
+      .replace(/(^|[^*])\*([^*]+)\*/g,'$1<em>$2</em>')
+      .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g,'<a href="$2" rel="noopener noreferrer" target="_blank">$1</a>');
+  }
+
+  var lines=text.split('\n'), i=0, out=[];
+  while(i<lines.length){
+    var l=lines[i];
+    if(/^\u0000CODE\d+\u0000$/.test(l.trim())){ out.push(l.trim()); i++; continue }
+    if(/^\s*$/.test(l)){ i++; continue }
+    if(/^#{1,6}\s/.test(l)){
+      var lv=l.match(/^#+/)[0].length;
+      out.push('<h'+Math.min(lv,3)+'>'+inline(l.replace(/^#+\s*/,''))+'</h'+Math.min(lv,3)+'>'); i++; continue;
+    }
+    if(/^\s*(---|\*\*\*|___)\s*$/.test(l)){ out.push('<hr>'); i++; continue }
+    if(/^\s*>/.test(l)){
+      var q=[]; while(i<lines.length&&/^\s*>/.test(lines[i])){q.push(lines[i].replace(/^\s*>\s?/,''));i++}
+      out.push('<blockquote>'+inline(q.join(' '))+'</blockquote>'); continue;
+    }
+    if(/^\s*[-*+]\s/.test(l)||/^\s*\d+[.)]\s/.test(l)){
+      var ord=/^\s*\d/.test(l), items=[];
+      while(i<lines.length&&(/^\s*[-*+]\s/.test(lines[i])||/^\s*\d+[.)]\s/.test(lines[i]))){
+        items.push('<li>'+inline(lines[i].replace(/^\s*(?:[-*+]|\d+[.)])\s+/,''))+'</li>'); i++;
+      }
+      out.push((ord?'<ol>':'<ul>')+items.join('')+(ord?'</ol>':'</ul>')); continue;
+    }
+    var para=[]; while(i<lines.length&&!/^\s*$/.test(lines[i])&&!/^#{1,6}\s/.test(lines[i])
+      &&!/^\s*[-*+]\s/.test(lines[i])&&!/^\s*\d+[.)]\s/.test(lines[i])&&!/^\s*>/.test(lines[i])
+      &&!/^\u0000CODE/.test(lines[i].trim())){ para.push(lines[i]); i++ }
+    if(para.length)out.push('<p>'+inline(para.join(' '))+'</p>');
+  }
+  var html=out.join('').replace(/\u0000CODE(\d+)\u0000/g,function(_m,n){return code[+n]});
+  return (meta?'<div class="meta">'+esc(meta)+'</div>':'')+html;
+}
+
+/* ---------- drawer do brief ---------- */
+
+function closeDrawer(){
+  E('drawer').classList.remove('on'); E('scrim').classList.remove('on');
+  E('drawer').setAttribute('aria-hidden','true');
+}
+function openBrief(id){
+  var d=E('drawer');
+  E('dw-id').textContent=id; E('dw-title').textContent='';
+  E('dw-body').innerHTML='<p class="muted">carregando...</p>';
+  d.classList.add('on'); E('scrim').classList.add('on'); d.setAttribute('aria-hidden','false');
+  E('dw-close').focus();
+  fetch('/api/brief?change='+encodeURIComponent(id)).then(function(r){return r.json()}).then(function(b){
+    if(E('dw-id').textContent!==id)return;
+    if(!b.found){
+      var why={no_plan:'Este projeto não tem plano.',change_not_found:'Incremento não encontrado.',
+               not_materialized:'Este incremento ainda não tem resumo. Rode /spec-project-generate.',
+               missing_on_disk:'O arquivo do resumo não está no disco.'};
+      E('dw-body').innerHTML='<p class="muted">'+esc(why[b.reason]||'Não consegui abrir.')+'</p>';
+      return;
+    }
+    E('dw-title').textContent=b.title;
+    E('dw-body').innerHTML=md(b.markdown)
+      +'<div class="meta" style="margin-top:20px;border:0">'+esc(b.path)+'</div>';
+  }).catch(function(){E('dw-body').innerHTML='<p class="muted">Falha ao carregar.</p>'});
+}
+E('dw-close').addEventListener('click',closeDrawer);
+E('scrim').addEventListener('click',closeDrawer);
+addEventListener('click',function(e){
+  var t=e.target.closest('[data-brief]'); if(!t)return;
+  e.preventDefault(); openBrief(t.dataset.brief);
+});
 
 /* ---------- abas ---------- */
 
@@ -324,7 +464,7 @@ function show(id,force){
 function stamp(d){
   var v=d.overviewSchemaVersion||d.dashboardSchemaVersion;
   E('foot').textContent=(d.generatedAt?'atualizado '+new Date(d.generatedAt).toLocaleTimeString():'')
-    +(v?'  ·  schema v'+v:'')+'  ·  1 2 3 ou Tab trocam de tela  ·  clique num comando para copiar';
+    +(v?'  ·  schema v'+v:'')+'  ·  1 2 3 ou Tab trocam de tela  ·  clique num comando para copiar, num incremento para ler o resumo';
 }
 
 /* Copiar é a ponte entre o painel e o harness: o comando sai daqui e é colado lá. */
@@ -365,7 +505,9 @@ E('tabs').addEventListener('click',function(e){
 
 /* Mesmas teclas do terminal: 1/2/3 saltam, Tab e setas andam. */
 addEventListener('keydown',function(e){
+  if(e.key==='Escape'&&E('drawer').classList.contains('on')){closeDrawer();return}
   if(e.metaKey||e.ctrlKey||e.altKey)return;
+  if(E('drawer').classList.contains('on'))return;
   var i=TABS.map(function(t){return t.id}).indexOf(active);
   if(/^[1-3]$/.test(e.key)){e.preventDefault();show(TABS[+e.key-1].id)}
   else if(e.key==='Tab'||e.key==='ArrowRight'){e.preventDefault();show(TABS[(i+1)%TABS.length].id)}
@@ -399,7 +541,12 @@ es.addEventListener('overview',function(ev){
   cache.resumo=d;
   E('proj').textContent=d.projectName+'  ·  '+d.schema+'  ·  '+d.harness;
   document.title='Specwright — '+d.projectName;
-  if(d.recommended&&d.recommended.harnessCommands)HARNESS_OPEN=d.recommended.harnessCommands;
+  // A sintaxe muda por harness ($spec-* no Codex): tiramos o verbo do que veio.
+  (d.recommended&&d.recommended.harnessCommands||[]).forEach(function(c){
+    var verb=c.split(' ')[0];
+    if(/explore$/.test(verb))HARNESS_VERB.explore=verb;
+    if(/propose$/.test(verb))HARNESS_VERB.propose=verb;
+  });
   // O stream só carrega o RESUMO; as outras telas recarregam sob demanda.
   delete cache.changes; delete cache.plano;
   show(active,active!=='resumo');

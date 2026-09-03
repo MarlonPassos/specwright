@@ -5,6 +5,29 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.19.0] - 2026-09-02
+
+### Adicionado
+
+- **feat(server): clicar num incremento abre o Planned Change renderizado** —
+  painel lateral com o Markdown formatado, `Esc` para fechar. Nova rota
+  `GET /api/brief?change=CH-NNN`. O caminho do arquivo vem do **manifesto**,
+  nunca da query: `?change=` seleciona um registro e o registro diz onde seu
+  resumo mora. Um id fora de `CH-NNN` é recusado com `400` antes de qualquer
+  leitura, e `safeResolve` é a segunda barreira caso o próprio manifesto carregue
+  um caminho que escape do diretório do plano.
+
+  O leitor de Markdown é ~60 linhas de JavaScript sem dependência: títulos,
+  ênfase, código, lista, citação e regra, com todo o texto escapado antes de
+  virar HTML — o arquivo é do projeto, mas continua sendo entrada.
+
+### Alterado
+
+- **feat(core): o comando do harness vem montado** — `/spec-propose CH-003
+  terminal-ux` em vez de `/spec-propose` solto, e não só para o incremento
+  recomendado: todo incremento pronto para começar mostra o seu. O verbo vem do
+  payload, então o Codex recebe `$spec-*` sem a página saber disso.
+
 ## [0.18.0] - 2026-09-02
 
 ### Adicionado

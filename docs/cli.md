@@ -289,6 +289,7 @@ escreve**, e qualquer método que não seja `GET`/`HEAD` devolve `405 read_only`
 | `GET /api/overview` | `buildOverview()`, o mesmo payload de `specs watch --json` |
 | `GET /api/changes` | `buildDashboard()` |
 | `GET /api/plan` | `statusPayload()` + a recomendação |
+| `GET /api/brief?change=CH-NNN` | o Planned Change do incremento, em Markdown |
 | `GET /api/events` | SSE: um evento `overview` ao conectar e um a cada mudança |
 
 A página tem as **mesmas três telas do terminal** — RESUMO, CHANGES e PLANO —
@@ -302,6 +303,16 @@ confundidos. Onde os dois caminhos existem, os dois aparecem: o próximo
 incremento mostra `/spec-explore` e `/spec-propose` ao lado de
 `specs new change` e `specs project link`; quando a change já está vinculada, o
 harness mostra o comando dela em vez de propor outra.
+
+Comando de harness vem **montado**: `/spec-propose CH-003 terminal-ux`, não
+`/spec-propose` solto — em todo incremento pronto para começar, não só no
+recomendado. O verbo vem do payload, então o Codex recebe `$spec-*`.
+
+Clicar num incremento abre o **Planned Change renderizado** num painel lateral,
+com Markdown formatado e `Esc` para fechar. O caminho do arquivo vem do
+manifesto, nunca da query: `?change=` seleciona um registro, e o registro diz
+onde seu resumo mora — um id fora de `CH-NNN` é recusado antes de qualquer
+leitura de disco.
 
 O primeiro card de cada tela é fixo; os demais são **acordeões abertos por
 padrão**, com a contagem no cabeçalho — numa tela com vinte incrementos, fechar
