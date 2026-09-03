@@ -84,6 +84,22 @@ versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 - **feat(server): a aba escolhida acompanha voltar e avançar do navegador** — a
   aba já vivia no hash, mas só era lida no carregamento.
 
+### Corrigido
+
+- **fix(server): o plano criado depois do painel subir nunca chegava ao leitor**
+  — `planning/` só existe quando um plano é criado, e o observador montava a
+  lista de diretórios uma vez, no boot: num projeto ainda sem plano ele pulava
+  `planning/` e não voltava a olhar. Quem subisse o painel e só então rodasse
+  `/spec-project-plan` ficava com o quadro inicial para sempre, com a página
+  dizendo "ao vivo".
+
+  Agora um diretório ausente deixa uma **sentinela no diretório pai**: quando ele
+  nasce, o watch recursivo é estabelecido e o próprio nascimento já conta como
+  mudança. A mesma sentinela cobre um diretório que some no meio do caminho — um
+  `git checkout` para um branch sem plano, e a volta — porque o watch morto passa
+  a ser descartado em vez de engolido em silêncio. `watching` virou um getter, e
+  reflete o que está observado agora, não o que estava no boot.
+
 ## [0.19.0] - 2026-09-02
 
 ### Adicionado

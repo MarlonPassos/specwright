@@ -65,3 +65,58 @@ describe('watchProject', () => {
     expect(hits).toBe(0);
   });
 });
+
+describe('watchProject — diretório que ainda não existe', () => {
+  it('avisa quando o diretório ausente NASCE, e passa a observá-lo', async () => {
+    const root = await makeTempDir('watch-');
+    const planning = path.join(root, 'planning');
+    let hits = 0;
+    const watcher = watchProject({
+      directories: [planning],
+      onChange: () => (hits += 1),
+      debounceMs: 60,
+    });
+
+    // O painel sobe num projeto sem plano: não há o que observar ainda.
+    expect(watcher.watching).toEqual([]);
+
+    // Criar o plano é justamente a mudança que o leitor quer ver.
+    await fs.mkdir(path.join(planning, 'demo'), { recursive: true });
+    await settle(400);
+    expect(hits).toBeGreaterThanOrEqual(1);
+    expect(watcher.watching).toEqual([planning]);
+
+    // E, dali em diante, o conteúdo dele conta como mudança.
+    const before = hits;
+    await fs.writeFile(path.join(planning, 'demo', 'plan.yaml'), 'id: demo\n');
+    await settle(400);
+    expect(hits).toBeGreaterThan(before);
+
+    watcher.close();
+  });
+
+  it('a sentinela do pai é solta assim que não há mais diretório ausente', async () => {
+    const root = await makeTempDir('watch-');
+    const present = path.join(root, 'spec');
+    await fs.mkdir(present, { recursive: true });
+
+    const watcher = watchProject({ directories: [present], onChange: () => {}, debounceMs: 60 });
+    expect(watcher.watching).toEqual([present]);
+    watcher.close();
+  });
+
+  it('close encerra tudo, inclusive o que só espera um diretório aparecer', async () => {
+    const root = await makeTempDir('watch-');
+    let hits = 0;
+    const watcher = watchProject({
+      directories: [path.join(root, 'planning')],
+      onChange: () => (hits += 1),
+      debounceMs: 60,
+    });
+    watcher.close();
+
+    await fs.mkdir(path.join(root, 'planning'), { recursive: true });
+    await settle(400);
+    expect(hits).toBe(0);
+  });
+});

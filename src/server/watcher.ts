@@ -37,21 +37,30 @@ export interface WatchProjectOptions {
 
 export interface ProjectWatcher {
   close(): void;
-  /** Directories actually being watched. */
-  watching: string[];
+  /** Directories actually being watched, right now. */
+  readonly watching: string[];
 }
 
 /**
  * Watches the project for changes worth a repaint.
  *
- * Fail-soft: a directory that does not exist yet is skipped rather than
- * throwing, because `planning/` appears only when a plan is created — the server
- * must start in a project that has no plan.
+ * A directory that does not exist yet is not an error and, more importantly,
+ * not a lost cause: `planning/` só aparece quando um plano é criado, e criar um
+ * plano é justamente a mudança que o leitor quer ver. Por isso o diretório
+ * ausente deixa uma sentinela no PAI — quando ele nasce, o watch recursivo é
+ * estabelecido e a criação já conta como mudança.
+ *
+ * A mesma sentinela cobre um diretório observado que some no meio do caminho
+ * (um `git checkout` para um branch sem plano, e a volta): o watch morto é
+ * descartado e refeito quando o diretório reaparece.
  */
 export function watchProject(options: WatchProjectOptions): ProjectWatcher {
   const debounceMs = options.debounceMs ?? DEBOUNCE_MS;
-  const watchers: FSWatcher[] = [];
-  const watching: string[] = [];
+  const wanted = [...options.directories];
+  /** Diretório desejado -> watch recursivo vivo. */
+  const active = new Map<string, FSWatcher>();
+  /** Diretório pai -> sentinela, enquanto algum filho desejado estiver ausente. */
+  const sentinels = new Map<string, FSWatcher>();
   let timer: NodeJS.Timeout | undefined;
   let closed = false;
 
@@ -65,7 +74,8 @@ export function watchProject(options: WatchProjectOptions): ProjectWatcher {
     timer.unref?.();
   };
 
-  for (const directory of options.directories) {
+  const attach = (directory: string): boolean => {
+    if (closed || active.has(directory)) return false;
     try {
       // macOS emits an extra event naming the WATCHED DIRECTORY itself on every
       // write inside it, carrying no clue about which file moved. Left in, it
@@ -80,21 +90,74 @@ export function watchProject(options: WatchProjectOptions): ProjectWatcher {
         settle();
       });
       watcher.on('error', () => {
-        /* a directory removed under us stops being watched; not fatal */
+        // O diretório sumiu debaixo do watch. Descartar e voltar a vigiar o pai
+        // é o que permite reencontrá-lo; engolir o erro em silêncio deixaria o
+        // painel dizendo "ao vivo" sobre um observador morto.
+        active.delete(directory);
+        watcher.close();
+        guardParents();
       });
-      watchers.push(watcher);
-      watching.push(directory);
+      active.set(directory, watcher);
+      return true;
     } catch {
-      /* absent or unreadable: nothing to observe here */
+      return false;
     }
-  }
+  };
+
+  const missing = (): string[] => wanted.filter((directory) => !active.has(directory));
+
+  /** Vigia o pai de todo diretório ainda ausente, e só enquanto houver algum. */
+  const guardParents = (): void => {
+    if (closed) return;
+    for (const directory of missing()) {
+      const parent = path.dirname(directory);
+      if (sentinels.has(parent)) continue;
+      try {
+        const sentinel = watch(parent, { recursive: false }, () => {
+          let born = false;
+          for (const candidate of missing()) born = attach(candidate) || born;
+          if (born) {
+            // O diretório nascer JÁ é a mudança: o plano acabou de ser criado.
+            settle();
+            releaseParents();
+          }
+        });
+        sentinel.on('error', () => {
+          sentinel.close();
+          sentinels.delete(parent);
+        });
+        sentinels.set(parent, sentinel);
+      } catch {
+        /* nem o pai existe: não há onde vigiar */
+      }
+    }
+    releaseParents();
+  };
+
+  /** Sentinela sem nenhum filho ausente não tem mais o que esperar. */
+  const releaseParents = (): void => {
+    const stillWanted = new Set(missing().map((directory) => path.dirname(directory)));
+    for (const [parent, sentinel] of sentinels) {
+      if (stillWanted.has(parent)) continue;
+      sentinel.close();
+      sentinels.delete(parent);
+    }
+  };
+
+  for (const directory of wanted) attach(directory);
+  guardParents();
 
   return {
-    watching,
+    get watching(): string[] {
+      return [...active.keys()];
+    },
     close(): void {
       closed = true;
       if (timer) clearTimeout(timer);
-      for (const watcher of watchers) watcher.close();
+      for (const watcher of active.values()) watcher.close();
+      for (const sentinel of sentinels.values()) sentinel.close();
+      active.clear();
+      sentinels.clear();
     },
   };
 }
