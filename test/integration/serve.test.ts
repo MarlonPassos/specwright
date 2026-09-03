@@ -162,7 +162,83 @@ describe('specs serve — a página e a projeção não podem divergir', () => {
     const { INDEX_HTML } = await import('../../src/server/ui.js');
     // Os campos opcionais são lidos sob guarda no script; os obrigatórios, não.
     for (const key of READS.raiz) expect(INDEX_HTML, key).toContain(key);
-    expect(INDEX_HTML).toContain('/api/overview');
-    expect(INDEX_HTML).toContain('/api/events');
+    for (const route of ['/api/overview', '/api/events', '/api/changes', '/api/plan']) {
+      expect(INDEX_HTML, route).toContain(route);
+    }
+  });
+
+  it('a tela CHANGES lê campos que /api/changes publica', async () => {
+    const workspace = await makeWorkspace();
+    await writeFile(path.join(workspace.changesPath, 'alguma', 'proposal.md'), '# x\n');
+    const server = await serve(workspace);
+    const body = (await (await get(server, '/api/changes')).json()) as Record<string, any>;
+
+    expect(body).toHaveProperty('changes');
+    expect(body).toHaveProperty('specs');
+    expect(body).toHaveProperty('archive');
+    const first = body.changes[0];
+    for (const key of ['id', 'phase', 'artifacts', 'blockedBy', 'next']) {
+      expect(first, key).toHaveProperty(key);
+    }
+    expect(first.artifacts[0]).toHaveProperty('state');
+  });
+
+  it('a tela PLANO degrada sem plano em vez de quebrar', async () => {
+    const server = await serve(await makeWorkspace());
+    const body = (await (await get(server, '/api/plan')).json()) as Record<string, any>;
+    expect(body.plan).toBeNull();
+    // A UI cai na mensagem quando `plan` é nulo; sem ela a tela ficaria vazia.
+    expect(body.message).toBeTruthy();
+  });
+});
+
+describe('specs serve — navegação', () => {
+  it('a página traz as três abas do terminal, com as mesmas teclas', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    for (const label of ['RESUMO', 'CHANGES', 'PLANO']) {
+      expect(INDEX_HTML, label).toContain(label);
+    }
+    // 1/2/3 saltam, Tab e setas andam, r repinta — o hábito vem do TUI.
+    expect(INDEX_HTML).toMatch(/\[1-3\]/);
+    expect(INDEX_HTML).toContain("'ArrowRight'");
+    expect(INDEX_HTML).toContain("'ArrowLeft'");
+    expect(INDEX_HTML).toContain('keydown');
+  });
+
+  it('a aba escolhida vive no hash, então recarregar não perde o lugar', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    expect(INDEX_HTML).toContain('location.hash');
+    expect(INDEX_HTML).toContain('replaceState');
+  });
+
+  it('os dois temas existem e a escolha é lembrada', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    expect(INDEX_HTML).toContain('data-theme=light');
+    expect(INDEX_HTML).toContain("localStorage.setItem('sw-theme'");
+    // localStorage lança em janela privada: a leitura tem de ser protegida.
+    expect(INDEX_HTML).toMatch(/try\{[^}]*localStorage\.getItem/);
+  });
+
+  it('todo comando vira um chip copiável, nenhum fica como texto cru', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    // O helper existe e é a única forma de imprimir comando na tela.
+    expect(INDEX_HTML).toContain('function cmd(text)');
+    expect(INDEX_HTML).toContain('data-copy=');
+    expect(INDEX_HTML).not.toContain('class="sub2 cmd">↳ \'+esc(');
+  });
+
+  it('a cópia tem plano B fora de contexto seguro', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    // A Clipboard API exige contexto seguro; um proxy sem HTTPS não é um.
+    expect(INDEX_HTML).toContain('navigator.clipboard');
+    expect(INDEX_HTML).toContain('isSecureContext');
+    expect(INDEX_HTML).toContain('execCommand');
+  });
+
+  it('as telas fora do RESUMO recarregam quando o stream avisa', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    // O SSE só carrega o overview; sem invalidar, CHANGES e PLANO ficariam velhas.
+    expect(INDEX_HTML).toContain('delete cache.changes');
+    expect(INDEX_HTML).toContain('delete cache.plano');
   });
 });
