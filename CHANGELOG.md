@@ -5,6 +5,42 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.17.0] - 2026-09-02
+
+### Adicionado
+
+- **feat(server): `specs serve` sobe o painel no navegador** — página pronta,
+  aberta sozinha, com atualização ao vivo. Três rotas de projeção
+  (`/api/overview`, `/api/changes`, `/api/plan`) e um stream SSE em
+  `/api/events`. A página é embutida como módulo, sem CDN, sem bundler e sem
+  passo de build: `tsc` compila só `src/**/*.ts`, então um `.html` solto exigiria
+  entrada em `package.json` `files` e poderia faltar em runtime.
+
+  **Zero dependência de runtime nova** — `node:http`, `node:fs` e SSE em texto
+  puro. A NFR-11 continua valendo.
+
+  **Leitura pura**: qualquer método que não seja `GET`/`HEAD` devolve `405
+  read_only`. Uma rota de escrita faria do painel um segundo caminho de mutação,
+  fora do protocolo de confirmação que os comandos de harness seguem. Escuta em
+  `127.0.0.1` por padrão.
+
+- **feat(core): `src/core/contract.ts`** — as duas versões de schema viviam como
+  `const` dentro de arquivos da CLI (`DASHBOARD_SCHEMA_VERSION` em
+  `commands/project.ts`, `OVERVIEW_SCHEMA_VERSION` em `commands/watch.ts`). Um
+  segundo consumidor teria de importar da CLI, invertendo a direção de
+  dependência, e uma versão alterada num lado divergiria do outro em silêncio.
+  Agora as duas e o carimbo de envelope vivem no core, e `specs watch --json` e
+  `GET /api/overview` produzem o mesmo documento.
+
+### Corrigido
+
+- **fix(server): o filtro de ruído do watcher deixava passar o evento do próprio
+  diretório** — no macOS, toda escrita dentro de um diretório observado emite um
+  evento extra cujo `filename` é o **diretório**, sem dizer qual arquivo mudou.
+  Ele atravessava o filtro, então gravar apenas um `.tmp` ainda repintava a tela.
+  Uma mudança real sempre emite também um evento nomeado, então descartar o
+  evento-de-si não perde nada. Encontrado por teste, não por leitura.
+
 ## [0.16.0] - 2026-09-02
 
 ### Adicionado

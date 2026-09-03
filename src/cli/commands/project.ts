@@ -20,8 +20,9 @@ import { renderProjectDashboard } from '../project-dashboard-view.js';
 import type { ViewOptions } from '../theme.js';
 import { PLAN_TAB, runPanel } from '../panel.js';
 import { fail, printJson, printLines } from '../output.js';
+import { dashboardEnvelope } from '../../core/contract.js';
 
-const DASHBOARD_SCHEMA_VERSION = 1;
+
 
 function intervalMs(raw: string | undefined): number {
   const seconds = Number(raw ?? '2');
@@ -94,12 +95,9 @@ export function registerProjectCommands(program: Command): void {
         const next = recommendNext(status);
 
         if (options.json) {
-          printJson({
-            ...statusPayload(status),
-            recommended: next.recommended,
-            dashboardSchemaVersion: DASHBOARD_SCHEMA_VERSION,
-            generatedAt: new Date().toISOString(),
-          });
+          printJson(
+            dashboardEnvelope({ ...statusPayload(status), recommended: next.recommended })
+          );
           return;
         }
         process.stdout.write(renderProjectDashboard(status, next, viewOptions(this)));

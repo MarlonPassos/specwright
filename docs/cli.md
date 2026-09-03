@@ -272,6 +272,30 @@ change de mesmo nome do slug exista e esteja livre — é a alternativa a repeti
 Códigos de erro: `link_target_missing`, `link_already_used`, `invalid_transition`,
 `missing_reason`, `completed_change_protected`.
 
+### `specs serve [<plan-id>]`
+
+Sobe o painel do projeto no navegador e o abre. Leitura pura: **nenhuma rota
+escreve**, e qualquer método que não seja `GET`/`HEAD` devolve `405 read_only`.
+
+| Opção | Efeito |
+|---|---|
+| `--port <n>` | Porta (padrão `4477`) |
+| `--host <endereço>` | Endereço de escuta (padrão `127.0.0.1`) |
+| `--no-open` | Não abre o navegador |
+
+| Rota | Projeção |
+|---|---|
+| `GET /` | a página, embutida no pacote — sem CDN, sem build |
+| `GET /api/overview` | `buildOverview()`, o mesmo payload de `specs watch --json` |
+| `GET /api/changes` | `buildDashboard()` |
+| `GET /api/plan` | `statusPayload()` + a recomendação |
+| `GET /api/events` | SSE: um evento `overview` ao conectar e um a cada mudança |
+
+O stream observa `spec/` e `planning/` com `fs.watch`, e agrupa a rajada de uma
+escrita atômica num aviso só — `writeFileAtomic` grava em temporário e renomeia,
+o que emite de 3 a 6 eventos por mutação, incluindo o instante em que o arquivo
+não existe. Escuta em loopback por padrão: o painel expõe conteúdo do projeto.
+
 ### `specs project bundle-schema`
 
 Imprime o contrato do bundle aceito por `apply`: raiz, catálogo de operações,
