@@ -5,6 +5,31 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.14.1] - 2026-09-02
+
+### Corrigido
+
+- **fix(project): a dica do `unclaimed_archive` não rodava, e o `adopt` dela
+  corrompia o plano** — o diagnóstico tirava o prefixo de data do diretório
+  arquivado para montar o slug e depois sugeria `specs project adopt <slug>`. Só
+  que `adopt` resolve o argumento como **nome de diretório**, não como slug:
+  `specs project adopt fund-empacotamento` morria em `link_target_missing`,
+  porque o diretório é `2026-09-02-fund-empacotamento`. O `path` do diagnóstico
+  apontava esse mesmo caminho inexistente.
+
+  Passando o nome real do diretório, era pior: `adopt` cria um incremento
+  **novo**, então o plano ganhava um CH-019 com o mesmo slug do CH-018 que já
+  planejava aquele trabalho. Slug duplicado é ERROR de validação, e
+  `specs project status` passava a responder só `plan_invalid` — seguir a dica
+  do diagnóstico deixava o plano sem carregar.
+
+  Agora a dica olha o plano: existe incremento sem vínculo com aquele slug, ela
+  aponta `specs project link <id> <slug>`; não existe, ela aponta
+  `specs project adopt` nomeando o **diretório** do archive. E `adopt` recusa um
+  slug que o plano já carrega (`slug_already_planned`), sem escrever nada,
+  apontando `link` — ou `set-state <id> planned` quando o incremento colidente
+  está cancelado, já que `link` recusa cancelado.
+
 ## [0.14.0] - 2026-09-02
 
 ### Adicionado

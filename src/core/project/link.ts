@@ -233,6 +233,24 @@ export async function adoptChange(
     });
   }
 
+  // `adopt` allocates a NEW increment, so a slug the plan already carries would
+  // be written twice. A duplicate slug is a validation ERROR and makes the plan
+  // unloadable, which `adopt` would have caused silently: the work already has
+  // an increment, it just has no link yet. `link` is that operation.
+  const planned = manifest.changes.find((entry) => entry.slug === name);
+  if (planned) {
+    throw new SpecError(
+      `O incremento ${planned.id} já planeja o slug "${name}"; adotar criaria um slug duplicado.`,
+      {
+        code: 'slug_already_planned',
+        fix:
+          planned.planning_state === 'cancelled'
+            ? `specs project set-state ${planned.id} planned`
+            : `specs project link ${planned.id} ${name}`,
+      }
+    );
+  }
+
   const proposal = await readFileIfExists(path.join(proposalDir, 'proposal.md'));
   const title =
     (proposal ? firstLine(parseProposal(proposal).why) : '') || name;

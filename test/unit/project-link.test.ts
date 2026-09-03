@@ -171,6 +171,44 @@ describe('adoptChange', () => {
     const result = await adoptChange(workspace, 'demo', 'x');
     expect(result.id).toBe('CH-008');
   });
+
+  it('recusa um slug que o plano já carrega, apontando link, e não escreve nada', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedArchivedChange(workspace, 'fund-empacotamento', '2026-09-02');
+    await seedPlan(
+      workspace,
+      manifest({ id: 'demo', revision: 4, changes: [change({ id: 'CH-018', slug: 'fund-empacotamento' })] })
+    );
+
+    // Sem o guarda isto criava CH-019 com o mesmo slug: plano com ERROR de slug
+    // duplicado, que `specs project status` depois se recusa a carregar.
+    await expect(adoptChange(workspace, 'demo', '2026-09-02-fund-empacotamento')).rejects.toMatchObject({
+      code: 'slug_already_planned',
+      fix: 'specs project link CH-018 fund-empacotamento',
+    });
+
+    const { manifest: reloaded } = await loadPlan(workspace.projectRoot, 'demo');
+    expect(reloaded.revision).toBe(4);
+    expect(reloaded.changes).toHaveLength(1);
+  });
+
+  it('manda destravar o incremento quando o slug já planejado está cancelado', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedArchivedChange(workspace, 'packaging', '2026-09-02');
+    await seedPlan(
+      workspace,
+      manifest({
+        id: 'demo',
+        changes: [change({ id: 'CH-002', slug: 'packaging', planning_state: 'cancelled' })],
+      })
+    );
+
+    // `link` recusa um incremento cancelado, então apontá-lo aqui seria um beco.
+    await expect(adoptChange(workspace, 'demo', '2026-09-02-packaging')).rejects.toMatchObject({
+      code: 'slug_already_planned',
+      fix: 'specs project set-state CH-002 planned',
+    });
+  });
 });
 
 describe('setPlanningState', () => {
@@ -278,9 +316,29 @@ describe('diagnósticos de archive órfão e execução ambígua', () => {
     const status = await computeProjectStatus(workspace, 'demo');
     const found = status.diagnostics.find((d) => d.code === 'unclaimed_archive');
     expect(found).toBeDefined();
-    expect(found!.fix).toContain('bug-fixes');
+    // O incremento do slug já existe: `adopt` duplicaria o slug, `link` o reivindica.
+    expect(found!.fix).toBe('specs project link CH-001 bug-fixes');
+    expect(found!.path).toBe('spec/changes/archive/2026-09-01-bug-fixes');
     // É exatamente o vão entre `specs status` (1 arquivada) e o plano (0/1).
     expect(status.progress.archived).toBe(0);
+  });
+
+  it('o fix sugerido é executável quando adopt é mesmo a resposta', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedArchivedChange(workspace, 'orfa', '2026-09-02');
+    await seedPlan(workspace, manifest({ id: 'demo', changes: [] }));
+
+    const status = await computeProjectStatus(workspace, 'demo');
+    const found = status.diagnostics.find((d) => d.code === 'unclaimed_archive');
+    // O argumento de `adopt` é um NOME DE DIRETÓRIO, não o slug: a dica antiga
+    // tirava o prefixo de data e o comando morria em `link_target_missing`.
+    expect(found!.fix).toBe('specs project adopt 2026-09-02-orfa');
+
+    const target = found!.fix!.split(' ').at(-1)!;
+    await expect(adoptChange(workspace, 'demo', target)).resolves.toMatchObject({
+      adopted: true,
+      change: 'orfa',
+    });
   });
 
   it('cala quando o incremento reivindica o archive', async () => {

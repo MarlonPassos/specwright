@@ -1,7 +1,14 @@
 import path from 'node:path';
 import { SpecError } from '../../util/errors.js';
 import { readFileIfExists } from '../../util/fs.js';
-import { listChanges, listArchivedChanges, type Workspace } from '../workspace.js';
+import {
+  ARCHIVE_DIR,
+  CHANGES_DIR,
+  WORKSPACE_DIR,
+  listChanges,
+  listArchivedChanges,
+  type Workspace,
+} from '../workspace.js';
 import { loadPlan } from './repository.js';
 import { ProjectGraph } from './graph.js';
 import { parsePlannedChange } from './planned-change.js';
@@ -303,20 +310,41 @@ export async function computeProjectStatus(
   // proposes creating a change that already exists, and the diagnostics use it
   // to notice archived work no increment claims.
   const activeChangeNames = new Set(await listChanges(workspace));
-  const archivedSlugs = new Set(
-    (await listArchivedChanges(workspace)).map((name) => name.replace(/^\d{4}-\d{2}-\d{2}-/, '').replace(/-\d+$/, ''))
-  );
+  // Both halves of an archive directory name matter here: the slug is what an
+  // increment claims, the DIRECTORY name (date prefix and collision suffix
+  // included) is what `adopt` takes as its argument. Keeping only the slug is
+  // what made the old fix hint unrunnable.
+  const archivedBySlug = new Map<string, string[]>();
+  for (const name of await listArchivedChanges(workspace)) {
+    const slug = name.replace(/^\d{4}-\d{2}-\d{2}-/, '').replace(/-\d+$/, '');
+    archivedBySlug.set(slug, [...(archivedBySlug.get(slug) ?? []), name]);
+  }
+  const archivedSlugs = new Set(archivedBySlug.keys());
   const claimedNames = new Set(
     manifest.changes.flatMap((change) => (change.link ? [change.link.name] : []))
   );
-  for (const slug of [...archivedSlugs].sort()) {
+  for (const [slug, dirs] of [...archivedBySlug].sort(([a], [b]) => a.localeCompare(b))) {
     if (claimedNames.has(slug)) continue;
+    const newest = [...dirs].sort((a, b) => b.localeCompare(a))[0];
+    // `adopt` creates a NEW increment. When the plan already carries this slug,
+    // adopting writes a duplicate slug: a plan that fails validation and that
+    // `project status` then refuses to load. So the increment that is already
+    // planned takes precedence, and `link` is the command that claims the work.
+    // Slugs are unique across the plan (`ProjectGraph.from` refuses otherwise),
+    // so there is at most one increment to point at. `link` refuses a cancelled
+    // one, so that case falls through to `adopt`, which reports the collision.
+    const claimable = manifest.changes.find(
+      (change) => change.slug === slug && !change.link && change.planning_state !== 'cancelled'
+    );
+    const fix = claimable
+      ? `specs project link ${claimable.id} ${slug}`
+      : `specs project adopt ${newest}`;
     diagnostics.push({
       level: 'WARNING',
       code: 'unclaimed_archive',
-      path: `spec/changes/archive/${slug}`,
+      path: `${WORKSPACE_DIR}/${CHANGES_DIR}/${ARCHIVE_DIR}/${newest}`,
       message: `a change "${slug}" está arquivada, mas nenhum incremento do plano a reivindica — o progresso do plano não a conta`,
-      fix: `specs project adopt ${slug}`,
+      fix,
     });
   }
 
