@@ -8,6 +8,8 @@ import { readDeltaSpecs, readTaskProgress } from '../change/model.js';
 import { specPath } from '../specs.js';
 import { validateChange } from '../validate/change-validator.js';
 import { changeDir, type Workspace } from '../workspace.js';
+import { adviseLink } from '../project/advice.js';
+import { linkChange } from '../project/link.js';
 import { mergeCapability } from './merge.js';
 
 export interface ArchiveOptions {
@@ -20,6 +22,17 @@ export interface ArchiveOptions {
   now?: Date;
 }
 
+export interface ArchivedPlanLink {
+  /** Plan that carried the increment. */
+  plan: string;
+  /** Increment now linked, e.g. `CH-018`. */
+  change: string;
+  /** Archive directory the link resolved to, project-relative. */
+  archivePath: string | null;
+  /** Plan revision after the link. */
+  revision: number;
+}
+
 export interface ArchiveResult {
   change: string;
   archivedAs: string;
@@ -28,6 +41,8 @@ export interface ArchiveResult {
   updatedSpecs: string[];
   retiredSpecs: string[];
   specsSkipped: boolean;
+  /** Present only when archiving recorded a plan link. */
+  plan?: ArchivedPlanLink;
 }
 
 export async function archiveChange(
@@ -115,6 +130,8 @@ export async function archiveChange(
   await ensureDir(workspace.archivePath);
   await fs.rename(dir, destination);
 
+  const plan = await linkArchivedToPlan(workspace, changeId);
+
   return {
     change: changeId,
     archivedAs,
@@ -123,7 +140,42 @@ export async function archiveChange(
     updatedSpecs: updated.sort(),
     retiredSpecs: retired.sort(),
     specsSkipped,
+    ...(plan ? { plan } : {}),
   };
+}
+
+/**
+ * Records the plan link for work a plan already planned, once the change sits
+ * in the archive.
+ *
+ * Only an exact identity match claims anything: an increment whose `slug` EQUALS
+ * the change name, with no link yet and not cancelled. Nothing is inferred from
+ * title, date or similarity, which is the same bar `link` and `sync --link` use.
+ *
+ * Best effort, and deliberately so. No plan, several plans with none matching,
+ * an unreadable manifest, a plan that refuses the write — every one of those
+ * leaves the archive exactly as it would have been. Archiving must never fail,
+ * and never behave differently, because of the state of a plan; the plan is
+ * downstream of the work, not a gate on it.
+ */
+async function linkArchivedToPlan(
+  workspace: Workspace,
+  changeId: string
+): Promise<ArchivedPlanLink | undefined> {
+  try {
+    const advice = await adviseLink(workspace.projectRoot, changeId);
+    if (!advice) return undefined;
+
+    const result = await linkChange(workspace, advice.plan, advice.change, changeId);
+    return {
+      plan: advice.plan,
+      change: result.id,
+      archivePath: result.archivePath ?? null,
+      revision: result.revision,
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 /**

@@ -5,6 +5,43 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.15.0] - 2026-09-02
+
+### Adicionado
+
+- **feat(project): `specs archive` fecha o vínculo já previsto** — uma change
+  criada com o slug de um incremento planejado podia ser trabalhada e arquivada
+  sem nunca chegar ao plano: o painel do projeto seguia mostrando o incremento
+  como pendente com o trabalho pronto no archive, e nenhum passo do caminho
+  dizia isso. O arquivamento passa a vincular o incremento **sem vínculo**, **não
+  cancelado**, cujo `slug` é **igual** ao nome da change, e reporta o que fez no
+  bloco `plan` do JSON.
+
+  Só identidade exata de identificador, o mesmo critério de `sync --link`: nada
+  é inferido de título, data ou semelhança. E nada é criado — nem incremento,
+  nem adoção, nem transição de `planning_state`. O archive apenas **fecha** um
+  vínculo previsto.
+
+  O arquivamento continua **não dependendo** do plano: plano ausente, ilegível,
+  ambíguo ou que recuse a escrita deixa o resultado byte a byte igual ao de
+  antes, e o comando nunca falha por causa dele. Num projeto sem `planning/` a
+  chave `plan` nunca aparece.
+
+- **feat(project): `specs new change` avisa qual incremento planeja o slug** —
+  quando algum plano carrega um incremento sem vínculo com aquele slug exato, a
+  saída ganha um bloco `plan` com o `specs project link` a rodar. É aviso, não
+  escrita: o plano não é tocado. `/spec-propose` passa a lê-lo e vincular já na
+  criação, para que o plano enxergue a change enquanto ela anda, não só no fim.
+
+### Documentação
+
+- **docs(project): a exceção à regra do vínculo explícito** — `docs/cli.md` e
+  `docs/project-planning.md` descrevem o fechamento no `archive` e o aviso do
+  `new change`. O passo 5 do `/spec-archive` foi reescrito: reportar o bloco
+  `plan` e, quando ele não vem com `planning/` presente, checar
+  `unclaimed_archive` — que resta para o trabalho que nenhum incremento
+  planejava.
+
 ## [0.14.1] - 2026-09-02
 
 ### Corrigido

@@ -55,10 +55,32 @@ ${RESOLVE_CHANGE}
    As specs resultantes precisam continuar válidas. Se uma spec de capacidade recém-criada
    ficou com um propósito placeholder, substitua agora editando a spec do workspace direto.
 
+5. **Feche o plano, se houver um**
+
+   O arquivamento já vincula sozinho o incremento que planejava exatamente aquele slug e
+   ainda não tinha vínculo. Quando isso acontece, a saída do \`specs archive\` traz um bloco
+   \`plan\` com o incremento vinculado - reporte-o ao usuário.
+
+   Se existe \`planning/\` na raiz e o bloco \`plan\` **não** veio, confirme por quê:
+
+   \`\`\`bash
+   specs project status --json
+   \`\`\`
+   \`plan_not_found\` significa que não há plano: pare aqui, está tudo certo. Um
+   \`unclaimed_archive\` apontando a change que você acabou de arquivar significa que nenhum
+   incremento planejava aquele slug, ou que o plano recusou a escrita - rode o \`fix\` que o
+   diagnóstico traz (\`specs project adopt\` quando ninguém planejava, \`specs project link\`
+   quando alguém planejava). Depois confirme que o incremento aparece com
+   \`execution: "archived"\`.
+
+   Sem isso o trabalho fica concluído no workspace e invisível no plano: o painel do projeto
+   segue mostrando o incremento como pendente.
+
 **Saída**
 
 - onde a change foi arquivada;
 - capacidades criadas, atualizadas e aposentadas;
+- o incremento do plano que passou a contar como concluído, quando há plano;
 - qualquer coisa que reste para fazer à mão, como um propósito placeholder a substituir.
 
 **Guardrails**

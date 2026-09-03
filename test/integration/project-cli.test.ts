@@ -267,6 +267,103 @@ describe('specs project — no regression', () => {
     }
   });
 
+  it('new change avisa do incremento que planeja o slug, e cala sem plano', async () => {
+    const dir = await initProject();
+
+    const semPlano = await runCli(['new', 'change', 'fund-empacotamento', '--json'], dir);
+    expect(semPlano.code).toBe(0);
+    expect(parseJson(semPlano.stdout).plan).toBeUndefined();
+
+    await runCli(['project', 'create', 'demo', '--json'], dir);
+    const bundle = path.join(dir, 'b.json');
+    await writeFile(
+      bundle,
+      JSON.stringify({
+        bundleVersion: 1,
+        expectRevision: 0,
+        operations: [
+          { op: 'addChange', ref: '$emp', slug: 'fund-empacotamento-2', title: 'Empacotamento' },
+        ],
+      })
+    );
+    expect((await runCli(['project', 'apply', '--file', bundle, '--json'], dir)).code).toBe(0);
+
+    const comPlano = await runCli(['new', 'change', 'fund-empacotamento-2', '--json'], dir);
+    expect(comPlano.code).toBe(0);
+    // O plano não é tocado: isto é só a indicação de um comando a rodar.
+    expect(parseJson(comPlano.stdout).plan).toMatchObject({
+      plan: 'demo',
+      change: 'CH-001',
+      fix: 'specs project link CH-001 fund-empacotamento-2',
+    });
+    const status = parseJson((await runCli(['project', 'status', '--json'], dir)).stdout);
+    expect((status.changes as Array<{ execution: string }>)[0].execution).toBe('unlinked');
+
+    // E o comando indicado é executável tal como veio.
+    const link = await runCli(
+      ['project', 'link', 'CH-001', 'fund-empacotamento-2', '--json'],
+      dir
+    );
+    expect(link.code).toBe(0);
+    expect(parseJson(link.stdout)).toMatchObject({ linked: true, id: 'CH-001' });
+  });
+
+  it('archive vincula o incremento que planejava o slug e reporta no JSON', async () => {
+    const dir = await initProject();
+    await runCli(['project', 'create', 'demo', '--json'], dir);
+    const bundle = path.join(dir, 'b.json');
+    await writeFile(
+      bundle,
+      JSON.stringify({
+        bundleVersion: 1,
+        expectRevision: 0,
+        operations: [
+          { op: 'addChange', ref: '$e', slug: 'empacotamento', title: 'Empacotamento' },
+          { op: 'addChange', ref: '$c', slug: 'cancelada', title: 'Cancelada' },
+        ],
+      })
+    );
+    expect((await runCli(['project', 'apply', '--file', bundle, '--json'], dir)).code).toBe(0);
+    expect(
+      (await runCli(['project', 'set-state', 'CH-002', 'cancelled', '--reason', 'saiu do escopo', '--json'], dir)).code
+    ).toBe(0);
+
+    for (const slug of ['empacotamento', 'cancelada']) {
+      await runCli(['new', 'change', slug], dir);
+      await writeFile(
+        path.join(dir, `spec/changes/${slug}/proposal.md`),
+        '## Why\n\nCustomers keep hitting a small papercut that wastes support time every week.\n\n## What Changes\n\n- fix it\n\n## Impact\n\nnone\n'
+      );
+      await writeFile(
+        path.join(dir, `spec/changes/${slug}/.change.yaml`),
+        'schema: spec-driven\nskip_specs: true\n'
+      );
+      await writeFile(path.join(dir, `spec/changes/${slug}/tasks.md`), '## 1\n- [x] 1.1 done\n');
+    }
+
+    const archived = parseJson((await runCli(['archive', 'empacotamento', '--json'], dir)).stdout);
+    expect(archived.plan).toMatchObject({ plan: 'demo', change: 'CH-001' });
+
+    // Um incremento cancelado nunca é reivindicado, então o bloco não aparece.
+    const cancelada = parseJson((await runCli(['archive', 'cancelada', '--json'], dir)).stdout);
+    expect(cancelada.plan).toBeUndefined();
+
+    const status = parseJson((await runCli(['project', 'status', '--json'], dir)).stdout);
+    const views = status.changes as Array<{ id: string; execution: string }>;
+    expect(views.find((view) => view.id === 'CH-001')!.execution).toBe('archived');
+    expect(status.progress).toMatchObject({ archived: 1 });
+  });
+
+  it('um plano corrompido não faz new change falhar nem falar do plano', async () => {
+    const dir = await initProject();
+    await runCli(['project', 'create', 'demo', '--json'], dir);
+    await fs.writeFile(path.join(dir, 'planning/demo/plan.yaml'), ':\n  - [ quebrado', 'utf8');
+
+    const result = await runCli(['new', 'change', 'auth', '--json'], dir);
+    expect(result.code).toBe(0);
+    expect(parseJson(result.stdout).plan).toBeUndefined();
+  });
+
   it('specs init never creates a planning area', async () => {
     const dir = await initProject();
     await expect(fs.stat(path.join(dir, 'planning'))).rejects.toThrow();
