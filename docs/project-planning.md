@@ -284,7 +284,14 @@ antes de qualquer escrita. Os diagnósticos derivados que aparecem em
 `unclaimed_archive` fecha o vão entre `specs status` e `specs project`: uma
 change arquivada que nenhum incremento reivindica não conta no progresso do
 plano, e sem o aviso o painel mostra `0/20` enquanto o outro mostra duas
-arquivadas. `ambiguous_execution` avisa quando um mesmo slug tem diretório ativo
+arquivadas. O `fix` dele depende do plano: quando já existe um incremento com
+aquele slug e sem vínculo, ele aponta `specs project link <id> <slug>` — `adopt`
+ali criaria um segundo incremento com o mesmo slug, um ERROR de validação que
+deixa o plano sem carregar. Só quando nenhum incremento carrega o slug é que o
+`fix` é `specs project adopt`, e aí ele nomeia o **diretório** do archive, com
+prefixo de data, que é o argumento que `adopt` resolve. Se ainda assim o alvo
+colidir com um slug já planejado, `adopt` recusa com `slug_already_planned`.
+`ambiguous_execution` avisa quando um mesmo slug tem diretório ativo
 **e** archive: `executionOf` resolve o archive primeiro (§7.7), então o trabalho
 ativo fica invisível e o incremento é apresentado como concluído.
 
