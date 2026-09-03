@@ -104,9 +104,13 @@ function harnessStepsFor(
     ? dashboard.changes.find((change) => change.id === increment.link!.name)
     : undefined;
   if (linked) return [linked.next];
+  // Already spelled with its argument: a bare `/spec-propose` makes the reader
+  // remember which increment and which slug, which is exactly what the panel is
+  // there to spare them.
+  const argument = increment ? ` ${increment.id} ${increment.slug}` : '';
   return [
-    invocationFor(dashboard.harness, 'explore'),
-    invocationFor(dashboard.harness, 'propose'),
+    invocationFor(dashboard.harness, 'explore') + argument,
+    invocationFor(dashboard.harness, 'propose') + argument,
   ];
 }
 
