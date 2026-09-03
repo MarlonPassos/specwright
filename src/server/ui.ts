@@ -29,7 +29,8 @@ export const INDEX_HTML = String.raw`<!doctype html>
   --ink:#12262d; --dim:#5c7a84;
   --cyan:#0d8fa3; --green:#15803d; --yellow:#a16207; --red:#b91c1c; --violet:#6d5bb8;
 }
-*{box-sizing:border-box}
+*{box-sizing:border-box;min-width:0}
+html,body{max-width:100%;overflow-x:hidden}
 body{margin:0;background:var(--bg);color:var(--ink);
   font:14px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace}
 header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
@@ -49,7 +50,7 @@ nav button{background:none;border:0;border-bottom:2px solid transparent;color:va
 nav button:hover{color:var(--ink)}
 nav button[aria-selected=true]{color:var(--cyan);border-bottom-color:var(--cyan)}
 nav .k{opacity:.55;margin-right:6px}
-main{padding:20px 22px;display:grid;gap:16px;max-width:1180px;margin:0 auto}
+main{padding:20px 22px;display:grid;gap:16px;max-width:1180px;margin:0 auto;width:100%}
 section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:15px 18px}
 h2{margin:0 0 12px;font-size:11px;letter-spacing:.19em;color:var(--dim);font-weight:700}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px}
@@ -57,7 +58,8 @@ h2{margin:0 0 12px;font-size:11px;letter-spacing:.19em;color:var(--dim);font-wei
 .kpi .l{color:var(--dim);font-size:12px}
 .bar{height:8px;background:var(--sunken);border-radius:4px;overflow:hidden;margin:8px 0 4px}
 .bar>i{display:block;height:100%;background:var(--green);transition:width .4s}
-.row{display:flex;gap:11px;align-items:baseline;padding:8px 0;border-top:1px solid var(--line)}
+.row{display:flex;gap:11px;align-items:baseline;padding:8px 0;border-top:1px solid var(--line);
+  flex-wrap:wrap}
 .row:first-child{border-top:0}
 .id{color:var(--cyan);font-weight:700;min-width:78px}
 .tag{font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid var(--line);color:var(--dim);white-space:nowrap}
@@ -66,14 +68,17 @@ h2{margin:0 0 12px;font-size:11px;letter-spacing:.19em;color:var(--dim);font-wei
 .t-yellow{color:var(--yellow);border-color:var(--yellow)}
 .t-red{color:var(--red);border-color:var(--red)}
 .t-dim{opacity:.6}
-.grow{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grow{flex:1 1 220px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cmd{color:var(--cyan);font-size:12px}
-.cp{display:inline-flex;align-items:center;gap:7px;background:var(--sunken);
+.cp{display:inline-flex;align-items:center;gap:7px;max-width:100%;
+  overflow-wrap:anywhere;text-align:left;background:var(--sunken);
   border:1px solid var(--line);border-radius:6px;color:var(--cyan);cursor:pointer;
   font:inherit;font-size:12px;padding:3px 9px;transition:border-color .15s,color .15s}
 .cp:hover{border-color:var(--cyan)}
 .cp svg{width:13px;height:13px;flex:none;opacity:.5;transition:opacity .15s}
 .cp:hover svg{opacity:1}
+.cgroup{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:5px 0 5px 89px}
+.clabel{font-size:11px;letter-spacing:.13em;color:var(--dim);min-width:82px}
 .cp.done{color:var(--green);border-color:var(--green)}
 .cp.done svg{opacity:1}
 #toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,14px);
@@ -84,12 +89,22 @@ h2{margin:0 0 12px;font-size:11px;letter-spacing:.19em;color:var(--dim);font-wei
 .muted{color:var(--dim)}
 .sm{font-size:12px}
 .empty{color:var(--dim);padding:5px 0}
-.sub2{color:var(--dim);font-size:12px;padding:2px 0 2px 89px}
+.sub2{color:var(--dim);font-size:12px;padding:2px 0 2px 89px;overflow-wrap:anywhere}
 .dots{letter-spacing:3px;min-width:78px}
 .d-done{color:var(--green)} .d-ready{color:var(--cyan)} .d-blocked{opacity:.35} .d-skipped{opacity:.3}
-.mile{display:flex;gap:12px;align-items:center;padding:6px 0}
-.mile .nm{min-width:190px}
+.mile{display:flex;gap:12px;align-items:center;padding:6px 0;flex-wrap:wrap}
+.mile .nm{flex:1 1 150px;min-width:0}
 .mile .bar{flex:1;margin:0}
+details.card{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+details.card>summary{list-style:none;cursor:pointer;padding:15px 18px;
+  font-size:11px;letter-spacing:.19em;color:var(--dim);font-weight:700;
+  display:flex;align-items:center;gap:9px;user-select:none}
+details.card>summary::-webkit-details-marker{display:none}
+details.card>summary:hover{color:var(--ink)}
+details.card>summary .caret{transition:transform .18s;flex:none;opacity:.6}
+details.card[open]>summary .caret{transform:rotate(90deg)}
+details.card>summary .count{margin-left:auto;font-weight:400;letter-spacing:0;opacity:.75}
+details.card>.body{padding:0 18px 15px}
 footer{padding:12px 22px 24px;color:var(--dim);font-size:12px;text-align:center}
 @media(max-width:640px){.id,.dots{min-width:0}.mile .nm{min-width:0}.sub2{padding-left:0}}
 </style>
@@ -115,7 +130,21 @@ function bar(done,total,color){
   return '<div class="bar"><i style="width:'+p+'%;background:var(--'+(color||'green')+')"></i></div>';
 }
 function kpi(n,l){return '<div class="kpi"><div class="n">'+esc(n)+'</div><div class="l">'+esc(l)+'</div></div>'}
-function sec(t,b){return '<section><h2>'+esc(t)+'</h2>'+b+'</section>'}
+var CARET='<svg class="caret" viewBox="0 0 24 24" width="12" height="12" fill="none"'
+  +' stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">'
+  +'<path d="m9 18 6-6-6-6"/></svg>';
+
+/**
+ * O primeiro card de cada tela é fixo — é o resumo, e esconder o resumo não
+ * ajuda ninguém. Os demais viram acordeão, abertos por padrão: numa tela com
+ * vinte incrementos, poder fechar uma seção é a diferença entre ler e rolar.
+ */
+function sec(t,b,n){return '<section><h2>'+esc(t)+'</h2>'+b+'</section>'}
+function card(t,b,n){
+  return '<details class="card" open><summary>'+CARET+esc(t)
+    +(n!=null?'<span class="count">'+esc(n)+'</span>':'')
+    +'</summary><div class="body">'+b+'</div></details>';
+}
 function empty(t){return '<div class="empty">'+esc(t)+'</div>'}
 
 var ICO_COPY='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
@@ -123,6 +152,13 @@ var ICO_COPY='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-
   +'<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
 var ICO_OK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"'
   +' stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+
+/** Commands under a label, so CLI and harness never get mistaken for each other. */
+function group(label,list){
+  if(!list||!list.length)return '';
+  return '<div class="cgroup"><span class="clabel">'+esc(label)+'</span>'
+    +list.map(function(x){return cmd(x)}).join('')+'</div>';
+}
 
 /** A command the reader will paste into the harness: one click puts it on the clipboard. */
 function cmd(text){
@@ -145,6 +181,8 @@ var TABS=[{id:'resumo',label:'RESUMO',route:'/api/overview'},
           {id:'changes',label:'CHANGES',route:'/api/changes'},
           {id:'plano',label:'PLANO',route:'/api/plan'}];
 var cache={}, active='resumo', latest=null;
+/* A tela PLANO não carrega o harness; o RESUMO carrega, então herdamos dele. */
+var HARNESS_OPEN=['/spec-explore','/spec-propose'];
 
 /* ---------- telas ---------- */
 
@@ -160,7 +198,7 @@ function screenResumo(d){
   var out=sec('RESUMO',h);
 
   var f=d.focus||[];
-  out+=sec('EM ANDAMENTO', f.length? f.map(function(x){
+  out+=card('EM ANDAMENTO', f.length? f.map(function(x){
     var ch=x.change,inc=x.increment,r='<div class="row">';
     r+='<span class="id">'+esc(inc?inc.id:(ch?ch.id:'—'))+'</span>';
     r+='<span class="grow">'+esc(inc?inc.title:(ch?ch.id:''))+'</span>';
@@ -168,31 +206,32 @@ function screenResumo(d){
     if(ch&&ch.tasks&&ch.tasks.total>0)r+='<span class="tag">'+ch.tasks.completed+'/'+ch.tasks.total+'</span>';
     if(ch)r+=cmd(ch.next);
     return r+'</div>';
-  }).join('') : empty('Nada em andamento.'));
+  }).join('') : empty('Nada em andamento.'), f.length||null);
 
   if(d.milestones&&d.milestones.length)
-    out+=sec('MILESTONES', d.milestones.map(function(x){
+    out+=card('MILESTONES', d.milestones.map(function(x){
       return '<div class="mile"><span class="nm">'+esc(x.id)+' '+esc(x.name)+'</span>'
         +bar(x.archived,x.total)+'<span class="muted sm">'+x.archived+'/'+x.total+'</span></div>';
-    }).join(''));
+    }).join(''), d.milestones.length);
 
   var n=d.recommended;
-  if(n)out+=sec('PRÓXIMO PASSO','<div class="row"><span class="id">'+esc(n.id)+'</span><span class="grow">'+esc(n.title)+'</span></div>'
+  if(n)out+=card('PRÓXIMO PASSO','<div class="row"><span class="id">'+esc(n.id)+'</span><span class="grow">'+esc(n.title)+'</span></div>'
     +(n.reasons||[]).map(function(r){return '<div class="sub2">↳ '+esc(r)+'</div>'}).join('')
-    +(n.commands||[]).map(function(x){return '<div class="sub2">↳ '+cmd(x)+'</div>'}).join(''));
+    +group('no harness',n.harnessCommands)+group('no terminal',n.commands));
 
   var g=d.diagnostics||{errors:0,warnings:0};
-  out+=sec('DIAGNÓSTICOS',(g.errors||g.warnings)
+  out+=card('DIAGNÓSTICOS',(g.errors||g.warnings)
     ? '<div class="grid">'+kpi(g.errors,'erros')+kpi(g.warnings,'avisos')+'</div>' : empty('Sem diagnósticos.'));
   return out;
 }
 
 function screenChanges(d){
-  var out='',any=false;
+  var out='',first=true;
   PHASES.forEach(function(p){
     var m=(d.changes||[]).filter(function(c){return c.phase===p[0]});
-    if(!m.length)return; any=true;
-    out+=sec(p[1], m.map(function(c){
+    if(!m.length)return;
+    var box=first?sec:card; first=false;
+    out+=box(p[1], m.map(function(c){
       var dots=(c.artifacts||[]).map(function(a){
         return '<span class="d-'+a.state+'" title="'+esc(a.id)+': '+esc(a.state)+'">'+(DOT[a.state]||'·')+'</span>';
       }).join('');
@@ -204,16 +243,16 @@ function screenChanges(d){
       r+='</div>';
       if(c.error)r+='<div class="sub2" style="color:var(--red)">↳ '+esc(c.error)+'</div>';
       else if(c.blockedBy&&c.blockedBy.length)r+='<div class="sub2">↳ falta '+esc(c.blockedBy.join(', '))+'</div>';
-      if(c.next)r+='<div class="sub2">↳ '+cmd(c.next)+'</div>';
+      if(c.next)r+=group('no harness',[c.next]);
       return r;
-    }).join(''));
+    }).join(''), m.length);
   });
-  if(!any)out=sec('CHANGES',empty('Nenhuma change ativa.'));
+  if(first)out=sec('CHANGES',empty('Nenhuma change ativa.'));
   if(d.specs&&d.specs.length)
-    out+=sec('CAPACIDADES', d.specs.map(function(s){
+    out+=card('CAPACIDADES', d.specs.map(function(s){
       return '<div class="row"><span class="grow">'+esc(s.capability)+'</span><span class="tag">'+s.requirements+' req.</span></div>';
-    }).join(''));
-  if(d.archive)out+=sec('ARQUIVO','<div class="grid">'+kpi(d.archive.count,'changes arquivadas')+kpi(d.archive.last||'—','última data')+'</div>');
+    }).join(''), d.specs.length);
+  if(d.archive)out+=card('ARQUIVO','<div class="grid">'+kpi(d.archive.count,'changes arquivadas')+kpi(d.archive.last||'—','última data')+'</div>');
   return out;
 }
 
@@ -230,7 +269,7 @@ function screenPlano(d){
     var m=(d.changes||[]).filter(function(c){return s[1].indexOf(c.presentation)>=0 && !placed[c.id]});
     if(!m.length)return;
     m.forEach(function(c){placed[c.id]=1});
-    out+=sec(s[0], m.map(function(c){
+    out+=card(s[0], m.map(function(c){
       var r='<div class="row"><span class="id">'+esc(c.id)+'</span><span class="grow">'+esc(c.title)+'</span>'
         +'<span class="tag '+(PRES[c.presentation]||'')+'">'+esc(c.presentation)+'</span>';
       if(c.plannedChange)r+='<span class="tag">brief '+esc(c.plannedChange.state)+'</span>';
@@ -240,16 +279,23 @@ function screenPlano(d){
       (c.manualBlockers||[]).forEach(function(b){r+='<div class="sub2" style="color:var(--yellow)">↳ blocker: '+esc(b)+'</div>'});
       if(c.link)r+='<div class="sub2">↳ vínculo: '+esc(c.link.name)+'</div>';
       if(c.unlocks&&c.unlocks.length&&c.execution!=='archived')r+='<div class="sub2">↳ desbloqueia '+esc(c.unlocks.join(', '))+'</div>';
+      // O caminho para começar este incremento, dos dois lados.
+      if(c.presentation==='pronta'&&!c.link){
+        r+=group('no harness',HARNESS_OPEN);
+        r+=group('no terminal',['specs new change '+c.slug,'specs project link '+c.id+' '+c.slug]);
+      } else if(c.link&&c.execution!=='archived'){
+        r+=group('no terminal',['specs status --change '+c.link.name]);
+      }
       return r;
-    }).join(''));
+    }).join(''), m.length);
   });
 
   var dg=d.diagnostics||[];
-  out+=sec('DIAGNÓSTICOS', dg.length? dg.map(function(x){
+  out+=card('DIAGNÓSTICOS', dg.length? dg.map(function(x){
     var cl=x.level==='ERROR'?'t-red':x.level==='WARNING'?'t-yellow':'t-cyan';
     return '<div class="row"><span class="tag '+cl+'">'+esc(x.code)+'</span><span class="grow">'+esc(x.message)+'</span></div>'
-      +(x.fix?'<div class="sub2">↳ '+cmd(x.fix)+'</div>':'');
-  }).join('') : empty('Sem diagnósticos.'));
+      +(x.fix?group('no terminal',[x.fix]):'');
+  }).join('') : empty('Sem diagnósticos.'), dg.length||null);
   return out;
 }
 
@@ -353,6 +399,7 @@ es.addEventListener('overview',function(ev){
   cache.resumo=d;
   E('proj').textContent=d.projectName+'  ·  '+d.schema+'  ·  '+d.harness;
   document.title='Specwright — '+d.projectName;
+  if(d.recommended&&d.recommended.harnessCommands)HARNESS_OPEN=d.recommended.harnessCommands;
   // O stream só carrega o RESUMO; as outras telas recarregam sob demanda.
   delete cache.changes; delete cache.plano;
   show(active,active!=='resumo');

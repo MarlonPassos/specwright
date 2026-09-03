@@ -297,8 +297,15 @@ vive no hash (`#changes`), então recarregar não perde o lugar. Dois temas, esc
 por padrão como o terminal, com a escolha lembrada no navegador.
 
 Todo comando exibido é um **chip clicável que copia para a área de transferência**,
-para colar direto no harness — o comando que avança uma change, os do próximo
-incremento e o `fix` de cada diagnóstico.
+agrupado sob **no harness** ou **no terminal**, para os dois nunca serem
+confundidos. Onde os dois caminhos existem, os dois aparecem: o próximo
+incremento mostra `/spec-explore` e `/spec-propose` ao lado de
+`specs new change` e `specs project link`; quando a change já está vinculada, o
+harness mostra o comando dela em vez de propor outra.
+
+O primeiro card de cada tela é fixo; os demais são **acordeões abertos por
+padrão**, com a contagem no cabeçalho — numa tela com vinte incrementos, fechar
+uma seção é a diferença entre ler e rolar.
 
 O stream observa `spec/` e `planning/` com `fs.watch`, e agrupa a rajada de uma
 escrita atômica num aviso só — `writeFileAtomic` grava em temporário e renomeia,

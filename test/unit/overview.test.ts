@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { buildOverview } from '../../src/core/overview.js';
 import { renderOverview } from '../../src/cli/overview-view.js';
-import { makePlanWorkspace, seedPlan, manifest, change } from '../helpers/plan.js';
+import { makePlanWorkspace, seedPlan, manifest, change, withBrief } from '../helpers/plan.js';
 import { seedChange } from '../helpers/workspace.js';
 
 const PLAIN = { color: false, width: 100 };
@@ -152,3 +152,40 @@ describe('renderOverview', () => {
     expect(estreito).toContain('PLANO');
   });
 });
+
+describe('buildOverview — a recomendação nos dois idiomas', () => {
+  it('sem vínculo, o harness abre a change; o terminal cria e vincula', async () => {
+    const workspace = await makePlanWorkspace();
+    const ch = await withBrief(workspace, 'demo', change({ id: 'CH-001', slug: 'human-dates', title: 'Datas humanas' }));
+    await seedPlan(workspace, manifest({ id: 'demo', changes: [ch] }));
+
+    const data = await buildOverview(workspace, { planId: 'demo' });
+    expect(data.recommended!.harnessCommands).toEqual(['/spec-explore', '/spec-propose']);
+    expect(data.recommended!.commands).toEqual([
+      'specs new change human-dates',
+      'specs project link CH-001 human-dates',
+    ]);
+  });
+
+  it('com a change vinculada, o harness aponta o comando dela, não propose de novo', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedChange(workspace, 'human-dates', { tasks: '## 1\n- [x] 1.1 ok\n- [ ] 1.2\n' });
+    const ch = await withBrief(
+      workspace,
+      'demo',
+      change({
+        id: 'CH-001',
+        slug: 'human-dates',
+        title: 'Datas humanas',
+        link: { name: 'human-dates', active_path: 'spec/changes/human-dates', archive_path: null, linked_at: '2026-09-01' },
+      })
+    );
+    await seedPlan(workspace, manifest({ id: 'demo', changes: [ch] }));
+
+    const data = await buildOverview(workspace, { planId: 'demo' });
+    expect(data.recommended!.harnessCommands).toHaveLength(1);
+    expect(data.recommended!.harnessCommands[0]).toMatch(/^\/spec-/);
+    expect(data.recommended!.harnessCommands).not.toContain('/spec-propose');
+  });
+});
+
