@@ -2,6 +2,7 @@ import { buildDashboard, type DashboardData, type DashboardOptions } from './das
 import { listPlanIds } from './project/paths.js';
 import { computeProjectStatus, type PlanStatus } from './project/status.js';
 import { recommendNext } from './project/next.js';
+import { invocationFor } from './harness/registry.js';
 import type { Workspace } from './workspace.js';
 
 /** One piece of work in flight, seen from both layers at once. */
@@ -51,7 +52,20 @@ export interface OverviewData {
   /** Work in flight, plan and execution joined. Empty when nothing is running. */
   focus: OverviewFocus[];
   milestones?: { id: string; name: string; archived: number; total: number }[];
-  recommended?: { id: string; title: string; reasons: string[]; commands: string[] };
+  recommended?: {
+    id: string;
+    title: string;
+    reasons: string[];
+    /** CLI commands, in order. */
+    commands: string[];
+    /**
+     * The same step spelled for the running harness. `/spec-project-next` points
+     * at explore or propose to open the change; once one is linked, the command
+     * that moves it forward is the change's own. A panel that shows only the CLI
+     * side makes the reader translate, and the harness is where the work happens.
+     */
+    harnessCommands: string[];
+  };
   diagnostics: { errors: number; warnings: number };
 }
 
@@ -73,6 +87,29 @@ export interface OverviewOptions extends DashboardOptions {
  * plan-side field absent, and the execution side is projected on its own. A
  * broken plan must never cost the reader the half of the screen that still works.
  */
+/**
+ * The harness side of the recommendation.
+ *
+ * With no change linked yet the step is to open one — `/spec-project-next` names
+ * explore and propose. Once a change exists, its own next command is the honest
+ * answer, and proposing again would be wrong.
+ */
+function harnessStepsFor(
+  incrementId: string,
+  dashboard: DashboardData,
+  status: PlanStatus
+): string[] {
+  const increment = status.changes.find((change) => change.id === incrementId);
+  const linked = increment?.link
+    ? dashboard.changes.find((change) => change.id === increment.link!.name)
+    : undefined;
+  if (linked) return [linked.next];
+  return [
+    invocationFor(dashboard.harness, 'explore'),
+    invocationFor(dashboard.harness, 'propose'),
+  ];
+}
+
 export async function buildOverview(
   workspace: Workspace,
   options: OverviewOptions = {}
@@ -139,6 +176,7 @@ export async function buildOverview(
             commands: [next.recommended.startWith, next.recommended.thenLink].filter(
               (command): command is string => Boolean(command)
             ),
+            harnessCommands: harnessStepsFor(next.recommended.id, dashboard, status),
           },
         }
       : {}),

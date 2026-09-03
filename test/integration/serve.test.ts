@@ -235,6 +235,30 @@ describe('specs serve — navegação', () => {
     expect(INDEX_HTML).toContain('execCommand');
   });
 
+  it('os cards depois do primeiro são acordeão, abertos por padrão', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    // <details open> nativo: sem JS, acessível e navegável por teclado.
+    expect(INDEX_HTML).toContain('<details class="card" open>');
+    expect(INDEX_HTML).toContain('function card(t,b,n)');
+    // O primeiro card de cada tela continua fixo: esconder o resumo não ajuda.
+    expect(INDEX_HTML).toContain('var box=first?sec:card');
+  });
+
+  it('CLI e harness aparecem rotulados, nunca misturados', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    expect(INDEX_HTML).toContain("group('no harness'");
+    expect(INDEX_HTML).toContain("group('no terminal'");
+  });
+
+  it('nada pode vazar da viewport', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    expect(INDEX_HTML).toContain('overflow-x:hidden');
+    // Linha, milestone e grupo de comando quebram em vez de empurrar a largura.
+    expect(INDEX_HTML).toMatch(/\.row\{[^}]*flex-wrap:wrap/);
+    expect(INDEX_HTML).toMatch(/\.grow\{flex:1 1 220px/);
+    expect(INDEX_HTML).toContain('overflow-wrap:anywhere');
+  });
+
   it('as telas fora do RESUMO recarregam quando o stream avisa', async () => {
     const { INDEX_HTML } = await import('../../src/server/ui.js');
     // O SSE só carrega o overview; sem invalidar, CHANGES e PLANO ficariam velhas.

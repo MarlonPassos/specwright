@@ -5,6 +5,32 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.18.0] - 2026-09-02
+
+### Adicionado
+
+- **feat(core): a recomendação sai nos dois idiomas** — `buildOverview` publica
+  `recommended.harnessCommands` ao lado de `commands`. Sem vínculo, o harness
+  abre a change (`/spec-explore`, `/spec-propose`), que é o que
+  `/spec-project-next` manda fazer; com a change já vinculada, o comando dela é a
+  resposta honesta e propor de novo seria errado. O painel mostrava só o lado da
+  CLI e deixava a tradução para o leitor.
+- **feat(server): comandos rotulados por destino** — cada comando aparece sob
+  **no harness** ou **no terminal**, nunca misturados, na tela RESUMO, na CHANGES
+  e por incremento na PLANO.
+- **feat(server): cards viram acordeão** — o primeiro card de cada tela fica
+  fixo, porque esconder o resumo não ajuda; os demais são `<details open>`
+  nativos, abertos por padrão, com a contagem no cabeçalho. Sem JavaScript,
+  acessível e navegável por teclado.
+
+### Corrigido
+
+- **fix(server): os cards vazavam da viewport** — numa tela estreita, título
+  longo e chips empurravam a largura para fora do container e o card era cortado
+  à direita. `overflow-x` travado no documento, `.row` e o grupo de comandos
+  quebrando em vez de empurrar, `.grow` encolhendo a partir de 220px e quebra de
+  palavra nos comandos longos.
+
 ## [0.17.0] - 2026-09-02
 
 ### Adicionado
