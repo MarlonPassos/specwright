@@ -138,6 +138,38 @@ previsto — o incremento sem vínculo cujo `slug` é igual ao nome da change �
 reporta no bloco `plan`. Um plano ausente ou ilegível não muda o arquivamento em
 nada.
 
+### `specs watch [plan-id]`
+
+Painel único, navegável por teclado. Três telas num processo só:
+
+| Tecla | Tela | Conteúdo |
+| --- | --- | --- |
+| `1` | **RESUMO** | execução e plano juntos, com o vínculo `change ↔ incremento` desenhado |
+| `2` | **CHANGES** | o painel de `specs status` |
+| `3` | **PLANO** | o painel de `specs project` |
+
+| Tecla | Ação |
+| --- | --- |
+| `Tab`, `→` | próxima aba |
+| `Shift+Tab`, `←` | aba anterior |
+| `1`…`9` | salta para aquela aba |
+| `r` | repinta agora |
+| `q`, `Esc`, `Ctrl+C` | sai |
+
+| Opção | Significado |
+| --- | --- |
+| `--interval <segundos>` | Intervalo de repintura; padrão 2 |
+| `--once` | Desenha um quadro e sai |
+| `--json` | Publica a projeção combinada e sai |
+| `--no-color` | Sem cor nem glifos Unicode |
+
+`specs status --watch` e `specs project --watch` entram no mesmo painel, abrindo
+em CHANGES e em PLANO. Nenhuma tecla escreve no projeto.
+
+Num projeto **sem** plano legível existe uma aba só, e nada muda: sem barra de
+abas, sem teclas. Sem TTY — pipe, CI, `| cat` — o painel repinta por polling como
+sempre fez, sem capturar teclado.
+
 ## Inspeção
 
 ### `specs list`

@@ -18,7 +18,7 @@ import { PLANNING_STATES, type PlanningState, type PlanStatusValue } from '../..
 import type { ValidationReport } from '../../core/validate/report.js';
 import { renderProjectDashboard } from '../project-dashboard-view.js';
 import type { ViewOptions } from '../theme.js';
-import { watch } from '../watch.js';
+import { PLAN_TAB, runPanel } from '../panel.js';
 import { fail, printJson, printLines } from '../output.js';
 
 const DASHBOARD_SCHEMA_VERSION = 1;
@@ -79,17 +79,13 @@ export function registerProjectCommands(program: Command): void {
         const id = await resolvePlanId(workspace.projectRoot);
 
         if (options.watch) {
-          const view = viewOptions(this);
-          await watch({
+          // Opens on PLANO, the screen this command has always drawn; the other
+          // tabs are one key away.
+          await runPanel(workspace, {
+            initial: PLAN_TAB,
             intervalMs: intervalMs(options.interval),
-            command: 'specs project',
-            frame: async () => {
-              const snapshot = await computeProjectStatus(workspace, id);
-              return renderProjectDashboard(snapshot, recommendNext(snapshot), {
-                ...view,
-                width: process.stdout.columns ?? view.width,
-              });
-            },
+            view: viewOptions(this),
+            planId: id,
           });
           return;
         }

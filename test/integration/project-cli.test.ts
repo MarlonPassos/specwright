@@ -364,6 +364,59 @@ describe('specs project — no regression', () => {
     expect(parseJson(result.stdout).plan).toBeUndefined();
   });
 
+  it('specs watch publica a projeção combinada e desenha o painel unificado', async () => {
+    const dir = await initProject();
+    await runCli(['project', 'create', 'demo', '--json'], dir);
+    const bundle = path.join(dir, 'b.json');
+    await writeFile(
+      bundle,
+      JSON.stringify({
+        bundleVersion: 1,
+        expectRevision: 0,
+        operations: [{ op: 'addChange', ref: '$a', slug: 'fund-refactor', title: 'Refactorings' }],
+      })
+    );
+    expect((await runCli(['project', 'apply', '--file', bundle, '--json'], dir)).code).toBe(0);
+    await runCli(['new', 'change', 'fund-refactor'], dir);
+    await writeFile(
+      path.join(dir, 'spec/changes/fund-refactor/proposal.md'),
+      '## Why\n\nCustomers keep hitting a small papercut that wastes support time every week.\n\n## What Changes\n\n- fix it\n\n## Impact\n\nnone\n'
+    );
+    expect((await runCli(['project', 'link', 'CH-001', 'fund-refactor', '--json'], dir)).code).toBe(0);
+
+    const json = parseJson((await runCli(['watch', '--json'], dir)).stdout);
+    expect(json.overviewSchemaVersion).toBe(1);
+    expect(json.plan).toMatchObject({ id: 'demo' });
+    // A aresta que os dois painéis separados nunca desenharam.
+    expect(json.focus).toEqual([
+      expect.objectContaining({
+        change: expect.objectContaining({ id: 'fund-refactor' }),
+        increment: expect.objectContaining({ id: 'CH-001' }),
+      }),
+    ]);
+
+    const once = await runCli(['watch', '--once'], dir);
+    expect(once.code).toBe(0);
+    expect(once.stdout).toContain('FOCO AGORA');
+    expect(once.stdout).toContain('CH-001');
+    // Sem TTY não há modo raw nem barra de abas.
+    expect(once.stdout).not.toContain('[1] RESUMO');
+  });
+
+  it('specs watch recusa --json com --once e cai na aba única sem plano', async () => {
+    const dir = await initProject();
+
+    const conflito = await runCli(['watch', '--json', '--once'], dir);
+    expect(conflito.code).toBe(1);
+    expect(parseJson(conflito.stdout).error.code).toBe('invalid_option');
+
+    // Sem `planning/` a aba RESUMO não existe: o painel é o de changes.
+    const once = await runCli(['watch', '--once'], dir);
+    expect(once.code).toBe(0);
+    expect(once.stdout).toContain('RESUMO');
+    expect(once.stdout).not.toContain('MILESTONES');
+  });
+
   it('specs init never creates a planning area', async () => {
     const dir = await initProject();
     await expect(fs.stat(path.join(dir, 'planning'))).rejects.toThrow();
