@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { startServer, type RunningServer } from '../../src/server/serve.js';
 import { makeWorkspace, runCli, writeFile } from '../helpers/workspace.js';
 import type { Workspace } from '../../src/core/workspace.js';
+import { OPEN_TASKS_SHOWN } from '../../src/core/change/status.js';
 
 let running: RunningServer | undefined;
 
@@ -181,6 +182,43 @@ describe('specs serve — a página e a projeção não podem divergir', () => {
       expect(first, key).toHaveProperty(key);
     }
     expect(first.artifacts[0]).toHaveProperty('state');
+  });
+
+  it('a tela CHANGES recebe as tarefas abertas da change, não só o total', async () => {
+    const workspace = await makeWorkspace();
+    const dir = path.join(workspace.changesPath, 'alguma');
+    await writeFile(path.join(dir, 'proposal.md'), '# x\n');
+    await writeFile(
+      path.join(dir, 'tasks.md'),
+      '## 1. Base\n\n- [x] 1.1 Feito\n- [ ] 1.2 Em andamento\n- [ ] 1.3 Depois\n'
+    );
+    const server = await serve(workspace);
+    const body = (await (await get(server, '/api/changes')).json()) as Record<string, any>;
+    const change = body.changes.find((c: any) => c.id === 'alguma');
+
+    expect(change.tasks).toMatchObject({ total: 3, completed: 1 });
+    // Só as abertas: o que já foi feito o contador ao lado da barra já diz.
+    expect(change.tasks.open.map((t: any) => t.number)).toEqual(['1.2', '1.3']);
+
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    expect(INDEX_HTML).toContain('function openTasks(c)');
+    // A lista é curta e o resto abre no checklist inteiro, num clique.
+    expect(INDEX_HTML).toContain("data-doc=\"change:'+esc(c.id)+':tasks\"");
+  });
+
+  it('a lista de tarefas abertas é curta por contrato, não por acaso', async () => {
+    const workspace = await makeWorkspace();
+    const dir = path.join(workspace.changesPath, 'grande');
+    await writeFile(path.join(dir, 'proposal.md'), '# x\n');
+    const lines = Array.from({ length: 12 }, (_, i) => `- [ ] 1.${i + 1} Tarefa ${i + 1}`);
+    await writeFile(path.join(dir, 'tasks.md'), `## 1. Base\n\n${lines.join('\n')}\n`);
+    const server = await serve(workspace);
+    const body = (await (await get(server, '/api/changes')).json()) as Record<string, any>;
+    const change = body.changes.find((c: any) => c.id === 'grande');
+
+    expect(change.tasks.total).toBe(12);
+    // Uma tela com vinte changes tem de continuar sendo uma tela.
+    expect(change.tasks.open).toHaveLength(OPEN_TASKS_SHOWN);
   });
 
   it('a tela PLANO degrada sem plano em vez de quebrar', async () => {

@@ -329,6 +329,13 @@ O primeiro card de cada tela é fixo; os demais são **acordeões abertos por
 padrão**, com a contagem no cabeçalho — numa tela com vinte incrementos, fechar
 uma seção é a diferença entre ler e rolar.
 
+Na tela CHANGES, cada change mostra **as tarefas ainda abertas** embaixo da sua
+linha — só as abertas, porque o que já foi feito o contador ao lado da barra já
+diz. A lista é curta por contrato (`OPEN_TASKS_SHOWN`, cinco): uma tela com vinte
+changes tem de continuar sendo uma tela, e o botão ao pé abre o checklist
+inteiro. Os itens vêm do mesmo parse que conta o progresso, então mostrá-los não
+lê `tasks.md` uma segunda vez.
+
 #### A tela DOCUMENTOS
 
 O catálogo de tudo que se lê no projeto, agrupado como o projeto é organizado:

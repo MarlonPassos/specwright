@@ -37,6 +37,12 @@ versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
   perder o cursor. Fora de um `<summary>` de propósito: um input ali dentro
   abriria e fecharia o acordeão a cada clique.
 
+- **feat(server): as tarefas abertas na própria linha da change** — a tela
+  CHANGES mostra o que falta fazer sem abrir nada, com o checklist inteiro a um
+  clique. `computeStatus` passou a carregar as primeiras tarefas não marcadas
+  (`tasks.open`, no máximo cinco) em vez de jogar fora os itens que já parseou
+  para contar o progresso — mostrá-los não custa uma segunda leitura do arquivo.
+
 ### Alterado
 
 - **feat(server): a ordem das abas segue o trabalho** — RESUMO → PLANO → CHANGES

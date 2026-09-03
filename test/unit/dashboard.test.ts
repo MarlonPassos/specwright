@@ -31,7 +31,12 @@ describe('dashboard data', () => {
 
     const data = await buildDashboard(workspace, CLAUDE_ENV);
     expect(data.changes[0].phase).toBe('implementing');
-    expect(data.changes[0].tasks).toEqual({ total: 1, completed: 0 });
+    // O resumo carrega as tarefas ainda abertas: é o que o painel mostra na linha.
+    expect(data.changes[0].tasks).toEqual({
+      total: 1,
+      completed: 0,
+      open: [{ number: '1.1', text: expect.any(String), group: expect.any(String) }],
+    });
     expect(data.changes[0].next).toBe('/spec-implement');
   });
 

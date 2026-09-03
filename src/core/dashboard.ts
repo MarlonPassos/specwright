@@ -3,7 +3,12 @@ import { loadConfig, type WorkspaceConfig } from './config.js';
 import { detectHarness } from './harness/current.js';
 import type { HarnessAdapter } from './harness/types.js';
 import { listSpecEntries } from './list.js';
-import { computeStatus, resolveChangeContext, type ArtifactState } from './change/status.js';
+import {
+  computeStatus,
+  resolveChangeContext,
+  type ArtifactState,
+  type TaskSummary,
+} from './change/status.js';
 import { listArchivedChanges, listChanges, type Workspace } from './workspace.js';
 
 /** Where a change sits in the workflow, derived from its artifacts and tasks. */
@@ -19,7 +24,8 @@ export interface DashboardChange {
   phase: ChangePhase;
   artifacts: DashboardArtifact[];
   blockedBy: string[];
-  tasks?: { total: number; completed: number };
+  /** Progresso do checklist e as primeiras tarefas ainda abertas. */
+  tasks?: TaskSummary;
   /** The command that moves this change forward. */
   next: string;
   /** Why the change could not be read at all; set only when the phase is `broken`. */

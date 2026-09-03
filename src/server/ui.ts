@@ -142,6 +142,11 @@ section.toolbar{padding:11px 18px}
 .tk.ok .txt{color:var(--dim)}
 .tk .no{flex:none;min-width:32px;color:var(--dim);font-size:12px}
 .tk .txt{flex:1 1 200px;overflow-wrap:anywhere}
+.tks{padding:3px 0 6px 89px}
+.tks .tk{padding:2px 0;font-size:12px}
+.tks .tk .bx{font-size:11px}
+.tks .more{margin-top:5px}
+@media(max-width:640px){.tks{padding-left:0}}
 details.card{background:var(--panel);border:1px solid var(--line);border-radius:10px}
 details.card>summary{list-style:none;cursor:pointer;padding:15px 18px;
   font-size:11px;letter-spacing:.19em;color:var(--dim);font-weight:700;
@@ -437,6 +442,7 @@ function screenChanges(d){
       r+='</div>';
       if(c.error)r+='<div class="sub2" style="color:var(--red)">↳ '+esc(c.error)+'</div>';
       else if(c.blockedBy&&c.blockedBy.length)r+='<div class="sub2">↳ falta '+esc(c.blockedBy.join(', '))+'</div>';
+      r+=openTasks(c);
       if(c.next)r+=group('no harness',[c.next]);
       return r;
     }).join(''), m.length);
@@ -567,6 +573,33 @@ function docRow(x){
     +'<span class="dtitle openable" data-doc="'+esc(x.id)+'" title="Abrir">'+esc(x.title)+'</span>'
     +'<span class="grow muted sm">'+esc(x.purpose)+'</span>'
     +'<span class="dpath">'+esc(x.path)+'</span></div>';
+}
+
+/**
+ * O que falta fazer nesta change, na própria linha dela.
+ *
+ * Só as abertas, porque é isso que responde "o que está em andamento": o que já
+ * foi feito o contador ao lado da barra já diz. A lista é curta de propósito —
+ * o resto se lê no tasks.md, a um clique de distância — para uma tela com vinte
+ * changes continuar sendo uma tela e não um relatório.
+ */
+function openTasks(c){
+  var t=c.tasks;
+  if(!t||!t.total)return '';
+  var open=t.open||[];
+  if(!open.length)return '';
+  var rest=(t.total-t.completed)-open.length;
+  return '<div class="tks">'
+    +open.map(function(x){
+      var depth=x.number?x.number.split('.').length-1:0;
+      return '<div class="tk"'+(depth?' style="padding-left:'+(depth*16)+'px"':'')+'>'
+        +'<span class="bx">○</span><span class="no">'+esc(x.number)+'</span>'
+        +'<span class="txt">'+esc(x.text)+'</span></div>';
+    }).join('')
+    +'<div class="more"><button type="button" class="dchip" data-doc="change:'+esc(c.id)+':tasks"'
+    +' title="Abrir o checklist inteiro">'
+    +(rest>0?'mais '+rest+' — ver as '+t.total+' tarefas':'ver as '+t.total+' tarefas')
+    +'</button></div></div>';
 }
 
 /**

@@ -35,8 +35,26 @@ export interface ChangeStatus {
   applyBlockedBy: string[];
   ready: boolean;
   next: string[];
-  tasks?: { total: number; completed: number };
+  tasks?: TaskSummary;
 }
+
+/**
+ * O checklist da change, resumido.
+ *
+ * `open` carrega as primeiras tarefas ainda não marcadas — o que está em
+ * andamento agora. Vem daqui, e não de uma segunda leitura do arquivo, porque
+ * `tasks.md` já foi lido e parseado para contar o progresso; jogar os itens fora
+ * e relê-los para mostrá-los seria ler o mesmo arquivo duas vezes.
+ */
+export interface TaskSummary {
+  total: number;
+  completed: number;
+  /** Tarefas abertas, em ordem de arquivo, limitadas a `OPEN_TASKS_SHOWN`. */
+  open: { number: string; text: string; group?: string }[];
+}
+
+/** Quantas tarefas abertas o resumo carrega. O resto se lê no próprio tasks.md. */
+export const OPEN_TASKS_SHOWN = 5;
 
 export interface StatusContext {
   workspace: Workspace;
@@ -151,6 +169,21 @@ export async function computeStatus(context: StatusContext): Promise<ChangeStatu
     applyBlockedBy,
     ready: applyBlockedBy.length === 0,
     next: artifacts.filter((entry) => entry.state === 'ready').map((entry) => entry.id),
-    ...(tasks ? { tasks: { total: tasks.total, completed: tasks.completed } } : {}),
+    ...(tasks ? { tasks: summarizeTasks(tasks) } : {}),
+  };
+}
+
+function summarizeTasks(tasks: TaskProgress): TaskSummary {
+  return {
+    total: tasks.total,
+    completed: tasks.completed,
+    open: tasks.tasks
+      .filter((task) => !task.done)
+      .slice(0, OPEN_TASKS_SHOWN)
+      .map((task) => ({
+        number: task.number,
+        text: task.text,
+        ...(task.group ? { group: task.group } : {}),
+      })),
   };
 }
