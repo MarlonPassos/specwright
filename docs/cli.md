@@ -295,6 +295,11 @@ escreve**, e qualquer método que não seja `GET`/`HEAD` devolve `405 read_only`
 | `GET /api/doc?id=<id>` | um documento do catálogo, em Markdown |
 | `GET /api/events` | SSE: um evento `overview` ao conectar e um a cada mudança |
 
+O stream observa `spec/` e `planning/`. Um deles que ainda não exista — `planning/`
+só nasce com o primeiro plano — deixa uma **sentinela no diretório pai**: quando
+ele aparece, passa a ser observado e o nascimento já conta como mudança. Vale
+também para um diretório que some e volta (`git checkout` de ida e de volta).
+
 A página tem as **três telas do terminal** — RESUMO, PLANO e CHANGES — mais
 DOCUMENTOS, que só uma página consegue oferecer; trocadas por clique, por
 `1`..`4`, por `Tab` e pelas setas; `r` repinta. A ordem é a do trabalho: onde

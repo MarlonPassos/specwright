@@ -87,6 +87,45 @@ describe('specs serve — superfície', () => {
     const server = await serve(await makeWorkspace());
     expect(server.watching).toHaveLength(1);
   });
+
+  it('o plano criado DEPOIS do painel subir também chega ao leitor', async () => {
+    const workspace = await makeWorkspace();
+    const server = await serve(workspace);
+    // O caso real: sobe-se o painel, e só então o harness cria o plano.
+    expect(server.watching).toHaveLength(1);
+
+    const response = await fetch(server.url + '/api/events');
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    const frames: string[] = [];
+    let buffer = '';
+
+    const pump = (async () => {
+      while (frames.length < 2) {
+        const { done, value } = await reader.read();
+        if (done) return;
+        buffer += decoder.decode(value, { stream: true });
+        let index: number;
+        while ((index = buffer.indexOf('\n\n')) >= 0) {
+          const raw = buffer.slice(0, index);
+          buffer = buffer.slice(index + 2);
+          if (raw.startsWith('event: overview')) frames.push(raw);
+        }
+      }
+    })();
+
+    await new Promise((r) => setTimeout(r, 200));
+    await fs.mkdir(path.join(workspace.projectRoot, 'planning', 'demo'), { recursive: true });
+    await new Promise((r) => setTimeout(r, 300));
+    await writeFile(path.join(workspace.projectRoot, 'planning', 'demo', 'plan.yaml'), 'id: demo\n');
+
+    await Promise.race([pump, new Promise((r) => setTimeout(r, 4000))]);
+    await reader.cancel().catch(() => undefined);
+
+    // Sem a sentinela no diretório pai, planning/ nunca seria observado e este
+    // leitor ficaria com o quadro inicial para sempre, dizendo "ao vivo".
+    expect(frames.length).toBeGreaterThanOrEqual(2);
+  });
 });
 
 describe('specs serve — stream', () => {
