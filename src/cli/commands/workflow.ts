@@ -12,7 +12,7 @@ import { commandName } from '../../core/workflows/index.js';
 import { fail, printJson, printLines } from '../output.js';
 import { buildDashboard } from '../../core/dashboard.js';
 import { renderDashboard, type ViewOptions } from '../dashboard-view.js';
-import { watch } from '../watch.js';
+import { CHANGES_TAB, runPanel } from '../panel.js';
 
 /** Resolves the change to act on: the explicit one, or the only active one. */
 async function resolveChangeId(
@@ -75,14 +75,13 @@ async function runWatch(workspace: Workspace, options: StatusOptions): Promise<v
     });
   }
 
-  const view = viewOptions(options);
-  await watch({
+  // The panel opens on CHANGES, which is the screen this command has always
+  // drawn. With no plan it is also the only tab, so nothing about this command
+  // changes for a workspace that never opted into planning.
+  await runPanel(workspace, {
+    initial: CHANGES_TAB,
     intervalMs: intervalMs(options.interval),
-    frame: async () =>
-      renderDashboard(await buildDashboard(workspace), {
-        ...view,
-        width: process.stdout.columns ?? view.width,
-      }),
+    view: viewOptions(options),
   });
 }
 

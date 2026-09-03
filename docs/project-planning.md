@@ -293,8 +293,51 @@ nunca omitida em silêncio.
 `specs project list` indexa os planos (`id`, status declarado e derivado,
 progresso). `pause --reason` / `resume` / `archive` movem o `status` declarado —
 o derivado continua sendo confrontado a cada `status`. `specs project --watch`
-repinta o dashboard por polling reusando o mesmo loop de `specs status --watch`
-(`--interval <s>`, Ctrl+C sai na hora, `--json` e `--watch` são exclusivos).
+repinta o dashboard por polling (`--interval <s>`, Ctrl+C sai na hora, `--json` e
+`--watch` são exclusivos).
+
+## O painel unificado
+
+`specs status` responde *o que está sendo construído*; `specs project` responde
+*onde estamos no plano*. Os dois eram verdade e nenhum bastava, porque a linha
+que importa — **esta change É aquele incremento** — só existia na cabeça de quem
+lia. Acompanhar um projeto de verdade exigia dois terminais lado a lado.
+
+`specs watch` põe as duas em um processo só, com uma terceira tela na frente:
+
+~~~text
+ [1] RESUMO   2 CHANGES   3 PLANO         Tab troca  ·  r recarrega  ·  q sai
+
+ EXECUÇÃO ────────────────────────────  PLANO ──────────────────────────────
+ ● Changes ativas        1                ◆ Prontas para começar  2
+ ◆ Prontas para arquivar 0                ● Em implementação      1
+ ✔ Changes arquivadas    3                ○ Bloqueadas           15
+ ▸ Tarefas      ░░░░░░ 0/14    0%
+ ✔ Incrementos  ▓░░░░░ 2/20   10%
+
+ FOCO AGORA ─────────────────────────────────────────────────────────────────
+ ● fund-refactor              ░░░░░░ 0/14   0%
+   ↳ CH-019  Refactorings e config de banco  ·  M3  ·  brief atual
+   ↳ desbloqueia CH-020
+   ↳ /spec-implement
+~~~
+
+**FOCO AGORA** é a razão de ser da tela: é a única superfície do produto onde
+`fund-refactor` e `CH-019` aparecem como a mesma coisa. A aresta sempre esteve no
+dado — `link.name` é o nome do diretório da change — e nunca tinha sido
+desenhada.
+
+Os restos são tão informativos quanto os pares: um incremento em implementação
+**sem** change ativa é trabalho que ninguém vinculou; uma change **sem**
+incremento é trabalho que o plano não enxerga.
+
+O join é projeção de core (`buildOverview`), não de renderer, e por isso sai
+também em `specs watch --json`, com `overviewSchemaVersion`.
+
+`specs status --watch` e `specs project --watch` entram no mesmo painel, abrindo
+na aba que sempre desenharam. Sem plano legível há uma aba só e nada muda; sem
+TTY o painel repinta por polling sem capturar teclado. As teclas estão em
+[`docs/cli.md`](cli.md).
 
 ## Comandos de harness
 

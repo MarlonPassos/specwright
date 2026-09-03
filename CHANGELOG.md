@@ -5,6 +5,55 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.16.0] - 2026-09-02
+
+### Adicionado
+
+- **feat(cli): `specs watch` — painel único com navegação por teclado** —
+  `specs status` e `specs project` eram dois painéis que não se conheciam, cada
+  um com seu `--watch` tomando o terminal inteiro. Acompanhar um projeto exigia
+  dois terminais lado a lado, e as duas telas mostravam o mesmo trabalho por
+  ângulos diferentes sem nunca dizer que era o mesmo.
+
+  Agora são três telas num processo só: **RESUMO**, **CHANGES** e **PLANO**,
+  trocadas por `Tab`, `Shift+Tab`, `←`/`→` ou `1`/`2`/`3`. `r` repinta, `q`,
+  `Esc` e `Ctrl+C` saem. `specs status --watch` abre em CHANGES e
+  `specs project --watch` em PLANO, cada um na tela que sempre desenhou.
+
+  A troca repinta **na tecla**, não no próximo tique, e só a aba visível é
+  coletada — uma aba invisível não custa I/O. Nenhuma tecla escreve no projeto.
+
+- **feat(core): a projeção que junta execução e plano** — `buildOverview` faz o
+  join `change ↔ incremento` por `link.name`, que é o nome do diretório da
+  change. A aresta sempre esteve no dado e nunca tinha sido desenhada: era o
+  leitor que precisava saber que `fund-refactor` e `CH-019` eram a mesma coisa.
+  O bloco **FOCO AGORA** desenha isso, e os restos de cada lado — incremento em
+  implementação sem change, change sem incremento — passam a ser visíveis.
+
+  Por ser projeção de core e não de renderer, sai também em
+  `specs watch --json`, com `overviewSchemaVersion`.
+
+  A degradação é a mesma regra de `adviseLink`: sem `planning/`, com plano
+  ilegível ou ambíguo, o lado da execução é projetado sozinho. Meia tela quebrada
+  seria pior que meia tela.
+
+- **feat(cli): `--once` em `specs watch`** — desenha um quadro e sai, para
+  inspeção rápida e para script.
+
+### Manutenção
+
+- **test(cli): o controlador de teclado testado sem pseudo-TTY** — `stdin` e
+  `stdout` são injetáveis, então o mapa de teclas, a troca imediata, a
+  restauração do terminal e o erro isolado por aba têm teste determinístico. Era
+  a condição que a especificação de Project Planning nomeou ao adiar este item
+  (5.8).
+
+### Documentação
+
+- **docs(cli): o painel unificado** — verbete de `specs watch` com a tabela de
+  teclas em `docs/cli.md`, e a seção do painel com o mockup do FOCO AGORA em
+  `docs/project-planning.md`.
+
 ## [0.15.0] - 2026-09-02
 
 ### Adicionado

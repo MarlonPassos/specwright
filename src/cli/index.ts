@@ -6,6 +6,7 @@ import { registerSetupCommands } from './commands/setup.js';
 import { registerWorkflowCommands } from './commands/workflow.js';
 import { registerInspectCommands } from './commands/inspect.js';
 import { registerProjectCommands } from './commands/project.js';
+import { registerWatchCommands } from './commands/watch.js';
 
 async function readVersion(): Promise<string> {
   const here = path.dirname(fileURLToPath(import.meta.url));
@@ -68,6 +69,7 @@ export async function buildProgram(): Promise<Command> {
   registerWorkflowCommands(program);
   registerInspectCommands(program);
   registerProjectCommands(program);
+  registerWatchCommands(program);
 
   return program;
 }
