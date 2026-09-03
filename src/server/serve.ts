@@ -11,6 +11,8 @@ import { listDocuments, readDocument } from '../core/documents.js';
 import { parseTasks } from '../core/change/model.js';
 import { dashboardEnvelope, overviewEnvelope } from '../core/contract.js';
 import { WORKSPACE_DIR, type Workspace } from '../core/workspace.js';
+import { HARNESS_ENV_OVERRIDE } from '../core/harness/current.js';
+import { harnessIds } from '../core/harness/registry.js';
 import { PLANNING_DIR } from '../core/project/paths.js';
 import { watchProject, type ProjectWatcher } from './watcher.js';
 import { INDEX_HTML } from './ui.js';
@@ -50,9 +52,27 @@ function sendJson(response: ServerResponse, status: number, body: unknown): void
  * protocol the harness commands follow.
  */
 async function projections(workspace: Workspace, planId: string | undefined) {
+  /**
+   * O harness pedido pelo leitor, se houver.
+   *
+   * O painel roda FORA do harness — o `specs serve` sobe no terminal — então o
+   * ambiente do processo raramente diz qual está em uso. Em vez de adivinhar, a
+   * página pergunta: `?harness=codex` refaz as projeções com aquele harness e
+   * todo comando volta na sintaxe que ele aceita. É o mesmo caminho de
+   * `SPECS_HARNESS`, que já existe, exposto por requisição.
+   */
+  const envFor = (harness?: string): NodeJS.ProcessEnv | undefined =>
+    harness ? { ...process.env, [HARNESS_ENV_OVERRIDE]: harness } : undefined;
+
   return {
-    overview: async () => overviewEnvelope(await buildOverview(workspace, { planId })),
-    changes: async () => dashboardEnvelope(await buildDashboard(workspace)),
+    overview: async (harness?: string) => {
+      const env = envFor(harness);
+      return overviewEnvelope(await buildOverview(workspace, { planId, ...(env ? { env } : {}) }));
+    },
+    changes: async (harness?: string) => {
+      const env = envFor(harness);
+      return dashboardEnvelope(await buildDashboard(workspace, env ? { env } : {}));
+    },
     plan: async () => {
       const ids = await listPlanIds(workspace.projectRoot);
       if (ids.length === 0) return { plan: null, message: 'Nenhum plano neste projeto.' };
@@ -133,20 +153,40 @@ export async function startServer(
 ): Promise<RunningServer> {
   const host = options.host ?? '127.0.0.1';
   const routes = await projections(workspace, options.planId);
-  const clients = new Set<ServerResponse>();
+  /** Cada leitor com o harness que pediu: duas abas podem pedir sintaxes diferentes. */
+  const clients = new Map<ServerResponse, string | undefined>();
   let watcher: ProjectWatcher | undefined;
 
   const push = async (): Promise<void> => {
     if (clients.size === 0) return;
-    let frame: string;
-    try {
-      frame = JSON.stringify(await routes.overview());
-    } catch {
-      // A projection that fails mid-flight must not kill the stream: the reader
-      // keeps the last good frame until the next settled change.
-      return;
+    // Um quadro por harness pedido, não um por leitor: dez abas no mesmo harness
+    // recalculam a projeção uma vez só.
+    const frames = new Map<string | undefined, string>();
+    for (const harness of new Set(clients.values())) {
+      try {
+        frames.set(harness, JSON.stringify(await routes.overview(harness)));
+      } catch {
+        // A projection that fails mid-flight must not kill the stream: the reader
+        // keeps the last good frame until the next settled change.
+      }
     }
-    for (const client of clients) client.write(`event: overview\ndata: ${frame}\n\n`);
+    for (const [client, harness] of clients) {
+      const frame = frames.get(harness);
+      if (frame !== undefined) client.write(`event: overview\ndata: ${frame}\n\n`);
+    }
+  };
+
+  /**
+   * O harness pedido na query, validado contra o registro.
+   *
+   * Um id desconhecido é recusado em vez de ignorado: ignorar devolveria uma
+   * projeção com a sintaxe de outro harness sem dizer nada, e o leitor copiaria
+   * um comando que o harness dele não aceita.
+   */
+  const askedHarness = (url: URL): { harness?: string; bad?: string } => {
+    const asked = url.searchParams.get('harness');
+    if (asked === null || asked === '') return {};
+    return harnessIds().includes(asked) ? { harness: asked } : { bad: asked };
   };
 
   const server: Server = http.createServer((request: IncomingMessage, response: ServerResponse) => {
@@ -160,13 +200,20 @@ export async function startServer(
     }
 
     if (route === '/api/events') {
+      const stream = askedHarness(url);
+      if (stream.bad !== undefined) {
+        sendJson(response, 400, {
+          error: { code: 'unknown_harness', message: `"${stream.bad}" não é um harness suportado.` },
+        });
+        return;
+      }
       response.writeHead(200, {
         'content-type': 'text/event-stream; charset=utf-8',
         'cache-control': 'no-store',
         connection: 'keep-alive',
       });
       response.write(': ok\n\n');
-      clients.add(response);
+      clients.set(response, stream.harness);
       // Without a heartbeat a proxy or a sleeping laptop drops the stream and
       // the page shows stale data believing it is live.
       const beat = setInterval(() => response.write(': beat\n\n'), 30_000);
@@ -175,7 +222,7 @@ export async function startServer(
         clearInterval(beat);
         clients.delete(response);
       });
-      void routes.overview().then((data) => {
+      void routes.overview(stream.harness).then((data) => {
         response.write(`event: overview\ndata: ${JSON.stringify(data)}\n\n`);
       });
       return;
@@ -219,10 +266,21 @@ export async function startServer(
       return;
     }
 
+    const { harness, bad } = askedHarness(url);
+    if (bad !== undefined) {
+      sendJson(response, 400, {
+        error: {
+          code: 'unknown_harness',
+          message: `"${bad}" não é um harness suportado. Suportados: ${harnessIds().join(', ')}`,
+        },
+      });
+      return;
+    }
+
     const handler =
-      route === '/api/overview' ? routes.overview
+      route === '/api/overview' ? () => routes.overview(harness)
       : route === '/api/docs' ? routes.docs
-      : route === '/api/changes' ? routes.changes
+      : route === '/api/changes' ? () => routes.changes(harness)
       : route === '/api/plan' ? routes.plan
       : undefined;
 
@@ -270,7 +328,7 @@ export async function startServer(
       watcher?.close();
       // Open streams keep the socket alive; without ending them the process
       // survives SIGINT and the port stays taken.
-      for (const client of clients) client.end();
+      for (const client of clients.keys()) client.end();
       clients.clear();
       await new Promise<void>((resolve) => server.close(() => resolve()));
     },

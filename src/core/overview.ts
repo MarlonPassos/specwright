@@ -31,6 +31,10 @@ export interface OverviewData {
   projectName: string;
   schema: string;
   harness: string;
+  /** Como o harness foi decidido: pedido, observado, configurado ou padrão. */
+  harnessSource: string;
+  /** Todo harness suportado, para o painel poder pedir outro. */
+  harnesses: string[];
   /** Absent in a project with no `planning/`, or whose plan will not load. */
   plan?: { id: string; name: string; revision: number; derivedStatus: string };
   changes: {
@@ -137,6 +141,8 @@ export async function buildOverview(
     projectName: dashboard.projectName,
     schema: dashboard.schema,
     harness: dashboard.harness,
+    harnessSource: dashboard.harnessSource,
+    harnesses: dashboard.harnesses,
     changes: {
       active: active.length,
       readyToArchive: readyToArchive.length,

@@ -43,6 +43,18 @@ versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
   (`tasks.open`, no máximo cinco) em vez de jogar fora os itens que já parseou
   para contar o progresso — mostrá-los não custa uma segunda leitura do arquivo.
 
+- **feat(server): seletor de harness no painel, com procedência** — o cabeçalho
+  mostrava o harness como fato observado quando, na maior parte das vezes, era só
+  o primeiro do `spec/config.yaml`: o painel roda FORA do harness, então o
+  ambiente do processo raramente sabe qual está em uso. Agora o leitor escolhe, o
+  rótulo diz de onde veio (`detectado`, `escolhido aqui`, `configurado`,
+  `padrão`), e as rotas aceitam `?harness=<id>` — todo comando continua sendo
+  montado no servidor, então trocar muda o payload, não um texto reescrito na
+  página. Um id não suportado é `400 unknown_harness`. `detectHarness` ganhou
+  `resolveHarness`, que devolve a procedência junto com o adapter.
+
+  O **modelo** não entra: nenhum harness o publica no ambiente.
+
 ### Alterado
 
 - **feat(server): a ordem das abas segue o trabalho** — RESUMO → PLANO → CHANGES

@@ -38,6 +38,11 @@ header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
   padding:16px 22px 0}
 h1{margin:0;font-size:19px;letter-spacing:.22em;color:var(--cyan);font-weight:700}
 .sub{color:var(--dim);font-size:13px}
+.hsel{display:inline-flex;align-items:center;gap:7px}
+.hsel select{background:var(--sunken);border:1px solid var(--line);border-radius:6px;
+  color:var(--ink);font:inherit;font-size:12px;padding:3px 7px;cursor:pointer}
+.hsel select:hover,.hsel select:focus{border-color:var(--cyan);outline:none}
+.hsel .src{font-size:11px;color:var(--dim)}
 .right{margin-left:auto;display:flex;align-items:center;gap:14px}
 #live{font-size:12px;color:var(--dim);display:flex;align-items:center;gap:7px}
 #dot{width:8px;height:8px;border-radius:50%;background:var(--dim);transition:background .3s}
@@ -198,6 +203,10 @@ footer{padding:12px 22px 24px;color:var(--dim);font-size:12px;text-align:center}
 <header>
   <h1>SPECWRIGHT</h1>
   <span class="sub" id="proj">carregando...</span>
+  <span class="hsel" id="hsel" hidden>
+    <select id="harness" aria-label="Harness para o qual os comandos são escritos"></select>
+    <span class="src" id="hsrc"></span>
+  </span>
   <span class="right">
     <span id="live"><span id="dot"></span><span id="livetext">conectando</span></span>
     <button id="theme" type="button" title="Alternar tema">tema</button>
@@ -341,6 +350,25 @@ var TABS=[{id:'resumo',label:'RESUMO',route:'/api/overview'},
           {id:'changes',label:'CHANGES',route:'/api/changes'},
           {id:'docs',label:'DOCUMENTOS',route:'/api/docs'}];
 var cache={}, active='resumo', latest=null;
+
+/**
+ * O harness para o qual os comandos são escritos.
+ *
+ * O painel roda FORA do harness — o servidor sobe no terminal — então o
+ * ambiente do processo raramente sabe qual está em uso, e adivinhar erra a
+ * sintaxe do comando que o leitor vai colar. Aqui ele diz, e o servidor
+ * remonta as projeções com esse harness. Vazio = o que o servidor decidiu.
+ */
+var HARNESS='';
+try{HARNESS=localStorage.getItem('sw-harness')||''}catch(err){}
+
+/** A query que carrega a escolha, para toda rota que monta comando. */
+function hq(route){
+  if(!HARNESS)return route;
+  return route+(route.indexOf('?')>=0?'&':'?')+'harness='+encodeURIComponent(HARNESS);
+}
+
+var HSOURCE={chosen:'escolhido aqui',env:'detectado',config:'configurado',default:'padrão'};
 /* Filtro por tela e milestone selecionado: o recorte é do leitor, não do dado. */
 var Q={changes:'',plano:'',docs:''}, MS=null;
 var KIND={project:'projeto',capability:'capacidade',proposal:'proposta',design:'design',
@@ -803,7 +831,7 @@ function show(id,force){
   active=id; drawTabs();
   if(location.hash.slice(1)!==id)history.replaceState(null,'','#'+id);
   if(cache[id]&&!force){render(id);return}
-  fetch(tab.route).then(function(r){return r.json()}).then(function(d){
+  fetch(hq(tab.route)).then(function(r){return r.json()}).then(function(d){
     cache[id]=d;
     if(id==='docs'){DOCSET={};(d.documents||[]).forEach(function(x){DOCSET[x.id]=1})}
     if(active===id){E('screen').innerHTML=RENDER[id](d);stamp(d)}
@@ -911,17 +939,57 @@ E('theme').addEventListener('click',function(){
   theme(document.documentElement.getAttribute('data-theme')==='light'?'dark':'light');
 });
 
+/* ---------- harness ---------- */
+
+/**
+ * O seletor, preenchido pelo que o servidor suporta.
+ *
+ * O rótulo ao lado diz de onde veio a escolha — detectado, configurado, padrão
+ * ou escolhido aqui — porque "claude" sem procedência lê como fato observado, e
+ * na maior parte das vezes é só o primeiro harness que o workspace configurou.
+ */
+function drawHarness(d){
+  var list=d.harnesses||[]; if(!list.length)return;
+  var sel=E('harness');
+  if(sel.options.length!==list.length){
+    sel.innerHTML=list.map(function(id){
+      return '<option value="'+esc(id)+'">'+esc(id)+'</option>';
+    }).join('');
+  }
+  sel.value=d.harness;
+  E('hsrc').textContent=HSOURCE[d.harnessSource]||'';
+  E('hsel').hidden=false;
+}
+
+E('harness').addEventListener('change',function(){
+  HARNESS=this.value;
+  try{localStorage.setItem('sw-harness',HARNESS)}catch(err){}
+  // Todo comando na tela foi montado pelo servidor: nada é reescrito aqui,
+  // as projeções são refeitas com o harness pedido.
+  cache={}; DOCSET={};
+  reconnect();
+  loadCatalogue(function(){ show(active,true) });
+  toast('comandos escritos para ' + HARNESS);
+});
+
 /* ---------- ao vivo ---------- */
 
 function setLive(on,t){E('dot').className=on?'on':'';E('livetext').textContent=t}
 
-var es=new EventSource('/api/events');
-es.onopen=function(){setLive(true,'ao vivo')};
-es.onerror=function(){setLive(false,'reconectando')};
-es.addEventListener('overview',function(ev){
+var es;
+function reconnect(){
+  if(es)es.close();
+  es=new EventSource(hq('/api/events'));
+  es.onopen=function(){setLive(true,'ao vivo')};
+  es.onerror=function(){setLive(false,'reconectando')};
+  es.addEventListener('overview',onOverview);
+}
+
+function onOverview(ev){
   var d=JSON.parse(ev.data);
   cache.resumo=d;
-  E('proj').textContent=d.projectName+'  ·  '+d.schema+'  ·  '+d.harness;
+  E('proj').textContent=d.projectName+'  ·  '+d.schema;
+  drawHarness(d);
   document.title='Specwright — '+d.projectName;
   // A sintaxe muda por harness ($spec-* no Codex): tiramos o verbo do que veio.
   (d.recommended&&d.recommended.harnessCommands||[]).forEach(function(c){
@@ -934,7 +1002,9 @@ es.addEventListener('overview',function(ev){
   // O catálogo muda quando um artefato nasce, e os chips do PLANO dependem dele:
   // recarrega primeiro, repinta depois, para a tela não mostrar um catálogo velho.
   loadCatalogue(function(){ show(active, active!=='resumo'&&active!=='docs') });
-});
+}
+
+reconnect();
 
 /* Voltar e avançar do navegador acompanham a aba, já que ela vive no hash. */
 addEventListener('hashchange',function(){

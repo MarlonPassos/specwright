@@ -287,6 +287,7 @@ escreve**, e qualquer método que não seja `GET`/`HEAD` devolve `405 read_only`
 |---|---|
 | `GET /` | a página, embutida no pacote — sem CDN, sem build |
 | `GET /api/overview` | `buildOverview()`, o mesmo payload de `specs watch --json` |
+| — aceita `?harness=<id>` | refaz a projeção com aquele harness (também em `/api/changes` e `/api/events`) |
 | `GET /api/changes` | `buildDashboard()` |
 | `GET /api/plan` | `statusPayload()` + a recomendação |
 | `GET /api/brief?change=CH-NNN` | o Planned Change do incremento, em Markdown |
@@ -357,6 +358,31 @@ arquivo declara e o recuo por numeração (`1.2` é subtarefa de `1`), com o
 Markdown logo abaixo. Os pontos de artefato da tela CHANGES abrem o documento
 correspondente, e um incremento com change vinculada mostra os artefatos dela ao
 lado do vínculo.
+
+#### O harness dos comandos
+
+O painel roda **fora** do harness: o `specs serve` sobe no terminal, então o
+ambiente do processo raramente diz qual está em uso. Por isso o cabeçalho traz um
+**seletor** e, ao lado dele, de onde veio a escolha:
+
+| Procedência | Significa |
+|---|---|
+| `detectado` | havia marcador de ambiente (`CLAUDECODE`, `CODEX_HOME`, …) |
+| `escolhido aqui` | o leitor pediu no seletor, ou `SPECS_HARNESS` foi definido |
+| `configurado` | veio de `harnesses` no `spec/config.yaml` — o caso comum |
+| `padrão` | não havia nada; é o primeiro suportado |
+
+Trocar o seletor refaz as projeções com `?harness=<id>`: **todo comando é montado
+no servidor**, então o que muda é o payload, não um texto reescrito na página. A
+escolha fica lembrada no navegador, e cada aba pode pedir um harness diferente —
+o stream entrega a cada leitor o quadro do harness dele. Um id não suportado é
+recusado com `400 unknown_harness` em vez de ignorado: ignorar devolveria a
+sintaxe de outro harness sem dizer nada.
+
+O **modelo** em uso não aparece porque nenhum harness o publica: o ambiente do
+Claude Code traz produto e versão (`AI_AGENT=claude-code_2-1-259_agent`) e o
+esforço (`CLAUDE_EFFORT`), nunca o modelo — e Codex, opencode e kiro expõem só
+sandbox e caminhos.
 
 #### Milestones e busca
 
