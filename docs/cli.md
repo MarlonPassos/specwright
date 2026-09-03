@@ -359,6 +359,39 @@ Markdown logo abaixo. Os pontos de artefato da tela CHANGES abrem o documento
 correspondente, e um incremento com change vinculada mostra os artefatos dela ao
 lado do vínculo.
 
+#### O grafo de dependências
+
+O botão **⌗ ver o grafo**, na barra de INCREMENTOS, abre o plano desenhado como o
+DAG que ele é — um diálogo por cima da tela, que fecha com `Esc`, sem trocar de
+aba nem alterar a lista.
+
+A **coluna é a ordem de execução**: a camada de um incremento é o caminho *mais
+longo* até ele, então toda aresta anda da esquerda para a direita e cada coluna é
+uma onda do plano (`1ª ONDA`, `2ª ONDA`, …). Dentro da coluna, os nós descem para
+perto das suas dependências (duas passadas de baricentro), o que tira a maior
+parte dos cruzamentos.
+
+| Elemento | Diz |
+|---|---|
+| cor da borda | o estado do incremento, a mesma da lista |
+| fundo preenchido | concluída (change arquivada) |
+| contorno grosso com brilho | em execução agora |
+| seta cheia | dependência já satisfeita |
+| seta tracejada amarela | dependência que **ainda barra** o destino |
+| `!` no canto | há blocker anotado à mão |
+| `M2` no canto | o milestone do incremento |
+
+Clicar num nó **acende a linhagem** — tudo de que ele depende e tudo que ele
+desbloqueia — e apaga o resto; clicar no vazio limpa. Duplo clique abre o resumo
+do incremento no painel lateral. A roda dá zoom no ponteiro, arrastar move, e
+**enquadrar** volta ao enquadramento inicial.
+
+Nada disso pede rota nova: `/api/plan` já publica `dependsOn`, `blockedBy`,
+`unlocks` e o estado de cada incremento, e o core recusa ciclo, auto-dependência
+e dependência inexistente antes de gravar — o desenho não tem o que validar. O
+SVG é escrito à mão porque uma biblioteca de grafo seria a primeira dependência
+de runtime do projeto (NFR-11).
+
 #### O harness dos comandos
 
 O painel roda **fora** do harness: o `specs serve` sobe no terminal, então o

@@ -165,6 +165,42 @@ details.card>.body{padding:0 18px 15px}
 .openable{cursor:pointer;text-decoration:underline;text-decoration-style:dotted;
   text-underline-offset:3px;text-decoration-color:var(--line)}
 .openable:hover{text-decoration-color:var(--cyan)}
+/* ---- grafo de dependências ---- */
+#gmodal{position:fixed;inset:26px;z-index:10;display:none;flex-direction:column;
+  background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;
+  box-shadow:0 24px 60px rgba(0,0,0,.45)}
+#gmodal.on{display:flex}
+#gmodal .head{display:flex;align-items:center;gap:12px;padding:14px 18px;flex-wrap:wrap;
+  border-bottom:1px solid var(--line)}
+#gmodal .head h2{margin:0}
+#gmodal .head .grow{flex:1 1 40px}
+#gwrap{flex:1;min-height:0;overflow:hidden;background:var(--sunken);cursor:grab}
+#gwrap.drag{cursor:grabbing}
+#gsvg{display:block;width:100%;height:100%;touch-action:none}
+#gmodal .foot{display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  padding:10px 18px;border-top:1px solid var(--line);color:var(--dim);font-size:11px}
+.lg{display:inline-flex;align-items:center;gap:6px}
+.lg i{width:9px;height:9px;border-radius:3px;display:inline-block}
+.gwave{fill:var(--dim);font-size:10px;letter-spacing:.18em}
+.gedge{fill:none;stroke:var(--line);stroke-width:1.6}
+.gedge.block{stroke:var(--yellow);stroke-dasharray:5 4}
+.gedge.lit{stroke:var(--cyan);stroke-width:2.2}
+.gn{cursor:pointer}
+.gn rect{fill:var(--panel);stroke:var(--line);stroke-width:1.5;rx:9}
+.gn .id{fill:var(--cyan);font-size:12px;font-weight:700}
+.gn .ti{fill:var(--ink);font-size:11px}
+.gn .ms{fill:var(--dim);font-size:10px}
+.gn.s-green rect{stroke:var(--green)} .gn.s-green .id{fill:var(--green)}
+.gn.s-cyan rect{stroke:var(--cyan)}
+.gn.s-yellow rect{stroke:var(--yellow)} .gn.s-yellow .id{fill:var(--yellow)}
+.gn.s-red rect{stroke:var(--red)} .gn.s-red .id{fill:var(--red)}
+.gn.s-dim rect{stroke:var(--line);opacity:.75}
+.gn.run rect{stroke-width:2.6;filter:drop-shadow(0 0 7px var(--cyan))}
+.gn.done rect{fill:color-mix(in srgb,var(--green) 12%,var(--panel))}
+.gn.off{opacity:.22}
+.gn.lit rect{stroke-width:2.6}
+svg .warn{fill:var(--yellow);font-size:11px}
+@media(max-width:640px){#gmodal{inset:8px}}
 #scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;
   transition:opacity .2s;z-index:8}
 #scrim.on{opacity:1;pointer-events:auto}
@@ -217,6 +253,17 @@ footer{padding:12px 22px 24px;color:var(--dim);font-size:12px;text-align:center}
 <footer id="foot"></footer>
 <div id="toast" role="status" aria-live="polite"></div>
 <div id="scrim"></div>
+<div id="gmodal" role="dialog" aria-modal="true" aria-label="Grafo de dependências do plano">
+  <div class="head">
+    <h2>DEPENDÊNCIAS</h2>
+    <span class="muted sm" id="ginfo"></span>
+    <span class="grow"></span>
+    <button type="button" class="chip" id="gfit">enquadrar</button>
+    <button type="button" class="chip" id="gclose">fechar (Esc)</button>
+  </div>
+  <div id="gwrap"><svg id="gsvg" role="img"></svg></div>
+  <div class="foot" id="gfoot"></div>
+</div>
 <aside id="drawer" aria-hidden="true">
   <div class="head">
     <span class="id" id="dw-id"></span>
@@ -520,10 +567,14 @@ function screenPlano(d){
   var visible=(d.changes||[]).filter(function(c){
     return (!MS || c.milestone===MS) && matches('plano',c.id+' '+c.title+' '+(c.slug||''));
   });
+  // O grafo é uma segunda leitura do MESMO plano, não outra tela: abre por cima
+  // e fecha, então quem só quer a lista nunca esbarra nele.
   out+=findBar('INCREMENTOS','plano','filtrar incrementos',
     visible.length+' de '+(d.changes||[]).length+(MS?' neste milestone':''),
-    MS?'<button type="button" class="chip" data-ms-clear="1">'+esc(MS)
-      +(mile?' · '+esc(mile.name):'')+' ✕</button>':'');
+    (MS?'<button type="button" class="chip" data-ms-clear="1">'+esc(MS)
+      +(mile?' · '+esc(mile.name):'')+' ✕</button>':'')
+    +'<button type="button" class="chip" id="gopen" title="Ver as dependências como grafo">'
+    +'⌗ ver o grafo</button>');
 
   var placed={};
   STAGES.forEach(function(s){
@@ -797,7 +848,9 @@ function openBrief(id){
   }).catch(function(){E('dw-body').innerHTML='<p class="muted">Falha ao carregar.</p>'});
 }
 E('dw-close').addEventListener('click',closeDrawer);
-E('scrim').addEventListener('click',closeDrawer);
+E('scrim').addEventListener('click',function(){
+  if(E('gmodal').classList.contains('on'))closeGraph(); else closeDrawer();
+});
 addEventListener('click',function(e){
   var t=e.target.closest('[data-brief]'); if(!t)return;
   e.preventDefault(); openBrief(t.dataset.brief);
@@ -861,7 +914,8 @@ addEventListener('click',function(e){
     return;
   }
   var go=e.target.closest('[data-goto]');
-  if(go){e.preventDefault(); show(go.dataset.goto)}
+  if(go){e.preventDefault(); show(go.dataset.goto); return}
+  if(e.target.closest('#gopen')){e.preventDefault(); openGraph()}
 });
 addEventListener('keydown',function(e){
   if(e.key!=='Enter'&&e.key!==' ')return;
@@ -915,9 +969,10 @@ E('tabs').addEventListener('click',function(e){
 
 /* Mesmas teclas do terminal: 1/2/3 saltam, Tab e setas andam. */
 addEventListener('keydown',function(e){
+  if(e.key==='Escape'&&E('gmodal').classList.contains('on')){closeGraph();return}
   if(e.key==='Escape'&&E('drawer').classList.contains('on')){closeDrawer();return}
   if(e.metaKey||e.ctrlKey||e.altKey)return;
-  if(E('drawer').classList.contains('on'))return;
+  if(E('gmodal').classList.contains('on')||E('drawer').classList.contains('on'))return;
   var i=TABS.map(function(t){return t.id}).indexOf(active);
   if(/^[1-4]$/.test(e.key)&&TABS[+e.key-1]){e.preventDefault();show(TABS[+e.key-1].id)}
   else if(e.key==='Tab'||e.key==='ArrowRight'){e.preventDefault();show(TABS[(i+1)%TABS.length].id)}
@@ -937,6 +992,251 @@ try{saved=localStorage.getItem('sw-theme')||'dark'}catch(err){}
 theme(saved);
 E('theme').addEventListener('click',function(){
   theme(document.documentElement.getAttribute('data-theme')==='light'?'dark':'light');
+});
+
+/* ---------- grafo de dependências ---------- */
+
+/**
+ * O plano desenhado como o DAG que ele é.
+ *
+ * Os dados já vêm em /api/plan (dependsOn, blockedBy, unlocks) junto com o estado
+ * de cada incremento — e o core garante que o grafo é acíclico antes de gravar,
+ * então aqui não há validação a refazer, só leitura. SVG à mão porque uma
+ * biblioteca de grafo seria a primeira dependência de runtime do projeto.
+ *
+ * A camada de um nó é o caminho MAIS LONGO até ele. Com o mais curto, um
+ * incremento apareceria antes de algo de que ele depende; com o mais longo,
+ * toda aresta anda da esquerda para a direita e a coluna vira o que ela é de
+ * fato: a ordem de execução, uma onda por vez.
+ */
+var GW=196, GH=52, GAPX=76, GAPY=20, PADX=34, PADY=44;
+
+function graphLayers(changes){
+  var by={}; changes.forEach(function(c){by[c.id]=c});
+  var depth={}, busy={};
+  function deep(id){
+    if(depth[id]!=null)return depth[id];
+    if(busy[id])return 0;            // o core recusa ciclo; isto é só um cinto
+    busy[id]=1;
+    var deps=(by[id].dependsOn||[]).filter(function(d){return by[d]});
+    depth[id]=deps.length?1+Math.max.apply(null,deps.map(deep)):0;
+    busy[id]=0;
+    return depth[id];
+  }
+  changes.forEach(function(c){deep(c.id)});
+
+  var cols=[];
+  changes.forEach(function(c){
+    var d=depth[c.id];
+    (cols[d]=cols[d]||[]).push(c);
+  });
+
+  // Baricentro: cada nó desce para perto da média das suas dependências. Duas
+  // passadas tiram a maior parte dos cruzamentos sem virar um solver.
+  var row={};
+  cols.forEach(function(col){col.forEach(function(c,i){row[c.id]=i})});
+  for(var pass=0;pass<2;pass++){
+    cols.forEach(function(col,d){
+      if(!d)return;
+      col.sort(function(a,b){return bary(a)-bary(b)});
+      col.forEach(function(c,i){row[c.id]=i});
+    });
+  }
+  function bary(c){
+    var deps=(c.dependsOn||[]).filter(function(x){return by[x]});
+    if(!deps.length)return row[c.id];
+    var sum=deps.reduce(function(t,x){return t+row[x]},0);
+    return sum/deps.length;
+  }
+
+  var nodes=[];
+  cols.forEach(function(col,d){
+    col.forEach(function(c,i){
+      nodes.push({
+        c: c,
+        x: PADX + d*(GW+GAPX),
+        y: PADY + i*(GH+GAPY),
+        wave: d
+      });
+    });
+  });
+  return { nodes: nodes, cols: cols };
+}
+
+function graphSvg(changes){
+  var laid=graphLayers(changes), nodes=laid.nodes;
+  var at={}; nodes.forEach(function(n){at[n.c.id]=n});
+  var width=PADX*2+laid.cols.length*(GW+GAPX)-GAPX;
+  var tallest=laid.cols.reduce(function(m,col){return Math.max(m,col.length)},0);
+  var height=PADY*2+tallest*(GH+GAPY)-GAPY;
+
+  var edges='';
+  nodes.forEach(function(n){
+    (n.c.dependsOn||[]).forEach(function(dep){
+      var from=at[dep]; if(!from)return;
+      var x1=from.x+GW, y1=from.y+GH/2, x2=n.x, y2=n.y+GH/2, mid=(x1+x2)/2;
+      // Uma aresta que ainda barra o destino é a informação mais útil do grafo.
+      var blocking=(n.c.blockedBy||[]).indexOf(dep)>=0;
+      edges+='<path class="gedge'+(blocking?' block':'')+'" data-from="'+esc(dep)+'"'
+        +' data-to="'+esc(n.c.id)+'" d="M'+x1+' '+y1+'C'+mid+' '+y1+' '+mid+' '+y2+' '+x2+' '+y2+'"'
+        +' marker-end="url(#gtip'+(blocking?'b':'')+')"/>';
+    });
+  });
+
+  var waves=laid.cols.map(function(col,d){
+    if(!col.length)return '';
+    return '<text class="gwave" x="'+(PADX+d*(GW+GAPX))+'" y="24">'+(d+1)+'ª ONDA</text>';
+  }).join('');
+
+  var boxes=nodes.map(function(n){
+    var c=n.c, tone=PRES[c.presentation]||'t-dim';
+    var running=c.execution==='in_progress'||c.execution==='verifying';
+    var cls='gn s-'+tone.replace('t-','')
+      +(running?' run':'')+(c.execution==='archived'?' done':'');
+    var title=clipText(c.title,26);
+    var badge=(c.manualBlockers&&c.manualBlockers.length)?'<text class="warn" x="'+(n.x+GW-14)+'" y="'+(n.y+19)+'">!</text>':'';
+    return '<g class="'+cls+'" data-node="'+esc(c.id)+'" tabindex="0" role="button">'
+      +'<title>'+esc(c.id+' · '+c.title+' — '+c.presentation
+        +((c.blockedBy&&c.blockedBy.length)?' (falta '+c.blockedBy.join(', ')+')':''))+'</title>'
+      +'<rect x="'+n.x+'" y="'+n.y+'" width="'+GW+'" height="'+GH+'"/>'
+      +'<text class="id" x="'+(n.x+13)+'" y="'+(n.y+20)+'">'+esc(c.id)+'</text>'
+      +(c.milestone?'<text class="ms" x="'+(n.x+GW-13)+'" y="'+(n.y+20)+'" text-anchor="end">'+esc(c.milestone)+'</text>':'')
+      +'<text class="ti" x="'+(n.x+13)+'" y="'+(n.y+38)+'">'+esc(title)+'</text>'
+      +badge+'</g>';
+  }).join('');
+
+  var defs='<defs>'
+    +'<marker id="gtip" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7"'
+    +' orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--line)"/></marker>'
+    +'<marker id="gtipb" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7"'
+    +' orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--yellow)"/></marker>'
+    +'</defs>';
+
+  return { svg: defs+waves+edges+boxes, width: width, height: height };
+}
+
+function clipText(text,max){
+  var t=String(text||'');
+  return t.length>max?t.slice(0,max-1)+'…':t;
+}
+
+/* ---------- o modal ---------- */
+
+var GVIEW=null;
+function setView(v){
+  GVIEW=v;
+  E('gsvg').setAttribute('viewBox',v.x+' '+v.y+' '+v.w+' '+v.h);
+}
+
+function openGraph(){
+  var d=cache.plano;
+  if(!d||!d.plan||!(d.changes||[]).length){toast('nenhum plano para desenhar');return}
+  var drawn=graphSvg(d.changes);
+  E('gsvg').innerHTML=drawn.svg;
+  E('gsvg').setAttribute('preserveAspectRatio','xMidYMid meet');
+  setView({x:0,y:0,w:drawn.width,h:drawn.height});
+  GFIT={x:0,y:0,w:drawn.width,h:drawn.height};
+
+  var blocked=d.changes.filter(function(c){return (c.blockedBy||[]).length}).length;
+  E('ginfo').textContent=d.changes.length+' incrementos  ·  '
+    +graphLayers(d.changes).cols.length+' ondas'
+    +(blocked?'  ·  '+blocked+' bloqueado(s)':'');
+  E('gfoot').innerHTML=[
+    ['green','concluída'],['cyan','em implementação'],['green','pronta'],
+    ['yellow','bloqueada'],['red','inconsistente'],['dim','fora do fluxo']
+  ].map(function(l){
+    return '<span class="lg"><i style="background:var(--'+l[0]+')"></i>'+esc(l[1])+'</span>';
+  }).join('')
+    +'<span class="lg"><i style="background:var(--yellow)"></i>seta tracejada = dependência que ainda barra</span>'
+    +'<span class="lg">clique num nó para acender a linhagem  ·  duplo clique abre o resumo</span>';
+
+  E('gmodal').classList.add('on'); E('scrim').classList.add('on');
+  E('gclose').focus();
+}
+
+var GFIT=null;
+function closeGraph(){
+  E('gmodal').classList.remove('on');
+  if(!E('drawer').classList.contains('on'))E('scrim').classList.remove('on');
+}
+
+/** Acende o nó, tudo de que ele depende e tudo que depende dele. */
+function litLineage(id){
+  var d=cache.plano||{}, by={};
+  (d.changes||[]).forEach(function(c){by[c.id]=c});
+  var keep={}, seen={};
+  (function up(x){ if(!by[x]||seen['u'+x])return; seen['u'+x]=1; keep[x]=1;
+    (by[x].dependsOn||[]).forEach(up); })(id);
+  (function down(x){ if(!by[x]||seen['d'+x])return; seen['d'+x]=1; keep[x]=1;
+    (by[x].unlocks||[]).forEach(down); })(id);
+
+  [].forEach.call(document.querySelectorAll('#gsvg .gn'),function(g){
+    var on=keep[g.dataset.node];
+    g.classList.toggle('off',!on);
+    g.classList.toggle('lit',g.dataset.node===id);
+  });
+  [].forEach.call(document.querySelectorAll('#gsvg .gedge'),function(e){
+    var on=keep[e.dataset.from]&&keep[e.dataset.to];
+    e.classList.toggle('lit',!!on);
+    e.style.opacity=on?'1':'.18';
+  });
+}
+
+function clearLineage(){
+  [].forEach.call(document.querySelectorAll('#gsvg .gn'),function(g){
+    g.classList.remove('off','lit');
+  });
+  [].forEach.call(document.querySelectorAll('#gsvg .gedge'),function(e){
+    e.classList.remove('lit'); e.style.opacity='';
+  });
+}
+
+E('gclose').addEventListener('click',closeGraph);
+E('gfit').addEventListener('click',function(){if(GFIT)setView(GFIT); clearLineage()});
+
+E('gsvg').addEventListener('click',function(e){
+  var g=e.target.closest('.gn');
+  if(!g){clearLineage();return}
+  litLineage(g.dataset.node);
+});
+E('gsvg').addEventListener('dblclick',function(e){
+  var g=e.target.closest('.gn'); if(!g)return;
+  closeGraph(); openBrief(g.dataset.node);
+});
+E('gsvg').addEventListener('keydown',function(e){
+  var g=e.target.closest?e.target.closest('.gn'):null; if(!g)return;
+  if(e.key==='Enter'||e.key===' '){e.preventDefault(); litLineage(g.dataset.node)}
+});
+
+/* Roda dá zoom no ponteiro, arrastar move: um grafo maior que a tela precisa disso. */
+E('gwrap').addEventListener('wheel',function(e){
+  if(!GVIEW)return;
+  e.preventDefault();
+  var box=E('gsvg').getBoundingClientRect();
+  var fx=(e.clientX-box.left)/box.width, fy=(e.clientY-box.top)/box.height;
+  var k=e.deltaY>0?1.12:1/1.12;
+  var w=Math.min(Math.max(GVIEW.w*k,240),GVIEW.w*40), h=GVIEW.h*(w/GVIEW.w);
+  setView({x:GVIEW.x+(GVIEW.w-w)*fx, y:GVIEW.y+(GVIEW.h-h)*fy, w:w, h:h});
+},{passive:false});
+
+var GDRAG=null;
+E('gwrap').addEventListener('pointerdown',function(e){
+  if(!GVIEW)return;
+  GDRAG={x:e.clientX,y:e.clientY,v:GVIEW};
+  E('gwrap').classList.add('drag');
+  E('gwrap').setPointerCapture(e.pointerId);
+});
+E('gwrap').addEventListener('pointermove',function(e){
+  if(!GDRAG)return;
+  var box=E('gsvg').getBoundingClientRect();
+  setView({
+    x:GDRAG.v.x-(e.clientX-GDRAG.x)*(GDRAG.v.w/box.width),
+    y:GDRAG.v.y-(e.clientY-GDRAG.y)*(GDRAG.v.h/box.height),
+    w:GDRAG.v.w, h:GDRAG.v.h
+  });
+});
+['pointerup','pointercancel'].forEach(function(ev){
+  E('gwrap').addEventListener(ev,function(){GDRAG=null;E('gwrap').classList.remove('drag')});
 });
 
 /* ---------- harness ---------- */

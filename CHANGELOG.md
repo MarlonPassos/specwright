@@ -43,6 +43,18 @@ versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
   (`tasks.open`, no máximo cinco) em vez de jogar fora os itens que já parseou
   para contar o progresso — mostrá-los não custa uma segunda leitura do arquivo.
 
+- **feat(server): grafo de dependências do plano** — o botão `⌗ ver o grafo`, na
+  barra de INCREMENTOS, abre um diálogo com o plano desenhado como o DAG que ele
+  é: a coluna é a ordem de execução (camada = caminho mais longo, então toda
+  aresta anda para a frente), a seta tracejada é a dependência que ainda barra o
+  destino, o nó em execução tem contorno com brilho, e clicar num nó acende a
+  linhagem inteira — o que ele espera e o que ele desbloqueia. Duplo clique abre
+  o resumo; roda dá zoom, arrastar move, `Esc` fecha.
+
+  Sem rota nova e sem leitura de disco: `/api/plan` já publicava tudo, e o core
+  já garante que o grafo é acíclico. SVG escrito à mão — uma biblioteca de grafo
+  seria a primeira dependência de runtime do projeto (NFR-11).
+
 - **feat(server): seletor de harness no painel, com procedência** — o cabeçalho
   mostrava o harness como fato observado quando, na maior parte das vezes, era só
   o primeiro do `spec/config.yaml`: o painel roda FORA do harness, então o
