@@ -52,6 +52,25 @@ describe('createWorktree / finishWorktree — happy path', () => {
     expect(branches.stdout.trim()).toBe('');
   });
 
+  it('keeps the merge commit and the task-completion commit distinct, in that order', async () => {
+    const workspace = await makeGitWorkspace();
+    await seedGitChange(workspace, 'demo', '- [ ] 1.1 Faz X `files: a.ts`\n');
+    const created = await createWorktree(workspace, 'demo', '1.1');
+    await writeFile(path.join(created.path, 'a.ts'), 'x');
+    await git(['add', '-A'], created.path);
+    await git(['commit', '-q', '-m', 'implement'], created.path);
+    const branchTip = (await git(['rev-parse', 'specwright/demo/1.1'], workspace.projectRoot)).stdout.trim();
+
+    await finishWorktree(workspace, 'demo', '1.1');
+
+    const log = await git(['log', '--format=%H %P', '-n', '2'], workspace.projectRoot);
+    const [completionLine, mergeLine] = log.stdout.trim().split('\n');
+    const completionSha = completionLine.split(' ')[0];
+    const [mergeSha, ...mergeParents] = mergeLine.split(' ');
+    expect(completionSha).not.toBe(mergeSha);
+    expect(mergeParents).toContain(branchTip);
+  });
+
   it('adds .specwright/ to .git/info/exclude exactly once across several worktrees', async () => {
     const workspace = await makeGitWorkspace();
     await seedGitChange(workspace, 'demo', '- [ ] 1.1 Faz X `files: a.ts`\n- [ ] 1.2 Faz Y `files: b.ts`\n');
@@ -177,6 +196,29 @@ describe('createWorktree — input validation', () => {
     await expect(createWorktree(workspace, 'demo', '1.1')).rejects.toMatchObject({
       code: 'worktree_registry_corrupt',
     });
+  });
+
+  it('rolls back the git worktree it just created when a later step in the same create fails', async () => {
+    const workspace = await makeGitWorkspace();
+    await seedGitChange(workspace, 'demo', '- [ ] 1.1 Faz X `files: a.ts`\n');
+    // a file git already tracks makes the --link step fail deterministically,
+    // after `git worktree add` has already succeeded.
+    await writeFile(path.join(workspace.projectRoot, 'tracked.txt'), 'x');
+    await commitAll(workspace.projectRoot, 'add tracked.txt');
+
+    await expect(createWorktree(workspace, 'demo', '1.1', { link: ['tracked.txt'] })).rejects.toMatchObject({
+      code: 'link_target_tracked',
+    });
+
+    const list = await git(['worktree', 'list', '--porcelain'], workspace.projectRoot);
+    expect(list.stdout).not.toContain(path.join('.specwright', 'worktrees', 'demo', '1.1'));
+    expect(await exists(path.join(workspace.projectRoot, '.specwright', 'worktrees', 'demo', '1.1'))).toBe(false);
+    const branches = await git(['branch', '--list', 'specwright/demo/1.1'], workspace.projectRoot);
+    expect(branches.stdout.trim()).toBe('');
+
+    // and a retry, without the mistake, works normally
+    const created = await createWorktree(workspace, 'demo', '1.1');
+    expect(await exists(created.path)).toBe(true);
   });
 });
 

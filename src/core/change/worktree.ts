@@ -315,9 +315,14 @@ async function commitTaskCompletion(projectRoot: string, changeDirPath: string, 
  * owed a cleanup; deleting it before removal is confirmed would strand that
  * pair with nothing left to retry it.
  */
-async function removeWorktreeAndBranch(projectRoot: string, entryPath: string, branch: string): Promise<boolean> {
-  await runGit(['worktree', 'remove', entryPath], projectRoot);
-  await runGit(['branch', '-d', branch], projectRoot);
+async function removeWorktreeAndBranch(
+  projectRoot: string,
+  entryPath: string,
+  branch: string,
+  force = false
+): Promise<boolean> {
+  await runGit(['worktree', 'remove', ...(force ? ['--force'] : []), entryPath], projectRoot);
+  await runGit(['branch', force ? '-D' : '-d', branch], projectRoot);
 
   const worktrees = await listGitWorktrees(projectRoot);
   const worktreeGone = !worktrees.some((entry) => path.resolve(entry.path) === path.resolve(entryPath));
@@ -460,29 +465,38 @@ export async function createWorktree(
       throw new SpecError(`"git worktree add" falhou: ${add.stderr.trim()}`, { code: 'git_worktree_add_failed' });
     }
 
-    for (const relative of options.link ?? []) {
-      const tracked = await runGit(['ls-files', '--error-unmatch', relative], projectRoot);
-      if (tracked.ok) {
-        throw new SpecError(`"${relative}" é rastreado pelo git — não pode virar link simbólico`, {
-          code: 'link_target_tracked',
-        });
+    // From here on, a real worktree exists but is not registered yet - any
+    // failure below must not surface as a bare error while silently leaving
+    // it behind. Best-effort undo before rethrowing, so a failed `create`
+    // leaves nothing for `list` to later report as unregistered.
+    try {
+      for (const relative of options.link ?? []) {
+        const tracked = await runGit(['ls-files', '--error-unmatch', relative], projectRoot);
+        if (tracked.ok) {
+          throw new SpecError(`"${relative}" é rastreado pelo git — não pode virar link simbólico`, {
+            code: 'link_target_tracked',
+          });
+        }
+        const source = path.join(projectRoot, relative);
+        if (await pathExists(source)) {
+          const destination = path.join(targetPath, relative);
+          await ensureDir(path.dirname(destination));
+          await fs.symlink(path.resolve(source), destination, 'dir');
+        }
       }
-      const source = path.join(projectRoot, relative);
-      if (await pathExists(source)) {
-        const destination = path.join(targetPath, relative);
-        await ensureDir(path.dirname(destination));
-        await fs.symlink(path.resolve(source), destination, 'dir');
-      }
-    }
 
-    await writeRegistry(projectRoot, changeId, {
-      task,
-      branch,
-      path: targetPath,
-      baseSha,
-      createdAt: new Date().toISOString(),
-      status: 'active',
-    });
+      await writeRegistry(projectRoot, changeId, {
+        task,
+        branch,
+        path: targetPath,
+        baseSha,
+        createdAt: new Date().toISOString(),
+        status: 'active',
+      });
+    } catch (error) {
+      await removeWorktreeAndBranch(projectRoot, targetPath, branch);
+      throw error;
+    }
 
     return { task, branch, path: targetPath };
   });
@@ -494,13 +508,19 @@ async function finalizeAfterMerge(
   changeId: string,
   entry: WorktreeEntry
 ): Promise<FinishResult> {
+  // Captured BEFORE the task-completion commit below, which is the only
+  // reason HEAD is still exactly the merge commit here - both callers
+  // (a merge `finishWorktree` just made, or one a human just finished by
+  // hand before `resumeWorktree`) reach this point with nothing else
+  // committed since.
+  const mergeHead = await runGit(['rev-parse', 'HEAD'], projectRoot);
+
   await commitTaskCompletion(projectRoot, changeDirPath, entry.task);
-  const head = await runGit(['rev-parse', 'HEAD'], projectRoot);
 
   await writeRegistry(projectRoot, changeId, {
     ...entry,
     status: 'cleanup_pending',
-    mergeCommitSha: head.ok ? head.stdout.trim() : entry.mergeCommitSha,
+    mergeCommitSha: mergeHead.ok ? mergeHead.stdout.trim() : entry.mergeCommitSha,
   });
 
   // The merge and the task-done commit are already durable at this point -
@@ -674,9 +694,14 @@ export async function cleanupWorktree(
         if (options.force) {
           const conventionalPath = worktreePath(projectRoot, changeId, task);
           if (await pathExists(conventionalPath)) {
-            await runGit(['worktree', 'remove', '--force', conventionalPath], projectRoot);
-            await runGit(['branch', '-D', branchName(changeId, task)], projectRoot);
-            removed.push(task);
+            const cleaned = await removeWorktreeAndBranch(
+              projectRoot,
+              conventionalPath,
+              branchName(changeId, task),
+              true
+            );
+            if (cleaned) removed.push(task);
+            else skipped.push({ task, reason: 'removal_failed' });
           }
         }
         continue;
@@ -691,8 +716,14 @@ export async function cleanupWorktree(
         }
       }
 
-      await runGit(['worktree', 'remove', ...(options.force ? ['--force'] : []), entry.path], projectRoot);
-      await runGit(['branch', options.force ? '-D' : '-d', entry.branch], projectRoot);
+      const cleaned = await removeWorktreeAndBranch(projectRoot, entry.path, entry.branch, options.force === true);
+      if (!cleaned) {
+        // Registry stays exactly as it was (still `active`/`merge_conflict`),
+        // so a retry - automatic via the next `reconcile`, or manual - has
+        // something real to act on instead of a removal nobody can find.
+        skipped.push({ task, reason: 'removal_failed' });
+        continue;
+      }
       await deleteRegistry(projectRoot, changeId, task);
       removed.push(task);
     }
