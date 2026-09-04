@@ -573,6 +573,13 @@ function screenPlano(d){
     +'<button type="button" class="chip" id="gopen" title="Ver as dependências como grafo">'
     +'⌗ ver o grafo</button>');
 
+  // Só uma linha 'pronta' é candidata real a "comece agora" - um id em
+  // d.parallelReady que já está em implementação entra no conjunto por causa
+  // do grafo de dependência, não da execução, e citar esse id aqui leria
+  // como convite pra começar de novo.
+  var readyIds={};
+  (d.changes||[]).forEach(function(c){if(c.presentation==='pronta')readyIds[c.id]=1});
+
   var placed={};
   STAGES.forEach(function(s){
     var m=visible.filter(function(c){return s[1].indexOf(c.presentation)>=0 && !placed[c.id]});
@@ -596,6 +603,13 @@ function screenPlano(d){
         r+=docChips(c.link);
       }
       if(c.unlocks&&c.unlocks.length&&c.execution!=='archived')r+='<div class="sub2">↳ desbloqueia '+esc(c.unlocks.join(', '))+'</div>';
+      // Marcado na própria linha, não só uma vez no RESUMO: quem varre esta
+      // seção precisa saber COM QUAIS outras prontas esta não tem dependência
+      // declarada, não só que existe alguma paralelizável em algum lugar.
+      if(c.presentation==='pronta'&&d.parallelReady&&d.parallelReady.indexOf(c.id)>=0){
+        var others=d.parallelReady.filter(function(id){return id!==c.id&&readyIds[id]});
+        if(others.length)r+='<div class="sub2" style="color:var(--cyan)" title="'+esc(d.parallelCaveat||'')+'">↳ paralelizável com '+esc(others.join(', '))+'</div>';
+      }
       // O caminho para começar este incremento, dos dois lados.
       if(c.presentation==='pronta'&&!c.link){
         // Montado com o incremento e o slug: quem lê não precisa lembrar de nada.
