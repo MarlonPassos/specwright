@@ -1,12 +1,10 @@
-import path from 'node:path';
-import { pathExists } from '../../util/fs.js';
 import { isDirectory } from '../../util/fs.js';
 import { listChanges, type Workspace } from '../workspace.js';
 import { loadPlan, savePlan } from './repository.js';
-import { readEvidence } from './evidence.js';
+import { readEvidence, resolveArchiveEvidence } from './evidence.js';
 import type { ProjectChange } from './model.js';
 import { safeResolve } from './paths.js';
-import { activePath, resolveArchivedDir } from './link.js';
+import { activePath } from './link.js';
 import { localDateStamp } from '../../util/date.js';
 
 export interface SyncResult {
@@ -16,6 +14,8 @@ export interface SyncResult {
   /** Links created by `--link`, empty unless it was asked for. */
   linked: Array<{ id: string; change: string; activePath: string | null; archivePath: string | null }>;
   cleared: string[];
+  /** Increments whose `archive_path` pointed at something that is not a valid archive directory. */
+  clearedArchive: string[];
   diagnostics: Array<{ level: string; code: string; path: string; message: string; fix?: string }>;
   revision: number;
 }
@@ -44,6 +44,7 @@ export async function syncPlan(
   const resolved: SyncResult['resolved'] = [];
   const linked: SyncResult['linked'] = [];
   const cleared: string[] = [];
+  const clearedArchive: string[] = [];
   const diagnostics: SyncResult['diagnostics'] = [];
 
   // Names already spoken for, so bulk linking can never steal one.
@@ -68,7 +69,9 @@ export async function syncPlan(
 
       const activeDir = safeResolve(workspace.changesPath, change.slug);
       const activeExists = activeDir !== undefined && (await isDirectory(activeDir));
-      const archiveDir = activeExists ? undefined : await resolveArchivedDir(workspace, change.slug);
+      const archiveDir = activeExists
+        ? undefined
+        : (await resolveArchiveEvidence(workspace, { name: change.slug })).chosen;
       if (!activeExists && !activeNames.has(change.slug) && archiveDir === undefined) {
         nextChanges.push(change);
         continue;
@@ -97,7 +100,10 @@ export async function syncPlan(
       change.link.active_path === null
         ? undefined
         : safeResolve(workspace.projectRoot, change.link.active_path);
-    const activeExists = activeAbsolute !== undefined && (await pathExists(activeAbsolute));
+    // A change is a DIRECTORY. `pathExists` said yes to a regular file sitting
+    // at `active_path`, so `sync` left a link the evidence reader already
+    // considered dead — the reconciler disagreed with the reader (A-02).
+    const activeExists = activeAbsolute !== undefined && (await isDirectory(activeAbsolute));
 
     let link = change.link;
 
@@ -105,6 +111,22 @@ export async function syncPlan(
       link = { ...link, archive_path: evidence.archivePath };
       resolved.push({ id: change.id, archivePath: evidence.archivePath });
       mutated = true;
+    }
+
+    // A persisted `archive_path` that no longer resolves to an archive
+    // DIRECTORY is a lie the plan keeps repeating. `sync` is the declared repair
+    // for it (F-04), so it clears the field instead of leaving the increment
+    // reading as concluded off a stale string.
+    if (!evidence.archivePath && evidence.invalidArchivePath && link.archive_path !== null) {
+      link = { ...link, archive_path: null };
+      clearedArchive.push(change.id);
+      mutated = true;
+      diagnostics.push({
+        level: 'WARNING',
+        code: 'invalid_archive_path',
+        path: `changes.${change.id}.link.archive_path`,
+        message: `"${evidence.invalidArchivePath}" não é um diretório de archive de "${change.link.name}"`,
+      });
     }
 
     if (!activeExists && link.active_path !== null && (evidence.archivePath || link.archive_path)) {
@@ -136,7 +158,16 @@ export async function syncPlan(
 
   if (mutated && !check) {
     const next = await savePlan(paths, { ...manifest, changes: nextChanges });
-    return { synced: true, checked: false, resolved, linked, cleared, diagnostics, revision: next.revision };
+    return {
+      synced: true,
+      checked: false,
+      resolved,
+      linked,
+      cleared,
+      clearedArchive,
+      diagnostics,
+      revision: next.revision,
+    };
   }
 
   return {
@@ -145,6 +176,7 @@ export async function syncPlan(
     resolved,
     linked,
     cleared,
+    clearedArchive,
     diagnostics,
     revision: manifest.revision,
   };

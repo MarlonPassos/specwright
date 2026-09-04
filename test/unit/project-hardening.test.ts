@@ -147,6 +147,20 @@ describe('concurrent writers cannot lose an update (R-03)', () => {
     await savePlan(paths, base);
     expect(await fs.readdir(paths.dir)).not.toContain('.plan.lock');
   });
+
+  it('does not delete a lock that no longer belongs to the releasing process', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedPlan(workspace, manifest({ id: 'p', changes: [] }));
+    const lock = path.join(workspace.projectRoot, 'planning/p/.plan.lock');
+
+    const { withPlanLock } = await import('../../src/core/project/repository.js');
+    await withPlanLock(planPaths(workspace.projectRoot, 'p'), async () => {
+      await fs.writeFile(lock, 'another-owner');
+    });
+
+    expect(await fs.readFile(lock, 'utf8')).toBe('another-owner');
+    await fs.rm(lock, { force: true });
+  });
 });
 
 describe('an already-invalid brief is never `ready` (R-01, FR-22)', () => {

@@ -2,11 +2,12 @@ import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { parse as parseYaml } from 'yaml';
 import { SpecError } from '../../util/errors.js';
-import { pathExists, readFileIfExists } from '../../util/fs.js';
+import { isDirectory, pathExists, readFileIfExists } from '../../util/fs.js';
 import { buildReport, type ValidationIssue, type ValidationReport } from '../validate/report.js';
 import { MAX_DELTAS_PER_CHANGE } from '../validate/rules.js';
 import { readDeltaSpecs } from '../change/model.js';
-import { CHANGES_DIR, ARCHIVE_DIR, WORKSPACE_DIR } from '../workspace.js';
+import { CHANGES_DIR, ARCHIVE_DIR, WORKSPACE_DIR, workspaceAt } from '../workspace.js';
+import { validateLinkEvidence } from './evidence.js';
 import { sha256, sourceHash, type HashableSource } from './hashes.js';
 import { renderManifest, type PlanManifest, type ProjectChange } from './model.js';
 import {
@@ -22,6 +23,7 @@ import {
   planPaths,
   plannedChangeFileName,
   resolveWithinRoot,
+  safeResolve,
   type PlanPaths,
 } from './paths.js';
 
@@ -224,6 +226,12 @@ async function checkManifest(
       );
       continue;
     }
+    if (ref.record_hash === undefined) {
+      warn(
+        `changes.${change.id}.planned_change.record_hash`,
+        `${change.id} não tem record_hash; a atualidade do registro não pode ser comprovada (record_hash_missing)`
+      );
+    }
     try {
       resolveWithinRoot(ctx.paths.dir, ref.path);
     } catch (pathError) {
@@ -296,13 +304,19 @@ async function checkManifest(
       }
     }
 
+    // Use the same evidence verdict as status before inspecting any linked
+    // content. This keeps validation fail-closed for missing files, regular
+    // files and symlink escapes, and gives every consumer the same archive
+    // candidate ordering.
+    const verdict = await validateLinkEvidence(workspaceAt(ctx.projectRoot), link);
+
     // oversized_change: the linked change carries more than 10 deltas
     const linkedDir = link.archive_path
-      ? path.join(ctx.projectRoot, link.archive_path)
+      ? safeResolve(ctx.projectRoot, link.archive_path)
       : link.active_path
-        ? path.join(ctx.projectRoot, link.active_path)
-        : path.join(ctx.projectRoot, WORKSPACE_DIR, CHANGES_DIR, link.name);
-    if (await pathExists(linkedDir)) {
+        ? safeResolve(ctx.projectRoot, link.active_path)
+        : safeResolve(ctx.projectRoot, `${WORKSPACE_DIR}/${CHANGES_DIR}/${link.name}`);
+    if (linkedDir !== undefined && (await isDirectory(linkedDir))) {
       const deltas = await readDeltaSpecs(linkedDir);
       const total = deltas.reduce((count, delta) => count + delta.entries.length, 0);
       if (total > MAX_DELTAS_PER_CHANGE) {
@@ -313,12 +327,36 @@ async function checkManifest(
       }
     }
 
-    // ambiguous_archive_match: more than one archive directory fits the slug
-    const candidates = await archiveCandidates(ctx.projectRoot, link.name);
+    // ambiguous_archive_match: more than one archive directory fits the slug.
+    // `verdict.archive.all` is already ordered by the shared authority.
+    const candidates = verdict.archive.all;
     if (candidates.length > 1) {
       warn(
         `changes.${change.id}.link`,
         `mais de um archive candidato para "${link.name}": ${candidates.join(', ')} (ambiguous_archive_match)`
+      );
+    }
+
+    // §7.17 ERROR 22, from the same verdict `status` reads. Checking the SHAPE
+    // of the two strings above is not validating the link: it approved a link
+    // whose target had been deleted, replaced by a regular file, or reached
+    // through a symlink out of the workspace — all three of which `status`
+    // already reported as `dangling_link` (F-03, FR-04, I-8).
+    for (const field of verdict.unsafe) {
+      error(
+        `changes.${change.id}.link.${field}`,
+        `${link[field]} não resolve dentro do workspace (unsafe_plan_path)`
+      );
+    }
+    if (verdict.dangling) {
+      error(
+        `changes.${change.id}.link`,
+        `o vínculo aponta para "${link.name}", que não existe ativa nem arquivada (dangling_link)`
+      );
+    } else if (verdict.archive.reason === 'explicit_path_invalid') {
+      warn(
+        `changes.${change.id}.link.archive_path`,
+        `${verdict.archive.rejectedPath} não é um diretório de archive de "${link.name}" e foi ignorado (invalid_archive_path)`
       );
     }
   }
@@ -625,18 +663,4 @@ async function validatePlannedChange(
   }
 
   return buildReport(change.id, 'planned-change', issues, ctx.strict);
-}
-
-async function archiveCandidates(projectRoot: string, name: string): Promise<string[]> {
-  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const pattern = new RegExp(`^\\d{4}-\\d{2}-\\d{2}-${escaped}(-\\d+)?$`);
-  const base = path.join(projectRoot, WORKSPACE_DIR, CHANGES_DIR, ARCHIVE_DIR);
-  try {
-    return (await fs.readdir(base, { withFileTypes: true }))
-      .filter((entry) => entry.isDirectory() && pattern.test(entry.name))
-      .map((entry) => entry.name)
-      .sort();
-  } catch {
-    return [];
-  }
 }

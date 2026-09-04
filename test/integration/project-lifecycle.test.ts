@@ -92,7 +92,9 @@ describe('project lifecycle', () => {
     status = await computeProjectStatus(workspace, 'shop');
     expect(status.changes.find((c) => c.id === 'CH-001')!.presentation).toBe('em implementação');
 
-    // 7. the existing cycle archives it — the plan is never told
+    // 7. Simulate the existing cycle moving it into the archive. This test
+    // exercises the read-only evidence path; the native `archive` command's
+    // best-effort plan closure is covered by the CLI integration tests.
     await fs.mkdir(path.join(workspace.archivePath, '2026-09-01-auth'), { recursive: true });
     await fs.rm(path.join(workspace.changesPath, 'auth'), { recursive: true, force: true });
 

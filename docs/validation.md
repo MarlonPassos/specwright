@@ -117,6 +117,8 @@ O `specs project sync` e o `status` reportam, como diagnóstico de leitura:
 | ERROR | `duplicate_link` | dois incrementos usam a mesma change nativa |
 | WARNING | `ambiguous_archive_match` | mais de um diretório de archive casa o slug; escolhe o de maior data e sufixo |
 | WARNING | `source_changed` / `missing_source` | um documento-fonte mudou ou sumiu desde o registro |
+| WARNING | `record_hash_missing` | o brief foi gravado antes da prova de identidade do incremento; rode `specs project generate` |
+| WARNING | `invalid_archive_path` | o `archive_path` persistido não é um diretório de archive válido e foi ignorado |
 
 Uma change que fica **fora do plano** indefinidamente é válida: não há warning que
 a trate como erro.

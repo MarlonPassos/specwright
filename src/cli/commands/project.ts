@@ -520,6 +520,10 @@ export function registerProjectCommands(program: Command): void {
           ...Object.entries(result.idMap).map(([ref, allocated]) => `  ${ref} → ${allocated}`),
           ...result.written.map((file) => `  + ${file}`),
           ...result.removed.map((file) => `  - ${file}`),
+          ...result.completedTouched.map(
+            (id) =>
+              `  ! ${id} está concluído e ${result.dryRun ? 'seria atingido' : 'foi atingido'} por esta operação`
+          ),
         ]);
       } catch (error) {
         fail(error, { json, payload: { applied: false } });

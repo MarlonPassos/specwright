@@ -1,12 +1,13 @@
 import path from 'node:path';
 import { SpecError } from '../../util/errors.js';
 import { localDateStamp } from '../../util/date.js';
-import { isDirectory, pathExists, readFileIfExists } from '../../util/fs.js';
-import { ARCHIVE_DIR, CHANGES_DIR, WORKSPACE_DIR, listArchivedChanges, type Workspace } from '../workspace.js';
+import { isDirectory, readFileIfExists } from '../../util/fs.js';
+import { ARCHIVE_DIR, CHANGES_DIR, WORKSPACE_DIR, listChanges, type Workspace } from '../workspace.js';
 import { parseProposal } from '../change/model.js';
 import { loadPlan, savePlan } from './repository.js';
 import { nextChangeId, type ChangeLink, type PlanningState, type ProjectChange } from './model.js';
-import { readEvidence } from './evidence.js';
+import { readEvidence, resolveArchiveEvidence } from './evidence.js';
+import { parseArchiveIdentity } from './archive-identity.js';
 import { safeResolve } from './paths.js';
 import { assertTransition, executionOf } from './state.js';
 import { computeProjectStatus } from './status.js';
@@ -37,19 +38,6 @@ export interface LinkResult {
   diagnostics: unknown[];
 }
 
-/** Newest archive directory answering to `name`, as a project-relative path. */
-export async function resolveArchivedDir(
-  workspace: Workspace,
-  name: string
-): Promise<string | undefined> {
-  const pattern = new RegExp(`^\\d{4}-\\d{2}-\\d{2}-${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(-\\d+)?$`);
-  const matches = (await listArchivedChanges(workspace)).filter((entry) => pattern.test(entry));
-  if (matches.length === 0) return undefined;
-  const chosen = [...matches].sort((a, b) => b.localeCompare(a))[0];
-  const dir = safeResolve(workspace.archivePath, chosen);
-  if (dir === undefined || !(await isDirectory(dir))) return undefined;
-  return `${WORKSPACE_DIR}/${CHANGES_DIR}/${ARCHIVE_DIR}/${chosen}`;
-}
 
 export async function linkChange(
   workspace: Workspace,
@@ -93,7 +81,9 @@ export async function linkChange(
   // then masks (`executionOf` resolves the archive first). The plan would read
   // the increment as concluded with no work behind it. `adopt` already resolves
   // an archive; `link` now resolves it the same way.
-  const archived = activeExists ? undefined : await resolveArchivedDir(workspace, changeName);
+  const archived = activeExists
+    ? undefined
+    : (await resolveArchiveEvidence(workspace, { name: changeName })).chosen;
   if (!activeExists && archived === undefined) {
     throw new SpecError(
       `Não encontrei "${changeName}" em spec/changes/ nem no archive.`,
@@ -210,7 +200,23 @@ export async function adoptChange(
       linked_at: localDateStamp(),
     };
   } else if (archiveDir !== undefined && (await isDirectory(archiveDir))) {
-    name = target.replace(/^\d{4}-\d{2}-\d{2}-/, '').replace(/-\d+$/, '');
+    // `<date>-<slug>[-N]` is ambiguous: `2026-01-01-release-2` is either the
+    // slug `release-2` or `release` archived twice on one day. Stripping
+    // `-\d+$` blindly answered the second reading always, so adopting a change
+    // whose slug ends in a number created the increment under a TRUNCATED slug
+    // (F-07). Context decides; with no context, `adopt` refuses instead of
+    // writing a guess into the plan.
+    const identity = parseArchiveIdentity(target, await knownSlugs(workspace, manifest));
+    if (identity.ambiguous) {
+      throw new SpecError(
+        `Não dá para saber se "${target}" é a change "${identity.slug}-${identity.collision}" ou a ${identity.collision}ª vez que "${identity.slug}" foi arquivada.`,
+        {
+          code: 'ambiguous_archive_identity',
+          fix: `Declare o incremento no plano com o slug pretendido (specs project apply, op addChange) e depois rode specs project link <id> <slug>.`,
+        }
+      );
+    }
+    name = identity.slug;
     proposalDir = archiveDir;
     link = {
       name,
@@ -373,6 +379,25 @@ function assertSafeAdoptTarget(target: string): void {
   if (!KEBAB.test(target) && !ARCHIVE_DIR_NAME.test(target)) {
     unsafe('deve ser um slug kebab-case ou um diretório de archive <YYYY-MM-DD>-<slug>[-N]');
   }
+}
+
+/**
+ * Everything the workspace knows about change names, so an archive directory
+ * name can be read against reality instead of a regex guess: the slugs the plan
+ * declares, the names its links already claim, and the active change
+ * directories. Read-only; `link.ts` already depends on the manifest it gets.
+ */
+async function knownSlugs(
+  workspace: Workspace,
+  manifest: { changes: ProjectChange[] }
+): Promise<Set<string>> {
+  const slugs = new Set<string>();
+  for (const change of manifest.changes) {
+    slugs.add(change.slug);
+    if (change.link) slugs.add(change.link.name);
+  }
+  for (const name of await listChanges(workspace)) slugs.add(name);
+  return slugs;
 }
 
 function firstLine(text: string): string {

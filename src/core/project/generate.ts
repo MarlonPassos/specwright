@@ -10,6 +10,7 @@ import { renderManifest, type PlanManifest, type ProjectChange } from './model.j
 import { plannedChangeRelPath, resolveWithinRoot, safeResolve } from './paths.js';
 import { renderPlannedChange } from './planned-change.js';
 import { assertRoadmapMarkers, renderRoadmapBlock, spliceRoadmap } from './render.js';
+import { materializationState } from './state.js';
 import { computeProjectStatus, roadmapRows } from './status.js';
 
 export interface GenerateOptions {
@@ -88,22 +89,15 @@ export async function generatePlannedChanges(
     const ref = change.planned_change;
 
     const currentContentHash = existing === undefined ? undefined : sha256(existing);
-    const currentRecordHash = recordHash({
-      slug: change.slug,
-      title: change.title,
-      dependsOn: change.depends_on,
-      milestone: change.milestone,
+    // One implementation of the rule, in `state.ts`. This used to be a second,
+    // hand-rolled copy — which is why the `record_hash` bug (F-06) existed in
+    // two places and had to be fixed twice.
+    const state = materializationState({
+      change,
+      briefContent: existing,
+      briefContentSha: currentContentHash,
+      currentSourceHash,
     });
-    const state =
-      ref === null || existing === undefined
-        ? 'missing'
-        : currentContentHash !== ref.content_hash
-          ? 'modified'
-          : currentSourceHash !== ref.source_hash
-            ? 'outdated'
-            : ref.record_hash !== undefined && ref.record_hash !== currentRecordHash
-              ? 'outdated'
-              : 'current';
 
     if (state === 'current') {
       skipped.push({ id: change.id, reason: 'planned_change_current' });
@@ -203,12 +197,6 @@ export async function generatePlannedChanges(
     };
   }
 
-  // Everything that can still fail must fail BEFORE the first byte is written.
-  // An unbalanced roadmap marker used to be discovered only after the briefs and
-  // the manifest had already landed (AC-21, NFR-07).
-  const planDocBefore = await readFileIfExists(paths.planDoc);
-  if (planDocBefore !== undefined) assertRoadmapMarkers(planDocBefore);
-
   const nextManifest: PlanManifest = {
     ...manifest,
     revision: manifest.revision + 1,
@@ -230,18 +218,24 @@ export async function generatePlannedChanges(
         { code: 'plan_revision_conflict', fix: 'specs project status --json' }
       );
     }
+    // Read and validate the human document under the same lock as the manifest
+    // and brief writes. Otherwise a concurrent editor could be overwritten by
+    // a projection based on bytes read before lock acquisition (R-01).
+    const planDocBefore = await readFileIfExists(paths.planDoc);
+    if (planDocBefore !== undefined) assertRoadmapMarkers(planDocBefore);
     await withStaging(paths.dir, async (stage) => {
       for (const entry of toWrite.values()) stage(entry.relPath, entry.content);
       stage('plan.yaml', renderManifest(nextManifest));
     });
-  });
 
-  if (planDocBefore !== undefined) {
-    // Markers were validated above, so this projection cannot fail.
-    const status = await computeProjectStatus(workspace, id);
-    const block = renderRoadmapBlock({ manifest: nextManifest, rows: roadmapRows(status) });
-    await writeFileAtomic(paths.planDoc, spliceRoadmap(planDocBefore, block));
-  }
+    if (planDocBefore !== undefined) {
+      // The staged manifest and briefs are visible while the lock is held, so
+      // the projection reflects exactly the committed state.
+      const fresh = await computeProjectStatus(workspace, id);
+      const block = renderRoadmapBlock({ manifest: fresh.manifest, rows: roadmapRows(fresh) });
+      await writeFileAtomic(paths.planDoc, spliceRoadmap(planDocBefore, block));
+    }
+  });
 
   return {
     generated: true,

@@ -134,9 +134,11 @@ Aplica os deltas da change nas specs do workspace e a move para o arquivo.
 | `--force` | Arquivar apesar de tarefas não marcadas |
 
 Num projeto com [plano](project-planning.md), o arquivamento fecha o vínculo já
-previsto — o incremento sem vínculo cujo `slug` é igual ao nome da change — e o
-reporta no bloco `plan`. Um plano ausente ou ilegível não muda o arquivamento em
-nada.
+previsto — o único incremento não cancelado e sem vínculo cujo `slug` é igual ao
+nome da change — e o reporta no bloco `plan`. Sem candidato, com mais de um
+candidato, ou quando o plano está ausente, ilegível ou recusa a escrita, o
+arquivamento continua bem-sucedido sem gravar no plano. Na ambiguidade, o JSON
+traz `planAmbiguity` com os candidatos e seus comandos `fix`.
 
 ### `specs watch [plan-id]`
 
@@ -270,7 +272,7 @@ change de mesmo nome do slug exista e esteja livre — é a alternativa a repeti
 `planning_state` (`on_hold` e `cancelled` exigem `--reason`).
 
 Códigos de erro: `link_target_missing`, `link_already_used`, `invalid_transition`,
-`missing_reason`, `completed_change_protected`.
+`missing_reason`, `completed_change_protected`, `ambiguous_archive_identity`.
 
 ### `specs serve [<plan-id>]`
 

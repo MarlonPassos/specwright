@@ -50,16 +50,21 @@ export function materializationState(input: MaterializationInput): Materializati
   }
   if (input.briefContentSha !== ref.content_hash) return 'modified';
   if (input.currentSourceHash !== ref.source_hash) return 'outdated';
+  // `record_hash` is optional so plans written before the field still LOAD.
+  // That is read compatibility, not semantic compatibility: with no hash there
+  // is no proof the record is unchanged, and "cannot tell" was being reported
+  // as `current`, which let an increment reach `ready` on no evidence (F-06,
+  // §7.2). Absent reads as `outdated`: `generate` rewrites the brief, fills the
+  // field, and the plan converges on the next pass with no manual step.
+  if (ref.record_hash === undefined) return 'outdated';
   // Relevant record change (slug/title/depends_on/milestone) since materialization.
-  if (ref.record_hash !== undefined) {
-    const current = recordHash({
-      slug: input.change.slug,
-      title: input.change.title,
-      dependsOn: input.change.depends_on,
-      milestone: input.change.milestone,
-    });
-    if (current !== ref.record_hash) return 'outdated';
-  }
+  const current = recordHash({
+    slug: input.change.slug,
+    title: input.change.title,
+    dependsOn: input.change.depends_on,
+    milestone: input.change.milestone,
+  });
+  if (current !== ref.record_hash) return 'outdated';
   return 'current';
 }
 
@@ -68,6 +73,13 @@ export interface ExecutionResult {
   evidence: string[];
 }
 
+/**
+ * I-7: `archived` exists only behind a resolved archive DIRECTORY, and no
+ * declared field can produce it. `evidence.archivePath` is set by
+ * `resolveArchiveEvidence` only after an `isDirectory` check whose name answers
+ * for the link, so the shortcut below cannot be forged by writing a string into
+ * the manifest or dropping a regular file at that path (F-04).
+ */
 export function executionOf(link: ProjectChange['link'], evidence: ChangeEvidence): ExecutionResult {
   if (!link) return { execution: 'unlinked', evidence: ['not_linked'] };
   if (evidence.archivePath) {
@@ -165,7 +177,7 @@ const REASON_TEXT: Record<string, string> = {
   dependency_pending: 'pelo menos uma dependência não está concluída',
   manual_blocker_present: 'há um blocker declarado',
   planned_change_missing: 'o Planned Change não foi materializado',
-  planned_change_outdated: 'a fonte mudou desde a materialização',
+  planned_change_outdated: 'a fonte ou o registro mudou desde a materialização, ou não há prova de que não mudou',
   planned_change_modified: 'o arquivo do Planned Change foi editado à mão',
   state_not_eligible: 'planning_state é idea, on_hold ou cancelled',
   diagnostic_blocking: 'há um diagnóstico impeditivo',

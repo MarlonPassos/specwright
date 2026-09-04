@@ -33,7 +33,7 @@ async function busyPlan(): Promise<Workspace> {
   const done = await withBrief(
     workspace,
     'demo',
-    change({ id: 'CH-001', slug: 'fundacao', title: 'Fundação', link: link('fundacao') })
+    change({ id: 'CH-001', slug: 'fundacao', title: 'Fundação', milestone: 'M1', link: link('fundacao') })
   );
   await seedArchivedChange(workspace, 'fundacao');
 
@@ -41,18 +41,25 @@ async function busyPlan(): Promise<Workspace> {
   const running = await withBrief(
     workspace,
     'demo',
-    change({ id: 'CH-002', slug: 'auth', title: 'Autenticação', depends_on: ['CH-001'], link: link('auth') })
+    change({
+      id: 'CH-002',
+      slug: 'auth',
+      title: 'Autenticação',
+      depends_on: ['CH-001'],
+      milestone: 'M2',
+      link: link('auth'),
+    })
   );
 
   const ready = await withBrief(
     workspace,
     'demo',
-    change({ id: 'CH-003', slug: 'catalogo', title: 'Catálogo', depends_on: ['CH-001'] })
+    change({ id: 'CH-003', slug: 'catalogo', title: 'Catálogo', depends_on: ['CH-001'], milestone: 'M2' })
   );
   const blocked = await withBrief(
     workspace,
     'demo',
-    change({ id: 'CH-004', slug: 'checkout', title: 'Checkout', depends_on: ['CH-002'] })
+    change({ id: 'CH-004', slug: 'checkout', title: 'Checkout', depends_on: ['CH-002'], milestone: 'M2' })
   );
   const held = await withBrief(
     workspace,
@@ -70,13 +77,7 @@ async function busyPlan(): Promise<Workspace> {
         { id: 'M1', name: 'Base', order: 1, changes: ['CH-001'] },
         { id: 'M2', name: 'Produto', order: 2, changes: ['CH-002', 'CH-003', 'CH-004'] },
       ],
-      changes: [
-        { ...done, milestone: 'M1' },
-        { ...running, milestone: 'M2' },
-        { ...ready, milestone: 'M2' },
-        { ...blocked, milestone: 'M2' },
-        held,
-      ],
+      changes: [done, running, ready, blocked, held],
     })
   );
   return workspace;

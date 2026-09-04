@@ -1,4 +1,10 @@
-import { readFile, open as openFile, rm as removeFile, stat as statFile } from 'node:fs/promises';
+import {
+  readFile,
+  open as openFile,
+  rm as removeFile,
+  stat as statFile,
+  utimes as touchFile,
+} from 'node:fs/promises';
 import path from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { SpecError } from '../../util/errors.js';
@@ -125,12 +131,16 @@ const LOCK_STALE_MS = 30_000;
  */
 export async function withPlanLock<T>(paths: PlanPaths, body: () => Promise<T>): Promise<T> {
   const lockPath = path.join(paths.dir, '.plan.lock');
+  const owner = String(process.pid);
 
   for (let attempt = 0; ; attempt += 1) {
     try {
       const handle = await openFile(lockPath, 'wx');
-      await handle.writeFile(String(process.pid));
-      await handle.close();
+      try {
+        await handle.writeFile(owner);
+      } finally {
+        await handle.close();
+      }
       break;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
@@ -150,10 +160,33 @@ export async function withPlanLock<T>(paths: PlanPaths, body: () => Promise<T>):
     }
   }
 
+  // A lock is a lease, not a one-time timestamp. Long materialization or
+  // archive operations must keep it fresh or a second writer can take it while
+  // the first one is still mutating the plan (R-02). `unref` keeps this timer
+  // from keeping a short-lived CLI process alive on its own.
+  const lease = setInterval(() => {
+    void (async () => {
+      // Do not refresh a lease that another process acquired after taking our
+      // old lock as stale. The owner check also makes the timer harmless after
+      // an unexpected handoff.
+      const current = await readFile(lockPath, 'utf8').catch(() => undefined);
+      if (current?.trim() !== owner) return;
+      await touchFile(lockPath, new Date(), new Date()).catch(() => undefined);
+    })();
+  }, Math.max(1_000, Math.floor(LOCK_STALE_MS / 3)));
+  lease.unref?.();
+
   try {
     return await body();
   } finally {
-    await removeFile(lockPath, { force: true });
+    clearInterval(lease);
+    // If this process was declared stale and another writer acquired the lock,
+    // an unconditional rm would delete the other writer's lease. Release only
+    // our own lock contents (A-06).
+    const current = await readFile(lockPath, 'utf8').catch(() => undefined);
+    if (current?.trim() === owner) {
+      await removeFile(lockPath, { force: true });
+    }
   }
 }
 

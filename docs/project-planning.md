@@ -174,14 +174,15 @@ archive por padrão a cada execução, então a conclusão nunca depende de `syn
 
 ### O fechamento no `archive`
 
-`specs archive` **não depende** do plano: plano ausente, ilegível ou que recuse a
-escrita não muda o arquivamento em nada, e o comando nunca falha por causa dele.
+`specs archive` **não depende** do plano: sem candidato, com mais de um candidato,
+ou com plano ausente, ilegível ou que recuse a escrita, o arquivamento não muda e
+o comando nunca falha por causa dele.
 O que ele faz, ao final e como efeito melhor-esforço, é **fechar um vínculo já
 previsto** — o incremento sem vínculo, não cancelado, cujo `slug` é **igual** ao
 nome da change. Só identidade exata, o mesmo critério de `sync --link`. Nada é
 criado: nem incremento, nem adoção, nem transição de `planning_state`.
 
-Quando fecha, o JSON traz um bloco `plan`:
+Quando há exatamente um candidato, o JSON traz um bloco `plan`:
 
 ```json
 {
@@ -199,6 +200,9 @@ Quando fecha, o JSON traz um bloco `plan`:
 Num projeto sem `planning/` a chave nunca aparece. É a exceção deliberada à
 regra do vínculo explícito, e existe porque o esquecimento era silencioso: a
 change ia até o archive e o plano seguia mostrando o incremento como pendente.
+Com mais de um candidato, a chave `plan` é omitida e `planAmbiguity` lista os
+candidatos; nenhum plano é escolhido por ordem de diretório. O `status` seguinte
+emite `unclaimed_archive` com um `fix` explícito.
 
 ### O aviso do `new change`
 
@@ -339,6 +343,17 @@ na aba que sempre desenharam. Sem plano legível há uma aba só e nada muda; se
 TTY o painel repinta por polling sem capturar teclado. As teclas estão em
 [`docs/cli.md`](cli.md).
 
+### Fora do terminal
+
+`specs serve` sobe as mesmas telas no navegador, mais o catálogo de documentos do
+projeto, e as atualiza sozinho quando `spec/` ou `planning/` muda. As projeções
+são as mesmas funções de core — `GET /api/overview` devolve byte a byte o que
+`specs watch --json` imprime.
+
+O painel é somente leitura: nenhuma rota escreve, todo método fora de
+`GET`/`HEAD` é `405`, e ele escuta em `127.0.0.1` a menos que `--host` diga outra
+coisa. As rotas estão em [`docs/cli.md`](cli.md).
+
 ## Comandos de harness
 
 Seis comandos gerados para os quatro harnesses (`/spec-project-plan`,
@@ -370,15 +385,16 @@ incremento ↔ milestone inconsistente; dois incrementos com o mesmo `link.name`
 
 **WARNING** — falham só sob `--strict`: `priority` ausente (default aplicado);
 seção recomendada vazia no brief; `missing_source`; `source_changed`;
-`orphan_planned_change`; `plan.md`/`architecture.md` ausente; plano em `draft`
-com briefs já materializados.
+`record_hash_missing`; `invalid_archive_path`; `orphan_planned_change`;
+`plan.md`/`architecture.md` ausente; plano em `draft` com briefs já
+materializados.
 
 A detecção de **ciclo** (`dependency_cycle`, com o caminho na mensagem) falha
 antes de qualquer escrita. Os diagnósticos derivados que aparecem em
 `specs project status` — `dangling_link`, `duplicate_link`, `source_changed`,
 `missing_source`, `ambiguous_archive_match`, `unclaimed_archive`,
-`ambiguous_execution` — usam código estável e trazem `fix` quando há recuperação
-óbvia.
+`ambiguous_execution`, `record_hash_missing`, `invalid_archive_path` — usam
+código estável e trazem `fix` quando há recuperação óbvia.
 
 `unclaimed_archive` fecha o vão entre `specs status` e `specs project`: uma
 change arquivada que nenhum incremento reivindica não conta no progresso do
@@ -401,3 +417,11 @@ ativo fica invisível e o incremento é apresentado como concluído.
 - Nenhum comando de plano cria, implementa, verifica ou arquiva uma change.
 - Nenhum conteúdo de documento-fonte é copiado para o manifesto, um Planned
   Change, um relatório ou um log — só o `path` e o `sha256`.
+- O bloco de roadmap dentro de `plan.md` é projetado **na escrita**, não na
+  leitura. Depois de um `specs archive`, o arquivo pode mostrar `Progresso: 0/1`
+  enquanto `specs project` mostra `1/1`: o painel resolve o archive a cada
+  execução, o arquivo é o retrato da última mutação do plano. Qualquer comando
+  que grave no plano reprojeta o bloco.
+- O painel web não tem autenticação. `specs serve` escuta em loopback por padrão
+  justamente por isso; `--host` expõe a leitura do projeto a quem alcançar a
+  porta.

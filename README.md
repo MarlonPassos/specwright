@@ -154,6 +154,9 @@ specs templates                      Mostra o template por trás de cada artefat
 
 specs project create <plan-id>       Cria um plano de projeto em planning/<plan-id>/
 specs project validate [<plan-id>]   Valida o manifesto, os briefs, as fontes e os vínculos
+
+specs watch [plan-id]                Painel único: RESUMO, CHANGES e PLANO, por teclado
+specs serve [plan-id]                O mesmo painel no navegador, em leitura pura
 ```
 
 Todo comando aceita `--json` e imprime um único documento JSON no stdout, em sucesso ou
@@ -162,6 +165,36 @@ pronto para colar. Os comandos saem com `0` em sucesso e `1` em falha; o `valida
 com `1` quando o relatório não está válido.
 
 Referência completa: [docs/cli.md](docs/cli.md).
+
+## Painéis
+
+`specs status` e `specs project` desenham o mesmo trabalho por ângulos diferentes: um
+mostra as changes, o outro mostra os incrementos do plano. O `specs watch` põe os dois
+numa tela só, mais um **RESUMO** que junta os dois lados — a change `foundation` e o
+incremento `CH-001` que a reivindica aparecem na mesma linha.
+
+```text
+specs watch                 abre no RESUMO
+specs status --watch        abre no CHANGES
+specs project --watch       abre no PLANO
+```
+
+São três entradas do mesmo painel. `Tab` e `1`–`3` trocam de tela, `r` recarrega, `q`
+sai. Sem TTY — num pipe, em CI — ou num projeto sem plano, o painel é a tela única de
+sempre. `specs watch --json` publica a projeção combinada.
+
+O `specs serve` sobe as mesmas telas no navegador, mais um catálogo dos documentos do
+projeto, e atualiza sozinho quando `spec/` ou `planning/` muda:
+
+```text
+specs serve                 http://127.0.0.1:4477
+specs serve --port 8080     outra porta
+specs serve --no-open       sem abrir o navegador
+```
+
+O painel é **somente leitura**: nenhuma rota escreve no projeto, e o servidor recusa todo
+método que não seja `GET`. Ele escuta em `127.0.0.1` a menos que `--host` diga outra
+coisa — não há autenticação, então expor além de loopback é decisão de quem opera.
 
 ## Validação
 

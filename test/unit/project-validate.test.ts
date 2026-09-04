@@ -197,6 +197,54 @@ describe('validatePlan — manifest rules', () => {
       /duplicate_link/
     );
   });
+
+  it('errors when a link has neither an active directory nor an archive', async () => {
+    const workspace = await makePlanWorkspace();
+    const data = manifest({
+      id: 'demo',
+      changes: [
+        change({
+          id: 'CH-001',
+          slug: 'missing',
+          link: {
+            name: 'missing',
+            active_path: 'spec/changes/missing',
+            archive_path: null,
+            linked_at: '2026-09-01',
+          },
+        }),
+      ],
+    });
+    await seedPlan(workspace, data);
+    const reports = await validatePlan(workspace.projectRoot, data.id, {});
+    expect(issues(reports, 'ERROR').join(' ')).toMatch(/dangling_link/);
+    expect(reports[0].valid).toBe(false);
+  });
+
+  it('does not treat a regular file at archive_path as an archived change', async () => {
+    const workspace = await makePlanWorkspace();
+    await fs.mkdir(workspace.archivePath, { recursive: true });
+    const archive = path.join(workspace.archivePath, '2026-09-01-missing');
+    await fs.writeFile(archive, 'not a directory');
+    const data = manifest({
+      id: 'demo',
+      changes: [
+        change({
+          id: 'CH-001',
+          slug: 'missing',
+          link: {
+            name: 'missing',
+            active_path: 'spec/changes/missing',
+            archive_path: 'spec/changes/archive/2026-09-01-missing',
+            linked_at: '2026-09-01',
+          },
+        }),
+      ],
+    });
+    await seedPlan(workspace, data);
+    const reports = await validatePlan(workspace.projectRoot, data.id, {});
+    expect(issues(reports, 'ERROR').join(' ')).toMatch(/dangling_link/);
+  });
 });
 
 describe('validatePlan — planned change rules', () => {

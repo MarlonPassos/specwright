@@ -143,6 +143,13 @@ export interface ApplyContext {
   projectRoot?: string;
   archivedIds: Set<string>;
   allowCompleted: boolean;
+  /**
+   * `--dry-run`. A preview REPORTS what it would touch instead of throwing:
+   * the §7.11 pipeline puts the completed-increment check after the dry-run
+   * fork, and a preview that blows up hides exactly the information the user
+   * needs to decide whether to pass `--allow-completed` (A-07).
+   */
+  previewOnly?: boolean;
   resolveSourceHash: (path: string) => string | undefined;
   now?: Date;
 }
@@ -225,17 +232,6 @@ export function applyBundle(
     }
     return token;
   };
-  const guardCompleted = (id: string): void => {
-    if (ctx.archivedIds.has(id)) {
-      if (!ctx.allowCompleted) {
-        throw new SpecError(`A operação atinge ${id}, que está concluído.`, {
-          code: 'completed_change_protected',
-          fix: 'specs project apply --allow-completed',
-        });
-      }
-      completedTouched.add(id);
-    }
-  };
   const allocated: string[] = [];
   const allocate = (token: string | undefined): string => {
     // nextChangeId only sees committed records, so track pending ids too.
@@ -299,26 +295,22 @@ export function applyBundle(
       }
       case 'updateChange': {
         const change = find(operation.id);
-        guardCompleted(change.id);
         if (operation.set.priority) change.priority = operation.set.priority as Priority;
         if (operation.set.title) change.title = operation.set.title;
         break;
       }
       case 'setDependencies': {
         const change = find(operation.id);
-        guardCompleted(change.id);
         change.depends_on = operation.dependsOn.map(resolveRef);
         break;
       }
       case 'setBlockers': {
         const change = find(operation.id);
-        guardCompleted(change.id);
         change.manual_blockers = [...operation.manualBlockers];
         break;
       }
       case 'renameSlug': {
         const change = find(operation.id);
-        guardCompleted(change.id);
         if (change.planned_change) {
           const from = change.planned_change.path;
           const to = plannedChangeRelPath(change.id, operation.slug);
@@ -330,14 +322,12 @@ export function applyBundle(
       }
       case 'replacePlannedChange': {
         const change = find(operation.id);
-        guardCompleted(change.id);
         change.planned_change = pendingRef(change.id, change.slug, working.revision + 1);
         pendingBriefs.push({ id: change.id, slug: change.slug, spec: operation.plannedChange });
         break;
       }
       case 'splitChange': {
         const original = find(operation.id);
-        guardCompleted(original.id);
         const dependents = new Set(
           working.changes.filter((c) => c.depends_on.includes(original.id)).map((c) => c.id)
         );
@@ -436,6 +426,29 @@ export function applyBundle(
     }
   }
 
+  // ONE completed-increment guard, over the real diff.
+  //
+  // The guard used to sit inside each `case`, keyed on the id the operation
+  // NAMES. Composite operations mutate records they do not name — `setMilestones`
+  // reassigns every increment's milestone, `splitChange` and `mergeChanges`
+  // rewrite the `depends_on` of dependents — so all three walked straight past
+  // `--allow-completed` and rewrote archived history without asking (F-05).
+  // §7.11 rule 6 says "reaches", not "names".
+  //
+  // Comparing records rather than collecting ids touched by the loop is what
+  // keeps this usable: a `setMilestones` that reassigns the same milestone to a
+  // completed increment changes nothing and must not demand a flag.
+  const completed = touchedChangeIds(manifest, working).filter((id) => ctx.archivedIds.has(id));
+  if (completed.length > 0) {
+    if (!ctx.allowCompleted && ctx.previewOnly !== true) {
+      throw new SpecError(
+        `A operação atinge ${completed.join(', ')}, que está concluído.`,
+        { code: 'completed_change_protected', fix: 'specs project apply --allow-completed' }
+      );
+    }
+    for (const id of completed) completedTouched.add(id);
+  }
+
   // Proposed state must be a DAG, and structurally valid, BEFORE any write.
   ProjectGraph.from(working.changes);
   assertProposedStateValid(working, ctx.projectRoot);
@@ -451,6 +464,74 @@ export function applyBundle(
     documents,
     completedTouched: [...completedTouched],
   };
+}
+
+/**
+ * Ids whose persisted record differs between two manifests, in the order the
+ * first manifest declares them.
+ *
+ * Every field a plan file carries for an increment is compared, because any of
+ * them is a mutation of the record: `depends_on` as an ordered SET, the way
+ * `recordHash` already treats it, so a reordering that means nothing is not
+ * reported as a change. An id present in `before` and gone from `after` counts
+ * as touched.
+ */
+export function touchedChangeIds(before: PlanManifest, after: PlanManifest): string[] {
+  const afterById = new Map(after.changes.map((change) => [change.id, change]));
+  const touched: string[] = [];
+  for (const previous of before.changes) {
+    const next = afterById.get(previous.id);
+    if (next === undefined || !sameRecord(previous, next)) touched.push(previous.id);
+  }
+  return touched;
+}
+
+function sameRecord(a: ProjectChange, b: ProjectChange): boolean {
+  return (
+    a.slug === b.slug &&
+    a.title === b.title &&
+    a.planning_state === b.planning_state &&
+    a.priority === b.priority &&
+    a.milestone === b.milestone &&
+    (a.reason ?? null) === (b.reason ?? null) &&
+    sameSet(a.depends_on, b.depends_on) &&
+    sameList(a.manual_blockers, b.manual_blockers) &&
+    sameList(a.superseded_by, b.superseded_by) &&
+    samePlannedChange(a.planned_change, b.planned_change) &&
+    sameLink(a.link, b.link)
+  );
+}
+
+function sameList(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+function sameSet(a: readonly string[], b: readonly string[]): boolean {
+  return sameList([...a].sort(), [...b].sort());
+}
+
+function samePlannedChange(
+  a: ProjectChange['planned_change'],
+  b: ProjectChange['planned_change']
+): boolean {
+  if (a === null || b === null) return a === b;
+  return (
+    a.path === b.path &&
+    a.generated_from_plan_revision === b.generated_from_plan_revision &&
+    a.source_hash === b.source_hash &&
+    a.content_hash === b.content_hash &&
+    (a.record_hash ?? null) === (b.record_hash ?? null)
+  );
+}
+
+function sameLink(a: ProjectChange['link'], b: ProjectChange['link']): boolean {
+  if (a === null || b === null) return a === b;
+  return (
+    a.name === b.name &&
+    a.active_path === b.active_path &&
+    a.archive_path === b.archive_path &&
+    a.linked_at === b.linked_at
+  );
 }
 
 const KEBAB_SLUG = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;

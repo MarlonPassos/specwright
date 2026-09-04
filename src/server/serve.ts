@@ -21,7 +21,7 @@ export const DEFAULT_PORT = 4477;
 
 export interface ServeOptions {
   port?: number;
-  /** Loopback by default: the panel exposes project content (I-2). */
+  /** Loopback by default: the panel exposes project content (I-13). */
   host?: string;
   planId?: string;
 }
@@ -107,13 +107,21 @@ async function projections(workspace: Workspace, planId: string | undefined) {
       const content = absolute === undefined ? undefined : await readFileIfExists(absolute);
       if (content === undefined) return { found: false, reason: 'missing_on_disk' as const };
 
+      // The materialization state comes from the same computation `status` runs,
+      // so the panel and the CLI cannot disagree about a brief. This route used
+      // to derive its own `null`-or-`undefined` signal from the presence of
+      // `record_hash`, which was a third reading of a rule that has one owner
+      // (F-06).
+      const briefStatus = await computeProjectStatus(workspace, id);
+      const view = briefStatus.changes.find((entry) => entry.id === changeId);
+
       return {
         found: true,
         id: record.id,
         slug: record.slug,
         title: record.title,
         path: record.planned_change.path,
-        state: record.planned_change.record_hash === undefined ? null : undefined,
+        state: view?.plannedChange?.state ?? null,
         markdown: content,
       };
     },
@@ -193,7 +201,7 @@ export async function startServer(
     const url = new URL(request.url ?? '/', `http://${host}`);
     const route = url.pathname;
 
-    // Read-only surface, stated in the protocol itself (I-1).
+    // Read-only surface, stated in the protocol itself (I-12).
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       sendJson(response, 405, { error: { code: 'read_only', message: 'O painel é somente leitura.' } });
       return;
