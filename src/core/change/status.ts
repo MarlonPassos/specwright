@@ -4,9 +4,28 @@ import { isDirectory } from '../../util/fs.js';
 import { loadSchema, type LoadedSchema } from '../schema/loader.js';
 import { resolveOutputs } from '../schema/outputs.js';
 import { loadConfig, type WorkspaceConfig } from '../config.js';
-import { changeDir, type Workspace } from '../workspace.js';
+import { changeDir, listChanges, type Workspace } from '../workspace.js';
 import { readChangeMetadata } from './metadata.js';
 import { readTaskProgress, type TaskProgress } from './model.js';
+
+/**
+ * The change to act on: the one the caller named, or the sole active one when
+ * there is exactly one. Shared by every command that takes an optional
+ * `--change` - it exists once here so "no change named and none active" /
+ * "several active" always fail the same way, whichever command hit it.
+ */
+export async function resolveChangeId(workspace: Workspace, explicit?: string): Promise<string> {
+  if (explicit) return explicit;
+
+  const active = await listChanges(workspace);
+  if (active.length === 1) return active[0];
+  if (active.length === 0) {
+    throw new SpecError('Nenhuma change ativa', { code: 'no_active_change', fix: 'specs new change <nome>' });
+  }
+  throw new SpecError(`Várias changes ativas: ${active.join(', ')}. Diga qual delas.`, {
+    code: 'ambiguous_change',
+  });
+}
 
 export type ArtifactState = 'done' | 'ready' | 'blocked' | 'skipped';
 
@@ -63,6 +82,8 @@ export interface StatusContext {
   changeId: string;
   dir: string;
   skipSpecs: boolean;
+  /** `.change.yaml`'s `parallel: true` - this change's opt-in to worktree-isolated dispatch. */
+  parallel: boolean;
 }
 
 /**
@@ -94,7 +115,7 @@ export async function resolveChangeContext(
   const schemaName = options.schema ?? metadata.metadata?.schema ?? config.schema;
   const schema = await loadSchema(schemaName, workspace);
 
-  return { workspace, config, schema, changeId, dir, skipSpecs: metadata.skipSpecs };
+  return { workspace, config, schema, changeId, dir, skipSpecs: metadata.skipSpecs, parallel: metadata.parallel };
 }
 
 /**

@@ -10,6 +10,8 @@ export const claudeAdapter: HarnessAdapter = {
   name: 'Claude Code',
   directory: path.join('.claude', 'commands'),
   envMarkers: ['CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT'],
+  supportsParallelDispatch: true,
+  parallelDispatchPrimitive: 'Task',
 
   filePath(commandId) {
     return path.join('.claude', 'commands', `${commandName(commandId)}.md`);

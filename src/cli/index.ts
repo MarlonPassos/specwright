@@ -8,6 +8,8 @@ import { registerInspectCommands } from './commands/inspect.js';
 import { registerProjectCommands } from './commands/project.js';
 import { registerWatchCommands } from './commands/watch.js';
 import { registerServeCommand } from './commands/serve.js';
+import { registerTaskCommands } from './commands/tasks.js';
+import { registerWorktreeCommands } from './commands/worktree.js';
 
 async function readVersion(): Promise<string> {
   const here = path.dirname(fileURLToPath(import.meta.url));
@@ -72,6 +74,8 @@ export async function buildProgram(): Promise<Command> {
   registerProjectCommands(program);
   registerWatchCommands(program);
   registerServeCommand(program);
+  registerTaskCommands(program);
+  registerWorktreeCommands(program);
 
   return program;
 }

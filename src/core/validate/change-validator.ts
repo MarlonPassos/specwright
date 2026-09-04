@@ -4,6 +4,7 @@ import { pathExists } from '../../util/fs.js';
 import { headerLines } from '../markdown/sections.js';
 import { removalNotes } from '../markdown/deltas.js';
 import { parseProposal, readDeltaSpecs, readTaskProgress, PROPOSAL_FILE } from '../change/model.js';
+import { findDependencyCycle, findUnknownDependencies } from '../change/taskGraph.js';
 import { readChangeMetadata } from '../change/metadata.js';
 import { readSpec } from '../specs.js';
 import { changeDir, type Workspace } from '../workspace.js';
@@ -245,6 +246,25 @@ async function validateTasks(dir: string, requireCompleted: boolean): Promise<Va
       path: 'tasks.md',
       message: `${MESSAGES.TASKS_INCOMPLETE}: ${progress.completed}/${progress.total} complete`,
     });
+  }
+
+  // Uses the same detectors TaskGraph.from throws on, but never stops at the
+  // first problem - a duplicate number is only a WARNING here (unchanged,
+  // general document quality), while an unknown/circular dependency is an
+  // ERROR: nothing downstream can make sense of a reference to a task that
+  // does not exist, or of a cycle.
+  const numbered = progress.tasks.filter((task) => task.number !== '');
+  for (const { task, dependency } of findUnknownDependencies(numbered)) {
+    issues.push({
+      level: 'ERROR',
+      path: 'tasks.md',
+      line: task.line,
+      message: `${MESSAGES.TASK_DEPENDS_UNKNOWN}: ${task.number} -> ${dependency}`,
+    });
+  }
+  const cycle = findDependencyCycle(numbered);
+  if (cycle) {
+    issues.push({ level: 'ERROR', path: 'tasks.md', message: `${MESSAGES.TASK_DEPENDS_CYCLE}: ${cycle.join(' -> ')}` });
   }
 
   return issues;
