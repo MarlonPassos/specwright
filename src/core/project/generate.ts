@@ -37,6 +37,14 @@ export interface GenerateResult {
   revision?: { from: number; to: number };
   selection: { milestone: string | null; changes: string[] };
   written: string[];
+  /**
+   * Ids among `written` that got the bare §7.5 skeleton (no prior content, no
+   * `plannedChange` spec) instead of real prose. Escopo and Critérios macro are
+   * empty on purpose, so the increment reads as blocked/`inconsistente` until
+   * someone supplies them — surfaced here so a preview does not silently
+   * schedule a batch of increments nobody has actually planned yet.
+   */
+  skeletons: string[];
   skipped: { id: string; reason: string }[];
   conflicts: GenerateConflict[];
   diagnostics: unknown[];
@@ -79,6 +87,7 @@ export async function generatePlannedChanges(
   const toWrite = new Map<string, { relPath: string; content: string }>();
   const nextRefs = new Map<string, ProjectChange['planned_change']>();
   const skipped: GenerateResult['skipped'] = [];
+  const skeletons: string[] = [];
   const conflicts: GenerateConflict[] = [];
   const diagnostics: GenerateResult['diagnostics'] = [];
 
@@ -138,6 +147,7 @@ export async function generatePlannedChanges(
             title: change.title,
             planRevision: manifest.revision + 1,
           });
+    if (existing === undefined) skeletons.push(change.id);
 
     toWrite.set(change.id, { relPath, content: body });
     nextRefs.set(change.id, {
@@ -160,6 +170,7 @@ export async function generatePlannedChanges(
       dryRun: options.dryRun === true,
       selection: { milestone: options.milestone ?? null, changes: selected.map((c) => c.id) },
       written: [],
+      skeletons: [],
       skipped,
       conflicts,
       diagnostics: [],
@@ -177,6 +188,7 @@ export async function generatePlannedChanges(
       revision: { from: manifest.revision, to: manifest.revision },
       selection: { milestone: options.milestone ?? null, changes: selected.map((c) => c.id) },
       written,
+      skeletons,
       skipped,
       conflicts: [],
       diagnostics,
@@ -191,6 +203,7 @@ export async function generatePlannedChanges(
       revision: { from: manifest.revision, to: manifest.revision },
       selection: { milestone: options.milestone ?? null, changes: selected.map((c) => c.id) },
       written: [],
+      skeletons: [],
       skipped,
       conflicts: [],
       diagnostics,
@@ -243,6 +256,7 @@ export async function generatePlannedChanges(
     revision: { from: manifest.revision, to: nextManifest.revision },
     selection: { milestone: options.milestone ?? null, changes: selected.map((c) => c.id) },
     written,
+    skeletons,
     skipped,
     conflicts: [],
     diagnostics,

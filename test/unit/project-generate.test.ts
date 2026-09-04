@@ -30,6 +30,10 @@ describe('generatePlannedChanges', () => {
     expect(result.generated).toBe(true);
     expect(result.revision).toEqual({ from: 3, to: 4 });
     expect(result.written).toContain('planning/demo/planned-changes/CH-002-auth.md');
+    // No prior content and no plannedChange spec: the §7.5 skeleton, flagged so
+    // a preview does not silently schedule an unplanned increment (see the
+    // "skeletons" describe block below for the full contract).
+    expect(result.skeletons).toEqual(['CH-002']);
 
     const status = await computeProjectStatus(workspace, 'demo');
     const ref = status.changes[0].plannedChange!;
@@ -225,5 +229,48 @@ describe('generatePlannedChanges', () => {
     await expect(
       generatePlannedChanges(workspace, 'demo', { changeIds: ['CH-001'] })
     ).rejects.toMatchObject({ code: 'roadmap_markers_invalid' });
+  });
+
+  describe('skeletons — o esqueleto vazio do §7.5 é sinalizado, não escondido', () => {
+    it('reports it in the --dry-run preview too, before anything is written', async () => {
+      const workspace = await makePlanWorkspace();
+      await seedPlan(workspace, manifest({ id: 'demo', changes: [change({ id: 'CH-001', slug: 'x' })] }));
+
+      const preview = await generatePlannedChanges(workspace, 'demo', {
+        changeIds: ['CH-001'],
+        dryRun: true,
+      });
+      expect(preview.skeletons).toEqual(['CH-001']);
+    });
+
+    it('does not flag a change whose brief already carries real content', async () => {
+      const workspace = await makePlanWorkspace();
+      await seedPlan(workspace, manifest({ id: 'demo', changes: [change({ id: 'CH-001', slug: 'x' })] }));
+
+      // A brief can sit on disk at the conventional path before the manifest
+      // ever records a `planned_change` ref for it — e.g. carried over by a
+      // `renameSlug`. `generate` must keep it, not treat it as unplanned.
+      await fs.mkdir(path.join(workspace.projectRoot, 'planning/demo/planned-changes'), {
+        recursive: true,
+      });
+      const briefPath = path.join(workspace.projectRoot, 'planning/demo/planned-changes/CH-001-x.md');
+      await fs.writeFile(
+        briefPath,
+        '---\nschema_version: 1\nid: CH-001\nslug: x\ntitle: X\nplan_revision: 0\n---\n\n# Objetivo\n\nJá escrito.\n\n# Escopo\n\n- a\n\n# Critérios macro\n\n- b\n'
+      );
+
+      const result = await generatePlannedChanges(workspace, 'demo', { changeIds: ['CH-001'] });
+      expect(result.skeletons).toEqual([]);
+      expect(await fs.readFile(briefPath, 'utf8')).toContain('Já escrito.');
+    });
+
+    it('stays empty when nothing new is written (idempotent second run)', async () => {
+      const workspace = await makePlanWorkspace();
+      await seedPlan(workspace, manifest({ id: 'demo', changes: [change({ id: 'CH-001', slug: 'x' })] }));
+      await generatePlannedChanges(workspace, 'demo', { changeIds: ['CH-001'] });
+
+      const again = await generatePlannedChanges(workspace, 'demo', { changeIds: ['CH-001'] });
+      expect(again.skeletons).toEqual([]);
+    });
   });
 });
