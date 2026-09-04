@@ -456,17 +456,36 @@ function screenResumo(d){
     +bar(i.archived,i.total)+'<div class="l muted sm">pronta '+i.ready+' · bloqueada '+i.blocked+' · em impl. '+i.inProgress+'</div></div>';
   var out=sec('RESUMO',h);
 
+  // EM ANDAMENTO é o mini painel operacional: tudo que CHANGES e PLANO
+  // mostram sobre esta mesma peça de trabalho, numa linha compacta em vez de
+  // duas telas - onde estou, o que já existe, o que falta, e como sigo,
+  // sem trocar de aba.
   var f=d.focus||[];
   out+=card('EM ANDAMENTO', f.length? f.map(function(x){
-    var ch=x.change,inc=x.increment,r='<div class="row">';
-    r+= inc ? '<span class="id openable" data-brief="'+esc(inc.id)+'">'+esc(inc.id)+'</span>'
-            : '<span class="id">'+esc(ch?ch.id:'—')+'</span>';
-    r+= inc ? '<span class="grow openable" data-brief="'+esc(inc.id)+'" title="Ver o resumo">'+esc(inc.title)+'</span>'
-            : '<span class="grow">'+esc(ch?ch.id:'')+'</span>';
+    var ch=x.change,inc=x.increment;
+    var open=inc?' openable" data-brief="'+esc(inc.id)+'"':'"';
+    var r='<div class="row"><span class="id'+open+'>'+esc(inc?inc.id:(ch?ch.id:'—'))+'</span>'
+      +'<span class="grow'+open+' title="Ver o resumo">'+esc(inc?inc.title:(ch?ch.id:''))+'</span>';
     if(inc)r+='<span class="tag '+(PRES[inc.presentation]||'')+'">'+esc(inc.presentation)+'</span>';
-    if(ch&&ch.tasks&&ch.tasks.total>0)r+='<span class="tag">'+ch.tasks.completed+'/'+ch.tasks.total+'</span>';
-    if(ch)r+=cmd(ch.next);
-    return r+'</div>';
+    else if(ch)r+='<span class="tag">'+esc(ch.phase)+'</span>';
+    if(inc&&inc.milestone)r+='<span class="tag dp" data-ms="'+esc(inc.milestone)+'" title="Ver no PLANO">'+esc(inc.milestone)+'</span>';
+    r+='</div>';
+    // Artefatos e progresso: a mesma leitura que CHANGES dá a esta change,
+    // não uma segunda versão resumida dela.
+    if(ch){
+      r+='<div class="row"><span class="dots">'+artifactDots(ch.id,ch.artifacts)+'</span><span class="grow">';
+      r+= ch.tasks&&ch.tasks.total>0 ? bar(ch.tasks.completed,ch.tasks.total,'cyan') : '<span class="muted sm">sem tarefas</span>';
+      r+='</span>';
+      if(ch.tasks&&ch.tasks.total>0)r+='<span class="tag">'+ch.tasks.completed+'/'+ch.tasks.total+'</span>';
+      r+='</div>';
+      if(ch.error)r+='<div class="sub2" style="color:var(--red)">↳ '+esc(ch.error)+'</div>';
+      else if(ch.blockedBy&&ch.blockedBy.length)r+='<div class="sub2">↳ falta '+esc(ch.blockedBy.join(', '))+'</div>';
+      r+=openTasks(ch);
+    }
+    if(inc&&inc.unlocks&&inc.unlocks.length)r+='<div class="sub2">↳ desbloqueia '+esc(inc.unlocks.join(', '))+'</div>';
+    r+=group('no harness',x.harnessCommands);
+    r+=group('no terminal',x.terminalCommands);
+    return r;
   }).join('') : empty('Nada em andamento.'), f.length||null);
 
   if(d.milestones&&d.milestones.length)
@@ -491,6 +510,23 @@ function screenResumo(d){
  */
 var DOTDOC={proposal:'proposal',design:'design',tasks:'tasks'};
 
+/**
+ * Um ponto por artefato - done/ready/blocked/skipped - clicável quando o
+ * artefato tem um documento aberto atrás dele (DOTDOC) e já está pronto.
+ * Compartilhado entre CHANGES e o card EM ANDAMENTO do RESUMO: a mesma change
+ * não deveria explicar seu progresso de duas formas diferentes conforme a
+ * tela onde aparece.
+ */
+function artifactDots(changeId,artifacts){
+  return (artifacts||[]).map(function(a){
+    var kind=DOTDOC[a.id], open=kind&&a.state==='done';
+    return '<span class="d-'+a.state+(open?' dp openable':'')+'"'
+      +(open?' data-doc="change:'+esc(changeId)+':'+kind+'"':'')
+      +' title="'+esc(a.id)+': '+esc(a.state)+(open?' — clique para ler':'')+'">'
+      +(DOT[a.state]||'·')+'</span>';
+  }).join('');
+}
+
 function screenChanges(d){
   var all=d.changes||[];
   var out=findBar('CHANGES','changes','filtrar changes',
@@ -499,15 +535,8 @@ function screenChanges(d){
     var m=all.filter(function(c){return c.phase===p[0] && matches('changes',c.id)});
     if(!m.length)return;
     out+=card(p[1], m.map(function(c){
-      var dots=(c.artifacts||[]).map(function(a){
-        var kind=DOTDOC[a.id], open=kind&&a.state==='done';
-        return '<span class="d-'+a.state+(open?' dp openable':'')+'"'
-          +(open?' data-doc="change:'+esc(c.id)+':'+kind+'"':'')
-          +' title="'+esc(a.id)+': '+esc(a.state)+(open?' — clique para ler':'')+'">'
-          +(DOT[a.state]||'·')+'</span>';
-      }).join('');
       var r='<div class="row"><span class="id">'+esc(c.id)+'</span>'
-        +'<span class="dots">'+dots+'</span><span class="grow">';
+        +'<span class="dots">'+artifactDots(c.id,c.artifacts)+'</span><span class="grow">';
       r+= c.tasks&&c.tasks.total>0 ? bar(c.tasks.completed,c.tasks.total,'cyan') : '<span class="muted sm">sem tarefas</span>';
       r+='</span>';
       if(c.tasks&&c.tasks.total>0)r+='<span class="tag">'+c.tasks.completed+'/'+c.tasks.total+'</span>';
