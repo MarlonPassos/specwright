@@ -367,8 +367,9 @@ export function registerProjectCommands(program: Command): void {
   project
     .command('adopt [a] [b]')
     .description('Cria uma Project Change a partir de uma change existente fora do plano')
+    .option('--slug <slug>', 'Identidade explícita quando o archive termina em número')
     .option('--json', 'Saída em JSON')
-    .action(async function (this: Command, a?: string, b?: string) {
+    .action(async function (this: Command, a?: string, b?: string, options: { slug?: string } = {}) {
       const json = wantsJson(this);
       try {
         const [planId, target] = b ? [a, b] : [undefined, a];
@@ -379,7 +380,7 @@ export function registerProjectCommands(program: Command): void {
         }
         const workspace = await requireWorkspace();
         const id = await resolvePlanId(workspace.projectRoot, planId);
-        const result = await adoptChange(workspace, id, target);
+        const result = await adoptChange(workspace, id, target, { slug: options.slug });
         if (json) printJson(result);
         else printLines([`${result.id} adotado a partir de "${result.change}" — ${result.title}`]);
       } catch (error) {

@@ -167,7 +167,11 @@ describe('adoptChange', () => {
     await expect(adoptChange(workspace, 'demo', '2026-08-01-release-2')).rejects.toMatchObject({
       code: 'ambiguous_archive_identity',
     });
-    expect((await loadPlan(workspace.projectRoot, 'demo')).manifest.changes).toHaveLength(0);
+    const adopted = await adoptChange(workspace, 'demo', '2026-08-01-release-2', {
+      slug: 'release-2',
+    });
+    expect(adopted.change).toBe('release-2');
+    expect((await loadPlan(workspace.projectRoot, 'demo')).manifest.changes[0].slug).toBe('release-2');
   });
 
   it('refuses a target that is a path instead of a directory name (I-8, NFR-08)', async () => {
@@ -361,6 +365,21 @@ describe('diagnósticos de archive órfão e execução ambígua', () => {
     expect(found!.path).toBe('spec/changes/archive/2026-09-01-bug-fixes');
     // É exatamente o vão entre `specs status` (1 arquivada) e o plano (0/1).
     expect(status.progress.archived).toBe(0);
+  });
+
+  it('expõe a ambiguidade de um archive numérico sem adivinhar o slug', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedArchivedChange(workspace, 'release-2');
+    await seedPlan(workspace, manifest({ id: 'demo', changes: [] }));
+
+    const status = await computeProjectStatus(workspace, 'demo');
+    const diagnostic = status.diagnostics.find((entry) => entry.code === 'ambiguous_archive_identity');
+    expect(diagnostic).toMatchObject({
+      level: 'WARNING',
+      fix: 'specs project adopt 2026-09-01-release-2 --slug <slug>',
+    });
+    expect(diagnostic?.message).toContain('release-2');
+    expect(status.diagnostics.some((entry) => entry.code === 'unclaimed_archive')).toBe(false);
   });
 
   it('o fix sugerido é executável quando adopt é mesmo a resposta', async () => {

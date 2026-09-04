@@ -7,7 +7,7 @@ import { parseProposal } from '../change/model.js';
 import { loadPlan, savePlan } from './repository.js';
 import { nextChangeId, type ChangeLink, type PlanningState, type ProjectChange } from './model.js';
 import { readEvidence, resolveArchiveEvidence } from './evidence.js';
-import { parseArchiveIdentity } from './archive-identity.js';
+import { archiveNamePattern, parseArchiveIdentity } from './archive-identity.js';
 import { safeResolve } from './paths.js';
 import { assertTransition, executionOf } from './state.js';
 import { computeProjectStatus } from './status.js';
@@ -43,7 +43,8 @@ export async function linkChange(
   workspace: Workspace,
   planId: string,
   changeId: string,
-  changeName: string
+  changeName: string,
+  options: { archivePath?: string } = {}
 ): Promise<LinkResult> {
   const { manifest, paths } = await loadPlan(workspace.projectRoot, planId);
   const change = manifest.changes.find((entry) => entry.id === changeId);
@@ -81,9 +82,23 @@ export async function linkChange(
   // then masks (`executionOf` resolves the archive first). The plan would read
   // the increment as concluded with no work behind it. `adopt` already resolves
   // an archive; `link` now resolves it the same way.
-  const archived = activeExists
+  const archiveResolution = activeExists
     ? undefined
-    : (await resolveArchiveEvidence(workspace, { name: changeName })).chosen;
+    : await resolveArchiveEvidence(workspace, {
+        name: changeName,
+        explicitPath: options.archivePath,
+      });
+  // An explicit archive path is an identity assertion, not a hint. If it is
+  // stale or malformed, do not silently fall back to another historical
+  // candidate — that would recreate F-01 for callers that know the destination.
+  const archived =
+    archiveResolution === undefined
+      ? undefined
+      : options.archivePath !== undefined
+        ? archiveResolution.reason === 'explicit_path'
+          ? archiveResolution.chosen
+          : undefined
+        : archiveResolution.chosen;
   if (!activeExists && archived === undefined) {
     throw new SpecError(
       `Não encontrei "${changeName}" em spec/changes/ nem no archive.`,
@@ -176,7 +191,8 @@ export interface AdoptResult {
 export async function adoptChange(
   workspace: Workspace,
   planId: string,
-  target: string
+  target: string,
+  options: { slug?: string } = {}
 ): Promise<AdoptResult> {
   const { manifest, paths } = await loadPlan(workspace.projectRoot, planId);
 
@@ -206,17 +222,33 @@ export async function adoptChange(
     // whose slug ends in a number created the increment under a TRUNCATED slug
     // (F-07). Context decides; with no context, `adopt` refuses instead of
     // writing a guess into the plan.
+    const explicitSlug = options.slug;
+    if (explicitSlug !== undefined && !KEBAB.test(explicitSlug)) {
+      throw new SpecError(`"${explicitSlug}" não é um slug de change válido.`, {
+        code: 'invalid_change_name',
+      });
+    }
+    if (explicitSlug !== undefined && !archiveNamePattern(explicitSlug).test(target)) {
+      throw new SpecError(
+        `O slug explícito "${explicitSlug}" não corresponde ao diretório de archive "${target}".`,
+        {
+          code: 'ambiguous_archive_identity',
+          fix: `Use --slug com uma das identidades possíveis para ${target}.`,
+        }
+      );
+    }
+
     const identity = parseArchiveIdentity(target, await knownSlugs(workspace, manifest));
-    if (identity.ambiguous) {
+    if (explicitSlug === undefined && identity.ambiguous) {
       throw new SpecError(
         `Não dá para saber se "${target}" é a change "${identity.slug}-${identity.collision}" ou a ${identity.collision}ª vez que "${identity.slug}" foi arquivada.`,
         {
           code: 'ambiguous_archive_identity',
-          fix: `Declare o incremento no plano com o slug pretendido (specs project apply, op addChange) e depois rode specs project link <id> <slug>.`,
+          fix: `specs project adopt ${target} --slug <slug>`,
         }
       );
     }
-    name = identity.slug;
+    name = explicitSlug ?? identity.slug;
     proposalDir = archiveDir;
     link = {
       name,

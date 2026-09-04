@@ -34,6 +34,8 @@ export interface ChangeEvidence {
   invalidArchivePath?: string;
   /** Declared link paths that escape or are unsafe to resolve. */
   unsafe?: Array<'active_path' | 'archive_path'>;
+  /** Declared paths that are safe but point at a different identity. */
+  mismatched?: Array<'active_path'>;
 }
 
 export type ArchiveResolutionReason =
@@ -71,6 +73,7 @@ export async function readEvidence(
       proposalPresent: false,
       ambiguousArchive: [],
       unsafe: [],
+      mismatched: [],
     };
   }
 
@@ -93,6 +96,7 @@ export async function readEvidence(
   if (link.archive_path !== null && safeResolve(workspace.projectRoot, link.archive_path) === undefined) {
     unsafe.push('archive_path');
   }
+  const mismatched = linkPathMismatches(workspace, link, activeDirExists, matches.chosen);
 
   return {
     linked: true,
@@ -105,6 +109,7 @@ export async function readEvidence(
       ? { invalidArchivePath: matches.rejectedPath }
       : {}),
     unsafe,
+    mismatched,
   };
 }
 
@@ -168,6 +173,8 @@ export interface LinkEvidenceVerdict {
   dangling: boolean;
   /** Declared paths `safeResolve` refuses: absolute, `..`, NUL, symlink escape. */
   unsafe: Array<'active_path' | 'archive_path'>;
+  /** Safe paths whose target does not match the identity in `link.name`. */
+  mismatched: Array<'active_path'>;
 }
 
 /**
@@ -198,11 +205,33 @@ export async function validateLinkEvidence(
   if (link.archive_path !== null && safeResolve(workspace.projectRoot, link.archive_path) === undefined) {
     unsafe.push('archive_path');
   }
+  const mismatched = linkPathMismatches(workspace, link, activeDirExists, archive.chosen);
 
   return {
     activeDirExists,
     archive,
     dangling: !activeDirExists && archive.chosen === undefined,
     unsafe,
+    mismatched,
   };
+}
+
+function linkPathMismatches(
+  workspace: Workspace,
+  link: ChangeLink,
+  activeDirExists: boolean,
+  archivePath: string | undefined
+): Array<'active_path'> {
+  const expectedActive = safeResolve(workspace.changesPath, link.name);
+  if (expectedActive === undefined) return [];
+
+  if (link.active_path === null) {
+    // `null` is correct for an archive link. When no archive is available, an
+    // existing active directory still needs the canonical active_path recorded;
+    // otherwise status and sync disagree about the same link.
+    return activeDirExists && archivePath === undefined ? ['active_path'] : [];
+  }
+
+  const declaredActive = safeResolve(workspace.projectRoot, link.active_path);
+  return declaredActive !== undefined && declaredActive !== expectedActive ? ['active_path'] : [];
 }

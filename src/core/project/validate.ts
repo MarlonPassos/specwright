@@ -348,6 +348,12 @@ async function checkManifest(
         `${link[field]} não resolve dentro do workspace (unsafe_plan_path)`
       );
     }
+    for (const field of verdict.mismatched) {
+      error(
+        `changes.${change.id}.link.${field}`,
+        `${link[field]} não aponta para a change "${link.name}" (link_target_mismatch)`
+      );
+    }
     if (verdict.dangling) {
       error(
         `changes.${change.id}.link`,

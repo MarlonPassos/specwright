@@ -10,6 +10,8 @@ import { recommendNext } from '../../src/core/project/next.js';
 import { linkChange } from '../../src/core/project/link.js';
 import { syncPlan } from '../../src/core/project/sync.js';
 import { BUNDLE_VERSION } from '../../src/core/project/bundle.js';
+import { archiveChange } from '../../src/core/archive/archive.js';
+import { withStaging } from '../../src/util/fs.js';
 import { makeWorkspace, seedChange, writeFile } from '../helpers/workspace.js';
 
 /**
@@ -18,6 +20,53 @@ import { makeWorkspace, seedChange, writeFile } from '../helpers/workspace.js';
  * It asserts structure and invariants, never prose a model produced.
  */
 describe('project lifecycle', () => {
+  it('fecha o vínculo automático no archive que acabou de ser criado', async () => {
+    const workspace = await makeWorkspace();
+    const root = workspace.projectRoot;
+    await createPlan(root, 'shop', {});
+    await applyPlanBundle(workspace, 'shop', {
+      bundleVersion: BUNDLE_VERSION,
+      expectRevision: 0,
+      operations: [{ op: 'addChange', ref: '$same', slug: 'same-slug', title: 'Same' }],
+    });
+
+    const date = '2026-01-01';
+    for (const suffix of ['2', '10']) {
+      await fs.mkdir(path.join(workspace.archivePath, `${date}-same-slug-${suffix}`), {
+        recursive: true,
+      });
+    }
+    await seedChange(workspace, 'same-slug', { tasks: '## 1\n- [x] 1.1 feito\n' });
+
+    const archived = await archiveChange(workspace, 'same-slug', {
+      now: new Date(2026, 0, 1),
+      validate: false,
+    });
+
+    expect(archived.plan?.archivePath).toBe(
+      'spec/changes/archive/2026-01-01-same-slug'
+    );
+    expect(archived.plan?.archivePath).not.toContain('same-slug-10');
+  });
+
+  it('rollbacka os specs se o rename final do archive falhar', async () => {
+    const workspace = await makeWorkspace();
+    await writeFile(path.join(workspace.specsPath, 'a/spec.md'), 'old');
+
+    await expect(
+      // The hook is the deterministic equivalent of a rename failure after the
+      // spec commit. The utility must restore the old bytes before propagating it.
+      withStaging(
+        workspace.specsPath,
+        async (stage) => stage('a/spec.md', 'new'),
+        async () => {
+          throw new Error('rename failed');
+        }
+      )
+    ).rejects.toThrow('rename failed');
+    expect(await fs.readFile(path.join(workspace.specsPath, 'a/spec.md'), 'utf8')).toBe('old');
+  });
+
   it('walks a plan from a source document to an archived, recalculated increment', async () => {
     const workspace = await makeWorkspace();
     const root = workspace.projectRoot;

@@ -109,7 +109,7 @@ specs project generate [<plan-id>] [--change <id>...] [--milestone <id>]
                                    [--dry-run] [--force] [--expect-revision <n>] [--json]
 specs project link     [<plan-id>] <change-id> <change-name> [--json]
 specs project unlink   [<plan-id>] <change-id> [--force] [--json]
-specs project adopt    [<plan-id>] <change-name|archive-dir> [--json]
+specs project adopt    [<plan-id>] <change-name|archive-dir> [--slug <slug>] [--json]
 specs project sync     [<plan-id>] [--check] [--json]
 specs project set-state [<plan-id>] <change-id> <state> [--reason <texto>] [--json]
 specs project apply    [<plan-id>] [--file <path>|-] [--dry-run] [--allow-completed]
@@ -149,7 +149,7 @@ similaridade.
   mais de um) e a execução observada já nasce `archived`.
 - `unlink <change-id>` — remove o vínculo; exige `--force` quando a execução
   observada já é `archived`.
-- `adopt <change-name|archive-dir>` — cria uma Project Change (`planning_state:
+- `adopt <change-name|archive-dir> [--slug <slug>]` — cria uma Project Change (`planning_state:
   planned`, id novo, brief `missing`) a partir de uma change fora do plano, já
   vinculada. Não escreve nada dentro da change nativa.
 - `sync [--check] [--link]` — reconcilia só o bloco `link`: preenche
@@ -393,7 +393,9 @@ A detecção de **ciclo** (`dependency_cycle`, com o caminho na mensagem) falha
 antes de qualquer escrita. Os diagnósticos derivados que aparecem em
 `specs project status` — `dangling_link`, `duplicate_link`, `source_changed`,
 `missing_source`, `ambiguous_archive_match`, `unclaimed_archive`,
-`ambiguous_execution`, `record_hash_missing`, `invalid_archive_path` — usam
+`ambiguous_execution`, `record_hash_missing`, `invalid_archive_path`,
+`link_target_mismatch`,
+`ambiguous_archive_identity` — usam
 código estável e trazem `fix` quando há recuperação óbvia.
 
 `unclaimed_archive` fecha o vão entre `specs status` e `specs project`: uma
@@ -404,8 +406,11 @@ aquele slug e sem vínculo, ele aponta `specs project link <id> <slug>` — `ado
 ali criaria um segundo incremento com o mesmo slug, um ERROR de validação que
 deixa o plano sem carregar. Só quando nenhum incremento carrega o slug é que o
 `fix` é `specs project adopt`, e aí ele nomeia o **diretório** do archive, com
-prefixo de data, que é o argumento que `adopt` resolve. Se ainda assim o alvo
-colidir com um slug já planejado, `adopt` recusa com `slug_already_planned`.
+prefixo de data, que é o argumento que `adopt` resolve. Quando o nome termina em
+`-N`, o formato pode representar tanto um slug terminado em número quanto uma
+colisão; nesse caso `status` pede `--slug <slug>` e `adopt` recusa adivinhar sem
+essa confirmação. Se ainda assim o alvo colidir com um slug já planejado,
+`adopt` recusa com `slug_already_planned`.
 `ambiguous_execution` avisa quando um mesmo slug tem diretório ativo
 **e** archive: `executionOf` resolve o archive primeiro (§7.7), então o trabalho
 ativo fica invisível e o incremento é apresentado como concluído.

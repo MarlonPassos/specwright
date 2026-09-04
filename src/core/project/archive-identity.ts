@@ -60,6 +60,8 @@ export interface ArchiveIdentity {
   slug: string;
   /** The collision ordinal, when the trailing `-N` really is one. */
   collision?: number;
+  /** Both readings when a trailing number has no unique context. */
+  alternatives?: string[];
   /**
    * The name ends in `-N` and nothing in the context says whether that `N`
    * belongs to the slug or is a collision suffix. The caller must refuse to
@@ -84,20 +86,29 @@ export function parseArchiveIdentity(
   const date = dated ? dated[1] : '';
   const rest = dated ? dated[2] : dirName;
 
-  // The whole name is a slug somebody declares: the trailing digits are part of
-  // the identity, not a suffix.
-  if (knownSlugs.has(rest)) return { date, slug: rest, ambiguous: false };
-
   const collided = COLLISION_SUFFIX.exec(rest);
   if (!collided) return { date, slug: rest, ambiguous: false };
 
   const base = collided[1];
   const collision = Number(collided[2]);
-  // The stem is a slug somebody declares: this really is a collision.
-  if (knownSlugs.has(base)) return { date, slug: base, collision, ambiguous: false };
+  const wholeKnown = knownSlugs.has(rest);
+  const baseKnown = knownSlugs.has(base);
+  // A known whole name proves the number belongs to the slug; a known stem
+  // proves it is a collision suffix. If both are known, neither wins: both
+  // interpretations remain possible and choosing either would misattribute the
+  // archive (F-07).
+  if (wholeKnown && !baseKnown) return { date, slug: rest, ambiguous: false };
+  if (baseKnown && !wholeKnown) return { date, slug: base, collision, ambiguous: false };
 
   // Nothing in the context explains the name. Read it as a collision, which is
   // what `claimArchiveName` produces, but say so: a caller that WRITES from
-  // this must refuse instead of guessing.
-  return { date, slug: base, collision, ambiguous: true };
+  // this must refuse instead of guessing. The same applies when both possible
+  // slugs are known: context exists, but it does not disambiguate.
+  return {
+    date,
+    slug: base,
+    collision,
+    alternatives: [base, rest],
+    ambiguous: true,
+  };
 }

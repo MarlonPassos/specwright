@@ -7,7 +7,7 @@ import { readChangeMetadata } from '../change/metadata.js';
 import { readDeltaSpecs, readTaskProgress } from '../change/model.js';
 import { specPath } from '../specs.js';
 import { validateChange } from '../validate/change-validator.js';
-import { changeDir, type Workspace } from '../workspace.js';
+import { ARCHIVE_DIR, CHANGES_DIR, WORKSPACE_DIR, changeDir, type Workspace } from '../workspace.js';
 import { adviseLink, soleCandidate } from '../project/advice.js';
 import { linkChange } from '../project/link.js';
 import { mergeCapability } from './merge.js';
@@ -134,31 +134,51 @@ export async function archiveChange(
   // a failure on the N-th spec left the earlier ones applied, the change still
   // active and nothing archived — a partial state NFR-07 forbids (F-08).
   //
-  // Order of commit, declared: specs first, the change directory last. An
-  // interruption then leaves specs applied with the change still active, which
-  // `specs validate` reports and a re-run repairs, instead of an archive that
-  // claims work whose specs never landed.
-  if (writes.length > 0 || removals.length > 0) {
-    await ensureDir(workspace.specsPath);
-    const relativeToSpecs = (target: string): string =>
-      path.relative(workspace.specsPath, target);
-    await withStaging(workspace.specsPath, async (stage, remove) => {
-      for (const write of writes) stage(relativeToSpecs(write.filePath), write.content);
-      for (const target of removals) remove(relativeToSpecs(target));
-    });
-    // Only once the transaction committed: pruning an empty directory is not
-    // part of the all-or-nothing set and must never run before it.
-    for (const target of removals) {
-      await pruneEmptyDirs(path.dirname(target), workspace.specsPath);
-    }
-  }
-
+  // Order of commit, declared: reserve the archive name first, then commit specs
+  // and move the change directory as one transaction. A failure in either write
+  // phase or the final move restores the prior specs and removes our reservation.
   await ensureDir(workspace.archivePath);
   const archivedAs = await claimArchiveName(workspace, changeId, options.now ?? new Date());
   const destination = path.join(workspace.archivePath, archivedAs);
-  await moveIntoClaimedDir(dir, destination);
+  let moved = false;
+  try {
+    const moveChange = async (): Promise<void> => {
+      await moveIntoClaimedDir(dir, destination);
+      moved = true;
+    };
 
-  const closure = await linkArchivedToPlan(workspace, changeId);
+    if (writes.length > 0 || removals.length > 0) {
+      await ensureDir(workspace.specsPath);
+      const relativeToSpecs = (target: string): string =>
+        path.relative(workspace.specsPath, target);
+      // Keep the spec transaction's backups alive until the change directory has
+      // moved successfully. If the final rename fails, withStaging restores all
+      // spec bytes and the outer catch removes only our empty reservation (F-08).
+      await withStaging(
+        workspace.specsPath,
+        async (stage, remove) => {
+          for (const write of writes) stage(relativeToSpecs(write.filePath), write.content);
+          for (const target of removals) remove(relativeToSpecs(target));
+        },
+        moveChange
+      );
+      // Only once the complete transaction committed: pruning an empty directory
+      // is not part of the all-or-nothing set and must never run before it.
+      for (const target of removals) {
+        await pruneEmptyDirs(path.dirname(target), workspace.specsPath);
+      }
+    } else {
+      await moveChange();
+    }
+  } catch (error) {
+    // `claimArchiveName` reserves an empty directory. Never leave that marker
+    // behind after a failed archive, and never recursively remove a destination
+    // that another process may have populated.
+    if (!moved) await fs.rmdir(destination).catch(() => undefined);
+    throw error;
+  }
+
+  const closure = await linkArchivedToPlan(workspace, changeId, archivedAs);
 
   return {
     change: changeId,
@@ -195,7 +215,8 @@ export async function archiveChange(
  */
 async function linkArchivedToPlan(
   workspace: Workspace,
-  changeId: string
+  changeId: string,
+  archivedAs: string
 ): Promise<{ plan?: ArchivedPlanLink; ambiguity?: ArchivePlanAmbiguity }> {
   try {
     const advice = await adviseLink(workspace.projectRoot, changeId);
@@ -215,7 +236,8 @@ async function linkArchivedToPlan(
     const only = soleCandidate(advice);
     if (!only) return {};
 
-    const result = await linkChange(workspace, only.plan, only.change, changeId);
+    const archivePath = `${WORKSPACE_DIR}/${CHANGES_DIR}/${ARCHIVE_DIR}/${archivedAs}`;
+    const result = await linkChange(workspace, only.plan, only.change, changeId, { archivePath });
     return {
       plan: {
         plan: only.plan,

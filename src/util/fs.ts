@@ -77,7 +77,8 @@ export async function writeFileAtomic(target: string, content: string): Promise<
  * make `rename` fail halfway, so it is rejected up front. During the commit each
  * existing destination is moved aside into the staging area before being
  * replaced, so a failure on the N-th file restores every destination already
- * moved and the mutation is all-or-nothing.
+ * moved and the mutation is all-or-nothing. `afterCommit`, when supplied, runs
+ * while the backups still exist; if it throws, the same rollback is performed.
  *
  * `remove` deletes as part of the same transaction: the destination is MOVED
  * into the staging backup rather than unlinked, so a later failure puts it back.
@@ -94,7 +95,8 @@ export async function withStaging<T>(
   run: (
     stage: (relativePath: string, content: string) => void,
     remove: (relativePath: string) => void
-  ) => Promise<T>
+  ) => Promise<T>,
+  afterCommit?: () => Promise<void>
 ): Promise<T> {
   const stagingDir = path.join(stagingRoot, `.tmp-${process.pid}-${randomBytes(6).toString('hex')}`);
   const backupDir = path.join(stagingDir, '.backup');
@@ -130,6 +132,16 @@ export async function withStaging<T>(
       );
     }
   }
+  for (const relativePath of removals) {
+    const target = path.join(stagingRoot, relativePath);
+    const stats = await fs.stat(target).catch(() => undefined);
+    if (stats?.isDirectory()) {
+      await fs.rm(stagingDir, { recursive: true, force: true });
+      throw new Error(
+        `Não é possível remover "${relativePath}": o destino é um diretório.`
+      );
+    }
+  }
 
   try {
     await ensureDir(stagingDir);
@@ -158,8 +170,11 @@ export async function withStaging<T>(
         await ensureDir(path.dirname(backup));
         await fs.rename(target, backup);
       }
-      await fs.rename(staged, target);
+      // Record the backup before replacing the destination. If the replacement
+      // fails after the old file moved aside, rollback must know how to restore
+      // it; recording only after the second rename lost that file on failure.
       moved.unshift({ target, backup });
+      await fs.rename(staged, target);
     }
     // Removals last, and by MOVE: a delete is the one step a rollback cannot
     // invent its way out of, so the bytes stay in the staging backup until the
@@ -172,6 +187,7 @@ export async function withStaging<T>(
       await fs.rename(target, backup);
       moved.unshift({ target, backup });
     }
+    await afterCommit?.();
   } catch (error) {
     try {
       for (const entry of moved) {

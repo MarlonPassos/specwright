@@ -193,6 +193,7 @@ export async function computeProjectStatus(
   const ambiguousArchive = new Map<string, string[]>();
   const invalidArchivePaths = new Map<string, string>();
   const unsafeLinks = new Map<string, Array<'active_path' | 'archive_path'>>();
+  const mismatchedLinks = new Map<string, Array<'active_path'>>();
   const resumedSlugs = new Map<string, string>();
   for (const id2 of order) {
     const change = byId.get(id2)!;
@@ -207,6 +208,9 @@ export async function computeProjectStatus(
       invalidArchivePaths.set(id2, evidence.invalidArchivePath);
     }
     if (evidence.unsafe && evidence.unsafe.length > 0) unsafeLinks.set(id2, evidence.unsafe);
+    if (evidence.mismatched && evidence.mismatched.length > 0) {
+      mismatchedLinks.set(id2, evidence.mismatched);
+    }
     // Both an active directory AND an archive answer to this slug. `executionOf`
     // reports `archived` (the archive wins, §7.7), which silently presents brand
     // new work as delivered. Keep the documented state, surface the collision.
@@ -293,6 +297,7 @@ export async function computeProjectStatus(
     invalidArchivePaths,
     recordHashMissing,
     unsafeLinks,
+    mismatchedLinks,
   });
 
   for (const [id2, messages] of invalidBrief) {
@@ -336,8 +341,17 @@ export async function computeProjectStatus(
     if (change.link) knownSlugs.add(change.link.name);
   }
   const archivedBySlug = new Map<string, string[]>();
+  const ambiguousArchiveIdentities: Array<{ name: string; alternatives: string[] }> = [];
   for (const name of await listArchivedChanges(workspace)) {
-    const { slug } = parseArchiveIdentity(name, knownSlugs);
+    const identity = parseArchiveIdentity(name, knownSlugs);
+    if (identity.ambiguous) {
+      ambiguousArchiveIdentities.push({
+        name,
+        alternatives: identity.alternatives ?? [identity.slug],
+      });
+      continue;
+    }
+    const { slug } = identity;
     archivedBySlug.set(slug, [...(archivedBySlug.get(slug) ?? []), name]);
   }
   const archivedSlugs = new Set(archivedBySlug.keys());
@@ -366,6 +380,15 @@ export async function computeProjectStatus(
       path: `${WORKSPACE_DIR}/${CHANGES_DIR}/${ARCHIVE_DIR}/${newest}`,
       message: `a change "${slug}" está arquivada, mas nenhum incremento do plano a reivindica — o progresso do plano não a conta`,
       fix,
+    });
+  }
+  for (const archive of ambiguousArchiveIdentities) {
+    diagnostics.push({
+      level: 'WARNING',
+      code: 'ambiguous_archive_identity',
+      path: `${WORKSPACE_DIR}/${CHANGES_DIR}/${ARCHIVE_DIR}/${archive.name}`,
+      message: `o archive "${archive.name}" pode ser a change "${archive.alternatives.join('" ou "')}"; informe o slug explicitamente`,
+      fix: `specs project adopt ${archive.name} --slug <slug>`,
     });
   }
 
@@ -485,6 +508,8 @@ interface DiagnosticsInput {
   recordHashMissing: Set<string>;
   /** Increment id -> unsafe declared link path fields. */
   unsafeLinks: Map<string, Array<'active_path' | 'archive_path'>>;
+  /** Increment id -> safe declared link path fields targeting another identity. */
+  mismatchedLinks: Map<string, Array<'active_path'>>;
 }
 
 function collectDiagnostics(input: DiagnosticsInput): DiagnosticView[] {
@@ -547,6 +572,18 @@ function collectDiagnostics(input: DiagnosticsInput): DiagnosticView[] {
         code: 'unsafe_plan_path',
         path: `changes.${id}.link.${field}`,
         message: `o caminho ${field} de ${id} não resolve dentro do workspace`,
+        fix: 'specs project link ou specs project sync',
+      });
+    }
+  }
+
+  for (const [id, fields] of input.mismatchedLinks) {
+    for (const field of fields) {
+      diagnostics.push({
+        level: 'ERROR',
+        code: 'link_target_mismatch',
+        path: `changes.${id}.link.${field}`,
+        message: `o caminho ${field} de ${id} aponta para outra change que não a identidade declarada`,
         fix: 'specs project link ou specs project sync',
       });
     }

@@ -114,11 +114,13 @@ O `specs project sync` e o `status` reportam, como diagnóstico de leitura:
 | Nível | Código | Quando |
 | --- | --- | --- |
 | ERROR | `dangling_link` | o vínculo aponta para um diretório que não existe ativo nem arquivado — a execução fica `unknown`, nunca `archived` |
+| ERROR | `link_target_mismatch` | `active_path` é seguro, mas não aponta para `spec/changes/<link.name>` |
 | ERROR | `duplicate_link` | dois incrementos usam a mesma change nativa |
 | WARNING | `ambiguous_archive_match` | mais de um diretório de archive casa o slug; escolhe o de maior data e sufixo |
 | WARNING | `source_changed` / `missing_source` | um documento-fonte mudou ou sumiu desde o registro |
 | WARNING | `record_hash_missing` | o brief foi gravado antes da prova de identidade do incremento; rode `specs project generate` |
 | WARNING | `invalid_archive_path` | o `archive_path` persistido não é um diretório de archive válido e foi ignorado |
+| WARNING | `ambiguous_archive_identity` | o nome do archive pode ser um slug terminado em número ou uma colisão; use `adopt --slug` |
 
 Uma change que fica **fora do plano** indefinidamente é válida: não há warning que
 a trate como erro.

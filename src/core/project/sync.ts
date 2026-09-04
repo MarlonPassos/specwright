@@ -96,16 +96,22 @@ export async function syncPlan(
     }
 
     const evidence = await readEvidence(workspace, change.link);
-    const activeAbsolute =
-      change.link.active_path === null
-        ? undefined
-        : safeResolve(workspace.projectRoot, change.link.active_path);
-    // A change is a DIRECTORY. `pathExists` said yes to a regular file sitting
-    // at `active_path`, so `sync` left a link the evidence reader already
-    // considered dead — the reconciler disagreed with the reader (A-02).
-    const activeExists = activeAbsolute !== undefined && (await isDirectory(activeAbsolute));
+    // `readEvidence` is the authority for the identity-bearing active directory.
+    // Looking at the declared path here made sync accept a safe path for another
+    // change, while status read `spec/changes/<link.name>` (F-03).
+    const activeExists = evidence.activeDirExists;
 
     let link = change.link;
+
+    if (evidence.mismatched?.includes('active_path')) {
+      // The canonical path is an obvious, reversible repair. It also handles a
+      // null active_path left behind while the active directory still exists.
+      const canonical = activePath(change.link.name);
+      if (link.active_path !== canonical) {
+        link = { ...link, active_path: canonical };
+        mutated = true;
+      }
+    }
 
     if (evidence.archivePath && change.link.archive_path !== evidence.archivePath) {
       link = { ...link, archive_path: evidence.archivePath };

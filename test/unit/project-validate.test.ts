@@ -245,6 +245,32 @@ describe('validatePlan — manifest rules', () => {
     const reports = await validatePlan(workspace.projectRoot, data.id, {});
     expect(issues(reports, 'ERROR').join(' ')).toMatch(/dangling_link/);
   });
+
+  it('errors when active_path resolves to a different change than link.name', async () => {
+    const workspace = await makePlanWorkspace();
+    await fs.mkdir(path.join(workspace.changesPath, 'real'), { recursive: true });
+    await fs.mkdir(path.join(workspace.changesPath, 'wrong'), { recursive: true });
+    const data = manifest({
+      id: 'demo',
+      changes: [
+        change({
+          id: 'CH-001',
+          slug: 'real',
+          link: {
+            name: 'real',
+            active_path: 'spec/changes/wrong',
+            archive_path: null,
+            linked_at: '2026-09-01',
+          },
+        }),
+      ],
+    });
+    await seedPlan(workspace, data);
+
+    const reports = await validatePlan(workspace.projectRoot, data.id, {});
+    expect(issues(reports, 'ERROR').join(' ')).toMatch(/link_target_mismatch/);
+    expect(reports[0].valid).toBe(false);
+  });
 });
 
 describe('validatePlan — planned change rules', () => {
