@@ -69,11 +69,49 @@ export function rulesFor(config: WorkspaceConfig, artifactId: string): string[] 
   return config.rules?.[artifactId] ?? [];
 }
 
+/**
+ * A field with no natural default (free text, an arbitrary map) is commented
+ * out with a short example instead of being written active and empty - an
+ * empty `context: ""` looks like a deliberate choice to whoever reads the
+ * file later, when it is really just "nobody has set this yet".
+ */
+function optionalSection(value: unknown, guidance: string[]): string {
+  if (value === undefined) return guidance.join('\n');
+  return stringifyYaml(value, { lineWidth: 0 }).trimEnd();
+}
+
+/**
+ * Every field this build understands is present in the file from the moment
+ * `specs init` writes it - active with its real default when there is one
+ * (`defaultParallel`), commented out with guidance otherwise (`context`,
+ * `rules`) - so a workspace's `config.yaml` is a menu of what can be set,
+ * not something you can only edit correctly after reading the docs first.
+ */
 export function renderConfig(config: WorkspaceConfig): string {
-  const document: Record<string, unknown> = { schema: config.schema };
-  if (config.context !== undefined) document.context = config.context;
-  if (config.rules !== undefined) document.rules = config.rules;
-  if (config.harnesses !== undefined) document.harnesses = config.harnesses;
-  if (config.defaultParallel !== undefined) document.defaultParallel = config.defaultParallel;
-  return stringifyYaml(document);
+  const sections = [
+    `schema: ${config.schema}`,
+    optionalSection(config.harnesses !== undefined ? { harnesses: config.harnesses } : undefined, [
+      '# Harnesses para os quais os comandos /spec-* são gerados. Mantido por',
+      '# `specs init --harnesses <lista>`; editar aqui não gera nem apaga arquivo.',
+      '# harnesses: [claude, codex, opencode, kiro]',
+    ]),
+    optionalSection(config.context !== undefined ? { context: config.context } : undefined, [
+      '# Contexto injetado em toda instrução de artefato - convenções do projeto',
+      '# que valem pra qualquer change. Descomente e preencha se project.md não bastar.',
+      '# context: ""',
+    ]),
+    optionalSection(config.rules !== undefined ? { rules: config.rules } : undefined, [
+      '# Regras extras por artefato (id do artefato -> lista de regras), injetadas',
+      '# na instrução dele. Exemplo:',
+      '# rules:',
+      '#   design: ["Nunca proponha nova dependência sem listar alternativas."]',
+    ]),
+    [
+      '# Liga dispatch paralelo isolado por worktree como padrão pra toda change',
+      '# nova (`specs new change`). Uma change específica sempre pode ligar ou',
+      '# desligar na hora com --parallel/--no-parallel, não importa este valor.',
+      `defaultParallel: ${config.defaultParallel ?? false}`,
+    ].join('\n'),
+  ];
+  return sections.join('\n\n') + '\n';
 }
