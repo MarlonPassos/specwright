@@ -73,6 +73,16 @@ julgamento humano: *a fonte mudou desde que este brief foi escrito?* e *alguém
 editou este brief à mão?* Os hashes normalizam CRLF/CR para LF antes de calcular,
 então independem de plataforma.
 
+O `source_hash` delimita cada fonte pelo seu tamanho em bytes antes de absorver o
+conteúdo. Sem essa delimitação, uma fonte com `a\nb` e duas fontes com `a` e `b`
+davam o mesmo hash: dividir ou juntar documentos de origem mudava o conjunto sem
+mudar o hash, e o brief continuava `current`. A delimitação carrega só o tamanho,
+nunca o caminho, então o hash segue independente de onde as fontes moram.
+
+Planos materializados antes dessa mudança têm `source_hash` no formato antigo e
+aparecem uma vez como `outdated`. `specs project generate` regrava o brief com o
+hash novo e o plano converge; não há passo manual.
+
 ## Três dimensões de estado
 
 Uma Project Change não tem um campo único de status. Três dimensões independentes,
