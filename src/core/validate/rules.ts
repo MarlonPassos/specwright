@@ -78,4 +78,6 @@ export const MESSAGES = {
   TASK_NUMBER_OUT_OF_ORDER: 'Os números das tarefas estão fora de ordem dentro do grupo',
   TASK_NUMBER_DUPLICATE: 'Número de tarefa duplicado',
   TASKS_INCOMPLETE: 'A change tem tarefas não marcadas',
+  TASK_DEPENDS_UNKNOWN: 'depends: aponta para uma tarefa que não existe no checklist',
+  TASK_DEPENDS_CYCLE: 'Ciclo de dependência entre tarefas',
 } as const;

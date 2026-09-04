@@ -2,7 +2,7 @@ import type { Command } from 'commander';
 import { SpecError } from '../../util/errors.js';
 import { createChange } from '../../core/change/create.js';
 import { adviseLink, soleCandidate } from '../../core/project/advice.js';
-import { computeStatus, resolveChangeContext } from '../../core/change/status.js';
+import { computeStatus, resolveChangeContext, resolveChangeId } from '../../core/change/status.js';
 import { buildInstructions, RESERVED_INSTRUCTION_IDS } from '../../core/change/instructions.js';
 import { archiveChange } from '../../core/archive/archive.js';
 import { listSchemas, loadSchema, templatePath } from '../../core/schema/loader.js';
@@ -13,24 +13,6 @@ import { fail, printJson, printLines } from '../output.js';
 import { buildDashboard } from '../../core/dashboard.js';
 import { renderDashboard, type ViewOptions } from '../dashboard-view.js';
 import { CHANGES_TAB, runPanel } from '../panel.js';
-
-/** Resolves the change to act on: the explicit one, or the only active one. */
-async function resolveChangeId(
-  workspace: Awaited<ReturnType<typeof requireWorkspace>>,
-  explicit?: string
-): Promise<string> {
-  if (explicit) return explicit;
-
-  const active = await listChanges(workspace);
-  if (active.length === 1) return active[0];
-  if (active.length === 0) {
-    throw new SpecError('Nenhuma change ativa', { code: 'no_active_change', fix: 'specs new change <nome>' });
-  }
-  throw new SpecError(
-    `Várias changes ativas: ${active.join(', ')}. Diga qual delas.`,
-    { code: 'ambiguous_change' }
-  );
-}
 
 interface StatusOptions {
   change?: string;
@@ -94,14 +76,16 @@ export function registerWorkflowCommands(program: Command): void {
     .option('--schema <name>', 'Schema de workflow a usar')
     .option('--goal <text>', 'Objetivo registrado nos metadados da change')
     .option('--skip-specs', 'Declara que a change não altera nenhum comportamento observável')
+    .option('--parallel', 'Habilita dispatch paralelo isolado por worktree para esta change')
     .option('--json', 'Saída em JSON')
-    .action(async (name: string, options: { schema?: string; goal?: string; skipSpecs?: boolean; json?: boolean }) => {
+    .action(async (name: string, options: { schema?: string; goal?: string; skipSpecs?: boolean; parallel?: boolean; json?: boolean }) => {
       try {
         const workspace = await requireWorkspace();
         const created = await createChange(workspace, name, {
           schema: options.schema,
           goal: options.goal,
           skipSpecs: options.skipSpecs,
+          parallel: options.parallel,
         });
 
         // A change whose name is a planned increment's slug is almost always

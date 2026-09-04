@@ -3,6 +3,7 @@ import { SpecError } from '../../util/errors.js';
 import { readTemplate } from '../schema/loader.js';
 import { isPattern } from '../schema/outputs.js';
 import { rulesFor } from '../config.js';
+import { detectHarness } from '../harness/current.js';
 import { computeStatus, type StatusContext } from './status.js';
 
 /** Instruction surfaces that are phases of the workflow, not artifacts. */
@@ -56,6 +57,13 @@ export interface PhaseInstructions {
   /** File whose checkboxes track progress, when the schema declares one. */
   tracks?: string;
   tasks?: { total: number; completed: number };
+  /**
+   * Present only for `implement`. `supported` is true only when BOTH the
+   * running harness declares a native subagent primitive AND this change's
+   * `.change.yaml` opts in with `parallel: true` - a change that never opted
+   * in cannot enter parallel mode no matter how capable the harness is.
+   */
+  parallelDispatch?: { supported: boolean; primitive?: string };
 }
 
 export type Instructions = ArtifactInstructions | PhaseInstructions;
@@ -75,6 +83,22 @@ const ARCHIVE_INSTRUCTION = [
   'O arquivamento reescreve as specs do workspace, então só roda depois que a implementação',
   'está concluída. Use `--skip-specs` apenas para uma change que não declarou deltas de spec.',
 ].join('\n');
+
+/**
+ * Combines the running harness's capability with this change's opt-in. Both
+ * must hold - a capable harness alone must never be enough, or a change that
+ * predates this feature (no `parallel:` field at all) would silently start
+ * fanning out to worktrees the first time it happens to run under a harness
+ * that supports it.
+ */
+function resolveParallelDispatch(context: StatusContext): { supported: boolean; primitive?: string } {
+  const harness = detectHarness({ configured: context.config.harnesses });
+  const supported = context.parallel && harness.supportsParallelDispatch === true;
+  return {
+    supported,
+    ...(harness.parallelDispatchPrimitive ? { primitive: harness.parallelDispatchPrimitive } : {}),
+  };
+}
 
 export async function buildInstructions(
   context: StatusContext,
@@ -100,6 +124,7 @@ export async function buildInstructions(
       blockedBy: status.applyBlockedBy,
       ...(apply?.tracks ? { tracks: apply.tracks } : {}),
       ...(status.tasks ? { tasks: status.tasks } : {}),
+      ...(phase === 'implement' ? { parallelDispatch: resolveParallelDispatch(context) } : {}),
     };
   }
 

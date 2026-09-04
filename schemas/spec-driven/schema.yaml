@@ -182,6 +182,18 @@ artifacts:
       - [ ] 2.2 Ligar o endpoint de export e confirmar que o teste de integração passa
       ```
 
+      Numa change com `parallel: true` no `.change.yaml`, uma tarefa pode declarar
+      opcionalmente quais arquivos toca e de qual outra depende, entre crases, para
+      participar do agendamento de dispatch paralelo:
+
+      ```
+      - [ ] 2.1 Implementar o escritor de CSV `files: src/export/csv.ts` — confirma testes unitários
+      - [ ] 2.2 Ligar o endpoint de export `files: src/api/export.ts` `depends: 2.1` — confirma teste de integração
+      ```
+
+      Uma tarefa sem essas tags continua funcionando exatamente como antes - as tags são
+      só uma dica de agendamento, nunca obrigatórias.
+
       Use as specs para o que construir e o design para como construir.
 
 apply:
@@ -191,3 +203,7 @@ apply:
     Leia os artefatos da change, percorra as tarefas não marcadas em ordem e marque cada
     box conforme a verificação dela passa. Pare e pergunte quando bater num impedimento ou
     numa decisão que não foi tomada.
+
+    Numa change com `parallel: true`, rodada num harness que suporta dispatch paralelo, as
+    tarefas prontas e sem conflito declarado entre si podem ser trabalhadas em lote, cada
+    uma isolada num worktree próprio - veja o passo 2b do comando de implementação.

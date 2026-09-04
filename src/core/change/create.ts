@@ -28,6 +28,7 @@ export interface CreateChangeOptions {
   schema?: string;
   goal?: string;
   skipSpecs?: boolean;
+  parallel?: boolean;
 }
 
 export interface CreatedChange {
@@ -62,6 +63,7 @@ export async function createChange(
     created: localDateStamp(),
     ...(options.goal ? { goal: options.goal } : {}),
     ...(options.skipSpecs ? { skip_specs: true } : {}),
+    ...(options.parallel ? { parallel: true } : {}),
   });
 
   return {

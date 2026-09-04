@@ -1,9 +1,10 @@
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { findFilesNamed, pathExists } from '../../util/fs.js';
+import { findFilesNamed, pathExists, readFileIfExists, writeFileAtomic } from '../../util/fs.js';
 import { parseSections, findSection } from '../markdown/sections.js';
 import { parseDeltaSpec, type ParsedDeltaSpec } from '../markdown/deltas.js';
 import { changeDir, type Workspace } from '../workspace.js';
+import { SpecError } from '../../util/errors.js';
 
 export const PROPOSAL_FILE = 'proposal.md';
 export const DESIGN_FILE = 'design.md';
@@ -63,6 +64,10 @@ export interface Task {
   line: number;
   /** The `## N. <group>` header the task sits under, when there is one. */
   group?: string;
+  /** Files this task declares it touches, from a `` `files: a.ts, b.ts` `` tag. Empty when not declared. */
+  files: string[];
+  /** Task numbers this task declares it depends on, from a `` `depends: 1.1` `` tag. Empty when not declared. */
+  dependsOn: string[];
 }
 
 export interface TaskProgress {
@@ -71,8 +76,33 @@ export interface TaskProgress {
   completed: number;
 }
 
-const TASK_LINE = /^\s*[-*]\s+\[( |x|X)\]\s*(?:([0-9]+(?:\.[0-9]+)*)\s+)?(.*)$/;
+const TASK_LINE = /^\s*[-*]\s+\[( |x|X)\]\s*(?:([0-9]+(?:\.[0-9]+)*)\s+)?(.*)$/d;
 const GROUP_HEADER = /^##\s+(.*\S)\s*$/;
+const TASK_TAG = /`(files|depends):\s*([^`]*)`/g;
+
+/**
+ * Pulls `` `files: a.ts` `` / `` `depends: 1.1` `` tags out of a task's raw
+ * text, so the checklist stays human-readable while the scheduler gets
+ * structured data. A task that never declares a tag gets an empty array, not
+ * `undefined` - every consumer can iterate without an optional check.
+ */
+function extractTaskTags(rawText: string): { text: string; files: string[]; dependsOn: string[] } {
+  const files: string[] = [];
+  const dependsOn: string[] = [];
+  const text = rawText
+    .replace(TASK_TAG, (_match, key: string, value: string) => {
+      const values = value
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+      if (key === 'files') files.push(...values);
+      if (key === 'depends') dependsOn.push(...values);
+      return '';
+    })
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  return { text, files, dependsOn };
+}
 
 export function parseTasks(content: string): TaskProgress {
   const lines = content.replace(/\r\n?/g, '\n').split('\n');
@@ -87,12 +117,15 @@ export function parseTasks(content: string): TaskProgress {
     }
     const match = TASK_LINE.exec(line);
     if (!match) return;
+    const { text, files, dependsOn } = extractTaskTags(match[3]);
     tasks.push({
       number: match[2] ?? '',
-      text: match[3].trim(),
+      text,
       done: match[1].toLowerCase() === 'x',
       line: index + 1,
       group,
+      files,
+      dependsOn,
     });
   });
 
@@ -107,6 +140,47 @@ export async function readTaskProgress(dir: string): Promise<TaskProgress | unde
   const target = path.join(dir, TASKS_FILE);
   if (!(await pathExists(target))) return undefined;
   return parseTasks(await fs.readFile(target, 'utf8'));
+}
+
+/**
+ * Flips one task's checkbox to done, in place, touching only that line.
+ *
+ * Idempotent: a task already marked done reports `changed: false` without
+ * writing the file again. Every other line - including the tags and prose
+ * around the box this function flips - passes through byte for byte, because
+ * the replacement only ever touches the single character position the box's
+ * own regex match reports (via the `d` flag's `.indices`), never the
+ * surrounding text.
+ */
+export async function markTaskDone(dir: string, number: string): Promise<{ changed: boolean }> {
+  const target = path.join(dir, TASKS_FILE);
+  const raw = await readFileIfExists(target);
+  if (raw === undefined) {
+    throw new SpecError(`"${TASKS_FILE}" não existe em ${dir}`, { code: 'tasks_file_missing' });
+  }
+
+  const eol = raw.includes('\r\n') ? '\r\n' : '\n';
+  const lines = raw.replace(/\r\n?/g, '\n').split('\n');
+  let found = false;
+  let changed = false;
+
+  const updated = lines.map((line) => {
+    const match = TASK_LINE.exec(line);
+    if (!match || (match[2] ?? '') !== number) return line;
+    found = true;
+    if (match[1].toLowerCase() === 'x') return line;
+    changed = true;
+    const [start, end] = match.indices![1]!;
+    return `${line.slice(0, start)}x${line.slice(end)}`;
+  });
+
+  if (!found) {
+    throw new SpecError(`Tarefa "${number}" não existe em ${TASKS_FILE}`, { code: 'task_not_found' });
+  }
+  if (changed) {
+    await writeFileAtomic(target, updated.join(eol));
+  }
+  return { changed };
 }
 
 export interface ChangeSummary {

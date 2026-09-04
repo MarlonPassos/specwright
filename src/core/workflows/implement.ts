@@ -28,7 +28,44 @@ ${RESOLVE_CHANGE}
    specs instructions implement --change "<change>" --json
    \`\`\`
    A resposta carrega a orientação de implementação do schema, o arquivo cujos checkboxes
-   acompanham o progresso (\`tracks\`), a contagem atual de tarefas e o \`changeRoot\` resolvido.
+   acompanham o progresso (\`tracks\`), a contagem atual de tarefas, o \`changeRoot\` resolvido, e
+   \`parallelDispatch.supported\`.
+
+2b. **Se \`parallelDispatch.supported\` for \`true\`**, siga em lotes isolados por worktree em vez
+    de tarefa por tarefa:
+
+    a. \`specs tasks ready --change "<change>" --json\` — pega o próximo lote de tarefas prontas.
+    b. Para cada tarefa do lote: \`specs worktree create --change "<change>" --task "<numero>" --json\`
+       — anote o \`path\` devolvido.
+    c. Dispare um subagente por tarefa do lote **na mesma mensagem** (chamadas independentes de
+       uma vez, nunca uma esperando a outra). Cada subagente recebe: o \`path\` do worktree dele,
+       o texto da tarefa, a delta spec relevante como critério de aceite, e a instrução de
+       trabalhar **dentro daquele diretório** — implementar, rodar a verificação da tarefa, e
+       \`git commit\` o resultado ali. Nenhum subagente toca em \`tasks.md\`, roda
+       \`specs tasks complete\` ou \`specs worktree finish\` — isso é sempre você, no passo (e).
+    d. Espere todos os subagentes do lote retornarem. Para cada um, classifique o desfecho:
+       - **Sucesso com commit real**: a verificação passou e o subagente reporta ter commitado.
+         Vai para (e).
+       - **Falha explícita**: o subagente reporta que não conseguiu, ou a verificação falhou.
+         Não chame \`finish\`. O worktree fica \`active\`. Reporte ao usuário qual tarefa falhou e o
+         \`path\` do worktree, e pergunte se quer tentar de novo ou abandonar
+         (\`specs worktree cleanup --change "<change>" --task "<numero>" --force\`, só com
+         confirmação explícita do usuário — nunca chame \`--force\` sozinho).
+       - **Sucesso reportado sem commit real**: trate como falha explícita. Nunca chame \`finish\`
+         sobre um branch sem mudança de verdade.
+    e. Para cada tarefa classificada como sucesso, **em sequência, uma de cada vez**:
+       \`specs worktree finish --change "<change>" --task "<numero>" --json\`.
+       - \`merged: true\` → segue para a próxima tarefa do lote.
+       - \`conflict: true\` → **pare**. Reporte o \`path\` e o \`branch\` devolvidos. A resolução é
+         manual, na árvore principal (não no worktree): o usuário roda
+         \`git merge --no-ff <branch>\`, resolve o conflito à mão, \`git add\`, \`git commit\`. Só
+         então rode \`specs worktree resume --change "<change>" --task "<numero>" --json\`. Nunca
+         tente resolver o conflito sozinho.
+    f. Volte para (a). Quando \`specs tasks ready\` devolver um lote vazio, siga para o passo 6
+       (Reporte).
+
+    Se \`parallelDispatch.supported\` for \`false\` ou o campo estiver ausente, ignore este passo e
+    siga o passo 4 normalmente.
 
 3. **Leia o plano**
 
