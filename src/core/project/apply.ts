@@ -1,5 +1,4 @@
 import path from 'node:path';
-import { promises as fs } from 'node:fs';
 import { SpecError } from '../../util/errors.js';
 import { readFileIfExists, writeFileAtomic, withStaging } from '../../util/fs.js';
 import { type Workspace } from '../workspace.js';
@@ -35,6 +34,8 @@ export interface ApplyResult {
   removed: string[];
   impact: ImpactResult | null;
   validation: { valid: boolean; errors: number; warnings: number };
+  /** Completed increments this mutation reaches (FR-40). Reported by `--dry-run` too. */
+  completedTouched: string[];
   diagnostics: Array<{ level: string; code: string; message: string }>;
 }
 
@@ -77,6 +78,7 @@ export async function applyPlanBundle(
     projectRoot: workspace.projectRoot,
     archivedIds,
     allowCompleted: options.allowCompleted === true,
+    previewOnly: options.dryRun === true,
     resolveSourceHash,
     now: options.now,
   });
@@ -141,7 +143,12 @@ export async function applyPlanBundle(
   const diagnostics = result.completedTouched.map((id) => ({
     level: 'WARNING',
     code: 'completed_change_protected',
-    message: `${id} está concluído e foi alterado com --allow-completed`,
+    message:
+      options.dryRun && options.allowCompleted !== true
+        ? `${id} está concluído e seria alterado; a aplicação real exige --allow-completed`
+        : options.dryRun
+          ? `${id} está concluído e seria alterado com --allow-completed`
+          : `${id} está concluído e foi alterado com --allow-completed`,
   }));
 
   // A slug rename moves the brief: carry the existing bytes to the new path and
@@ -266,20 +273,13 @@ export async function applyPlanBundle(
       removed,
       impact,
       validation: { valid: errors === 0, errors, warnings },
+      completedTouched: result.completedTouched,
       diagnostics,
     };
   }
 
   // Stage every planning file, then rename atomically.
-  const planDocSource =
-    result.documents.find((doc) => doc.target === 'plan')?.content ??
-    (await readFileIfExists(paths.planDoc)) ??
-    '';
   const architectureDoc = result.documents.find((doc) => doc.target === 'architecture')?.content;
-
-  // Fail before the first byte: an unbalanced roadmap marker must not leave a
-  // half-applied plan behind (AC-21, NFR-07).
-  assertRoadmapMarkers(planDocSource);
 
   // The whole commit runs under the plan lock, and the revision is re-checked
   // inside it, so a concurrent writer cannot slip between the check and the write.
@@ -292,24 +292,32 @@ export async function applyPlanBundle(
         { code: 'plan_revision_conflict', fix: 'specs project status --json' }
       );
     }
-    await withStaging(paths.dir, async (stage) => {
+    // Read the human document only after acquiring the lock. A pre-lock read
+    // could project stale bytes over an edit made by another writer (R-01).
+    const planDocSource =
+      result.documents.find((doc) => doc.target === 'plan')?.content ??
+      (await readFileIfExists(paths.planDoc)) ??
+      '';
+    assertRoadmapMarkers(planDocSource);
+
+    await withStaging(paths.dir, async (stage, remove) => {
       for (const [relPath, content] of briefFiles) stage(relPath, content);
       stage('plan.yaml', renderManifest(result.manifest));
       if (architectureDoc !== undefined) stage('architecture.md', architectureDoc);
+      // A slug rename is part of the same locked transaction. Deleting the old
+      // brief after releasing the lock allowed another writer to observe both
+      // names and made a failed rename irreversible (R-01/A-04).
+      for (const rename of result.briefRenames) {
+        if (rename.from !== rename.to) remove(rename.from);
+      }
     });
+
+    // Project the roadmap while the same plan lock is still held. The write is
+    // atomic, and its source is the just-read document plus the fresh state.
+    const fresh = await computeProjectStatus(workspace, planId);
+    const block = renderRoadmapBlock({ manifest: fresh.manifest, rows: roadmapRows(fresh) });
+    await writeFileAtomic(paths.planDoc, spliceRoadmap(planDocSource, block));
   });
-
-  // Old brief files after a slug rename.
-  for (const rename of result.briefRenames) {
-    if (rename.from !== rename.to) {
-      await fs.rm(path.join(paths.dir, rename.from), { force: true });
-    }
-  }
-
-  // Project the roadmap into plan.md from the freshly written state.
-  const fresh = await computeProjectStatus(workspace, planId);
-  const block = renderRoadmapBlock({ manifest: fresh.manifest, rows: roadmapRows(fresh) });
-  await writeFileAtomic(paths.planDoc, spliceRoadmap(planDocSource, block));
 
   const reports = await validatePlan(workspace.projectRoot, planId, {});
   const validation = {
@@ -327,6 +335,7 @@ export async function applyPlanBundle(
     removed,
     impact,
     validation,
+    completedTouched: result.completedTouched,
     diagnostics,
   };
 }

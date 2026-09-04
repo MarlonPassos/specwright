@@ -354,6 +354,42 @@ describe('specs project — no regression', () => {
     expect(status.progress).toMatchObject({ archived: 1 });
   });
 
+  it('archive não escolhe entre dois planos candidatos e reporta a ambiguidade', async () => {
+    const dir = await initProject();
+    await runCli(['project', 'create', 'p1', '--json'], dir);
+    await runCli(['project', 'create', 'p2', '--json'], dir);
+    const bundle = path.join(dir, 'same.json');
+    await writeFile(
+      bundle,
+      JSON.stringify({
+        bundleVersion: 1,
+        expectRevision: 0,
+        operations: [{ op: 'addChange', ref: '$same', slug: 'same-work', title: 'Same work' }],
+      })
+    );
+    expect((await runCli(['project', 'apply', 'p1', '--file', bundle, '--json'], dir)).code).toBe(0);
+    expect((await runCli(['project', 'apply', 'p2', '--file', bundle, '--json'], dir)).code).toBe(0);
+
+    await runCli(['new', 'change', 'same-work'], dir);
+    await writeFile(
+      path.join(dir, 'spec/changes/same-work/proposal.md'),
+      '## Why\n\nCustomers keep hitting a small papercut that wastes support time every week.\n\n## What Changes\n\n- fix it\n\n## Impact\n\nnone\n'
+    );
+    await writeFile(path.join(dir, 'spec/changes/same-work/.change.yaml'), 'schema: spec-driven\nskip_specs: true\n');
+    await writeFile(path.join(dir, 'spec/changes/same-work/tasks.md'), '## 1\n- [x] 1.1 done\n');
+
+    const archived = await runCli(['archive', 'same-work', '--json'], dir);
+    expect(archived.code).toBe(0);
+    const payload = parseJson(archived.stdout);
+    expect(payload.plan).toBeUndefined();
+    expect(payload.planAmbiguity.candidates).toHaveLength(2);
+
+    for (const planId of ['p1', 'p2']) {
+      const status = parseJson((await runCli(['project', 'status', planId, '--json'], dir)).stdout);
+      expect(status.diagnostics.some((diagnostic: { code: string }) => diagnostic.code === 'unclaimed_archive')).toBe(true);
+    }
+  });
+
   it('um plano corrompido não faz new change falhar nem falar do plano', async () => {
     const dir = await initProject();
     await runCli(['project', 'create', 'demo', '--json'], dir);

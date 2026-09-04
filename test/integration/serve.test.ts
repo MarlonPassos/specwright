@@ -48,7 +48,7 @@ describe('specs serve — superfície', () => {
     expect(String(body.generatedAt)).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
-  it('recusa qualquer método de escrita (I-1)', async () => {
+  it('recusa qualquer método de escrita (I-12)', async () => {
     const server = await serve(await makeWorkspace());
     for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
       const response = await fetch(server.url + '/api/overview', { method });
@@ -71,7 +71,7 @@ describe('specs serve — superfície', () => {
     expect(String(body.message)).toContain('Nenhum plano');
   });
 
-  it('escuta só em loopback (I-2)', async () => {
+  it('escuta só em loopback (I-13)', async () => {
     const server = await serve(await makeWorkspace());
     expect(server.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
   });

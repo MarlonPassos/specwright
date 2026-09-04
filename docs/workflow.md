@@ -134,9 +134,14 @@ O [Project Planning](project-planning.md) fica **acima** deste ciclo. Ele decide
   implementa, verifica ou arquiva uma change.
 - Depois que a change existe, `specs project link <change-id> <change-name>`
   registra o vínculo 1:1.
-- Quando a change é arquivada pelo ciclo normal, o plano observa o diretório de
-  archive na próxima `specs project status` e recalcula quem ficou pronto — sem
-  hook, sem aviso.
+- Quando a change é arquivada pelo ciclo normal, o archive tenta fechar — como
+  efeito best-effort — o vínculo já previsto: o incremento não cancelado, ainda
+  sem vínculo, cujo `slug` é igual ao nome da change. Quando há exatamente um
+  candidato, a saída traz o bloco `plan` com o vínculo gravado. Quando não há
+  candidato, há mais de um, ou o plano está ausente, ilegível ou recusa a
+  escrita, o arquivamento continua bem-sucedido e o `status` seguinte reporta
+  `unclaimed_archive`; no caso de ambiguidade, a saída traz `planAmbiguity` e
+  os candidatos para escolha explícita.
 
 O que o plano **não** faz: gerar código, criar artefatos de change, executar
 agentes em paralelo, guardar estado fora do Git, ou alterar uma change arquivada.

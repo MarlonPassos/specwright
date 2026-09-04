@@ -77,7 +77,14 @@ export async function writeFileAtomic(target: string, content: string): Promise<
  * make `rename` fail halfway, so it is rejected up front. During the commit each
  * existing destination is moved aside into the staging area before being
  * replaced, so a failure on the N-th file restores every destination already
- * moved and the mutation is all-or-nothing.
+ * moved and the mutation is all-or-nothing. `afterCommit`, when supplied, runs
+ * while the backups still exist; if it throws, the same rollback is performed.
+ *
+ * `remove` deletes as part of the same transaction: the destination is MOVED
+ * into the staging backup rather than unlinked, so a later failure puts it back.
+ * The native archive retires capability specs this way; it used to `fs.rm` them
+ * mid-sequence, which was the one irreversible step in the whole flow (F-08,
+ * A-05).
  *
  * When a rollback itself cannot complete, the staging directory is deliberately
  * LEFT ON DISK so `specs project validate` can report `partial_write_detected`
@@ -85,19 +92,29 @@ export async function writeFileAtomic(target: string, content: string): Promise<
  */
 export async function withStaging<T>(
   stagingRoot: string,
-  run: (stage: (relativePath: string, content: string) => void) => Promise<T>
+  run: (
+    stage: (relativePath: string, content: string) => void,
+    remove: (relativePath: string) => void
+  ) => Promise<T>,
+  afterCommit?: () => Promise<void>
 ): Promise<T> {
   const stagingDir = path.join(stagingRoot, `.tmp-${process.pid}-${randomBytes(6).toString('hex')}`);
   const backupDir = path.join(stagingDir, '.backup');
   const pending = new Map<string, string>();
+  const removals = new Set<string>();
 
   const stage = (relativePath: string, content: string): void => {
+    removals.delete(relativePath);
     pending.set(relativePath, content);
+  };
+  const remove = (relativePath: string): void => {
+    pending.delete(relativePath);
+    removals.add(relativePath);
   };
 
   let result: T;
   try {
-    result = await run(stage);
+    result = await run(stage, remove);
   } catch (error) {
     await fs.rm(stagingDir, { recursive: true, force: true });
     throw error;
@@ -115,6 +132,16 @@ export async function withStaging<T>(
       );
     }
   }
+  for (const relativePath of removals) {
+    const target = path.join(stagingRoot, relativePath);
+    const stats = await fs.stat(target).catch(() => undefined);
+    if (stats?.isDirectory()) {
+      await fs.rm(stagingDir, { recursive: true, force: true });
+      throw new Error(
+        `Não é possível remover "${relativePath}": o destino é um diretório.`
+      );
+    }
+  }
 
   try {
     await ensureDir(stagingDir);
@@ -128,7 +155,7 @@ export async function withStaging<T>(
     throw error;
   }
 
-  /** Destinations already replaced, newest first, for rollback. */
+  /** Destinations already replaced or removed, newest first, for rollback. */
   const moved: Array<{ target: string; backup?: string }> = [];
 
   try {
@@ -143,9 +170,24 @@ export async function withStaging<T>(
         await ensureDir(path.dirname(backup));
         await fs.rename(target, backup);
       }
+      // Record the backup before replacing the destination. If the replacement
+      // fails after the old file moved aside, rollback must know how to restore
+      // it; recording only after the second rename lost that file on failure.
+      moved.unshift({ target, backup });
       await fs.rename(staged, target);
+    }
+    // Removals last, and by MOVE: a delete is the one step a rollback cannot
+    // invent its way out of, so the bytes stay in the staging backup until the
+    // whole mutation has committed.
+    for (const relativePath of removals) {
+      const target = path.join(stagingRoot, relativePath);
+      if (!(await pathExists(target))) continue;
+      const backup = path.join(backupDir, relativePath);
+      await ensureDir(path.dirname(backup));
+      await fs.rename(target, backup);
       moved.unshift({ target, backup });
     }
+    await afterCommit?.();
   } catch (error) {
     try {
       for (const entry of moved) {
@@ -182,7 +224,11 @@ export async function findFilesNamed(root: string, fileName: string): Promise<st
     for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
       const absolute = path.join(dir, entry.name);
       const next = relative ? `${relative}/${entry.name}` : entry.name;
+      // A `.`-prefixed directory is never content: it is a staging area
+      // (`withStaging`) or tooling state. Walking one would publish a
+      // half-committed file as if it were a real spec.
       if (entry.isDirectory()) {
+        if (entry.name.startsWith('.')) continue;
         await walk(absolute, next);
       } else if (entry.isFile() && entry.name === fileName) {
         found.push(next);

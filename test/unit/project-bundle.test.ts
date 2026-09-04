@@ -99,6 +99,80 @@ describe('applyBundle', () => {
     expect(ok.completedTouched).toEqual(['CH-001']);
   });
 
+  it('protects completed increments reached by setMilestones, including dry-run preview', () => {
+    const base = manifest({ changes: [change({ id: 'CH-001', slug: 'a', milestone: null })] });
+    const b = parseBundle(
+      bundle([{ op: 'setMilestones', milestones: [{ id: 'M1', name: 'Um', order: 1, changes: ['CH-001'] }] }])
+    );
+
+    expectCode(
+      () => applyBundle(base, b, { ...ctx, archivedIds: new Set(['CH-001']) }),
+      'completed_change_protected'
+    );
+    const preview = applyBundle(base, b, {
+      ...ctx,
+      archivedIds: new Set(['CH-001']),
+      previewOnly: true,
+    });
+    expect(preview.completedTouched).toEqual(['CH-001']);
+    expect(preview.manifest.changes[0].milestone).toBe('M1');
+  });
+
+  it('protects an archived dependent rewired by split and merge', () => {
+    const splitBase = manifest({
+      changes: [
+        change({ id: 'CH-001', slug: 'original' }),
+        change({ id: 'CH-002', slug: 'dependent', depends_on: ['CH-001'] }),
+      ],
+    });
+    const split = parseBundle(
+      bundle([
+        {
+          op: 'splitChange',
+          id: 'CH-001',
+          into: [
+            { ref: '$a', slug: 'first', title: 'First' },
+            { ref: '$b', slug: 'second', title: 'Second' },
+          ],
+          rewire: { 'CH-002': ['$a'] },
+        },
+      ])
+    );
+    expectCode(
+      () => applyBundle(splitBase, split, { ...ctx, archivedIds: new Set(['CH-002']) }),
+      'completed_change_protected'
+    );
+    expect(
+      applyBundle(splitBase, split, {
+        ...ctx,
+        archivedIds: new Set(['CH-002']),
+        allowCompleted: true,
+      }).completedTouched
+    ).toEqual(['CH-002']);
+
+    const mergeBase = manifest({
+      changes: [
+        change({ id: 'CH-001', slug: 'survivor' }),
+        change({ id: 'CH-002', slug: 'absorbed' }),
+        change({ id: 'CH-003', slug: 'consumer', depends_on: ['CH-002'] }),
+      ],
+    });
+    const merge = parseBundle(
+      bundle([{ op: 'mergeChanges', ids: ['CH-001', 'CH-002'], survivor: 'CH-001' }])
+    );
+    expectCode(
+      () => applyBundle(mergeBase, merge, { ...ctx, archivedIds: new Set(['CH-003']) }),
+      'completed_change_protected'
+    );
+    expect(
+      applyBundle(mergeBase, merge, {
+        ...ctx,
+        archivedIds: new Set(['CH-003']),
+        allowCompleted: true,
+      }).completedTouched
+    ).toEqual(['CH-003']);
+  });
+
   it('split cancels the original with superseded_by and rewires every dependent', () => {
     const base = manifest({
       changes: [

@@ -7,6 +7,7 @@ import {
   readinessOf,
   PLANNING_STATE_TRANSITIONS,
 } from '../../src/core/project/state.js';
+import { recordHash } from '../../src/core/project/hashes.js';
 import { change } from '../helpers/plan.js';
 
 const REF = {
@@ -14,7 +15,11 @@ const REF = {
   generated_from_plan_revision: 1,
   source_hash: 'S',
   content_hash: 'C',
+  record_hash: recordHash({ slug: 'x', title: 'x', dependsOn: [], milestone: null }),
 };
+
+/** The same ref as written by a plan predating `record_hash` (F-06). */
+const LEGACY_REF = { ...REF, record_hash: undefined };
 
 describe('materializationState', () => {
   it('missing without a ref or a file', () => {
@@ -59,6 +64,17 @@ describe('materializationState', () => {
         currentSourceHash: 'S',
       })
     ).toBe('current');
+  });
+
+  it('legacy refs without record_hash are outdated, never current (F-06)', () => {
+    expect(
+      materializationState({
+        change: change({ id: 'CH-001', slug: 'x', planned_change: LEGACY_REF }),
+        briefContent: '...',
+        briefContentSha: 'C',
+        currentSourceHash: 'S',
+      })
+    ).toBe('outdated');
   });
 });
 

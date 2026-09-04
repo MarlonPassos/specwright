@@ -53,4 +53,35 @@ describe('withStaging', () => {
     expect(await fs.readFile(path.join(dir, 'a.md'), 'utf8')).toBe('keep');
     expect((await fs.readdir(dir)).some((name) => name.startsWith('.tmp-'))).toBe(false);
   });
+
+  it('commits removals through the same staging transaction', async () => {
+    const dir = await tempDir();
+    await fs.writeFile(path.join(dir, 'keep.md'), 'old');
+    await fs.writeFile(path.join(dir, 'retire.md'), 'retired');
+
+    await withStaging(dir, async (stage, remove) => {
+      stage('keep.md', 'new');
+      remove('retire.md');
+    });
+
+    expect(await fs.readFile(path.join(dir, 'keep.md'), 'utf8')).toBe('new');
+    await expect(fs.stat(path.join(dir, 'retire.md'))).rejects.toThrow();
+    expect((await fs.readdir(dir)).some((name) => name.startsWith('.tmp-'))).toBe(false);
+  });
+
+  it('rejects a blocked destination before applying removals', async () => {
+    const dir = await tempDir();
+    await fs.mkdir(path.join(dir, 'blocked.md'));
+    await fs.writeFile(path.join(dir, 'retire.md'), 'retired');
+
+    await expect(
+      withStaging(dir, async (stage, remove) => {
+        stage('blocked.md', 'cannot replace a directory');
+        remove('retire.md');
+      })
+    ).rejects.toThrow(/blocked\.md/);
+
+    expect(await fs.stat(path.join(dir, 'retire.md'))).toBeTruthy();
+    expect((await fs.readdir(dir)).some((name) => name.startsWith('.tmp-'))).toBe(false);
+  });
 });

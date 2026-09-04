@@ -134,9 +134,11 @@ Aplica os deltas da change nas specs do workspace e a move para o arquivo.
 | `--force` | Arquivar apesar de tarefas não marcadas |
 
 Num projeto com [plano](project-planning.md), o arquivamento fecha o vínculo já
-previsto — o incremento sem vínculo cujo `slug` é igual ao nome da change — e o
-reporta no bloco `plan`. Um plano ausente ou ilegível não muda o arquivamento em
-nada.
+previsto — o único incremento não cancelado e sem vínculo cujo `slug` é igual ao
+nome da change — e o reporta no bloco `plan`. Sem candidato, com mais de um
+candidato, ou quando o plano está ausente, ilegível ou recusa a escrita, o
+arquivamento continua bem-sucedido sem gravar no plano. Na ambiguidade, o JSON
+traz `planAmbiguity` com os candidatos e seus comandos `fix`.
 
 ### `specs watch [plan-id]`
 
@@ -260,9 +262,11 @@ glifos Unicode, igual a `specs status`.
 `link <change-id> <change-name>` registra o vínculo 1:1 (o incremento não pode
 estar concluído nem cancelado; a change precisa existir, **ativa ou no archive**;
 o nome não pode já estar vinculado). `unlink <change-id>` remove — `--force`
-quando a execução é `archived`. `adopt <change-name|archive-dir>` cria uma
-Project Change a partir de uma change fora do plano, sem tocar em nada dentro
-dela. `sync [--check] [--link]` reconcilia o bloco `link` com `spec/changes/` e o
+quando a execução é `archived`. `adopt <change-name|archive-dir> [--slug <slug>]`
+cria uma Project Change a partir de uma change fora do plano, sem tocar em nada dentro
+dela; `--slug` aceita a identidade explícita quando o nome do archive termina em número
+e pode ser interpretado de duas
+formas. `sync [--check] [--link]` reconcilia o bloco `link` com `spec/changes/` e o
 archive (idempotente); `--link` vincula em lote todo incremento sem vínculo cuja
 change de mesmo nome do slug exista e esteja livre — é a alternativa a repetir
 `specs project link` uma vez por incremento.
@@ -270,7 +274,7 @@ change de mesmo nome do slug exista e esteja livre — é a alternativa a repeti
 `planning_state` (`on_hold` e `cancelled` exigem `--reason`).
 
 Códigos de erro: `link_target_missing`, `link_already_used`, `invalid_transition`,
-`missing_reason`, `completed_change_protected`.
+`missing_reason`, `completed_change_protected`, `ambiguous_archive_identity`.
 
 ### `specs serve [<plan-id>]`
 

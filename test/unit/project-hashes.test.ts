@@ -34,6 +34,24 @@ describe('project hashes', () => {
     expect(withMissing).toBe(bothEmpty);
   });
 
+  it('separates source boundaries: one document is not two (R-03)', () => {
+    const single = sourceHash([{ path: 'a.md', content: 'alpha\nbeta' }]);
+    const split = sourceHash([
+      { path: 'a.md', content: 'alpha' },
+      { path: 'b.md', content: 'beta' },
+    ]);
+    expect(single).not.toBe(split);
+  });
+
+  it('distinguishes an absent source from an extra empty one', () => {
+    const one = sourceHash([{ path: 'a.md', content: 'alpha' }]);
+    const two = sourceHash([
+      { path: 'a.md', content: 'alpha' },
+      { path: 'b.md', content: '' },
+    ]);
+    expect(one).not.toBe(two);
+  });
+
   it('sha256 is stable and hex', () => {
     expect(sha256('x')).toMatch(/^[0-9a-f]{64}$/);
     expect(sha256('x')).toBe(sha256('x'));

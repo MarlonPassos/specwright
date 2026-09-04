@@ -146,6 +146,34 @@ describe('adoptChange', () => {
     });
   });
 
+  it('preserves a numeric suffix that is part of the change slug', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedArchivedChange(workspace, 'release-2', '2026-08-01');
+    // Active names are part of the disambiguating context, without creating a
+    // planned increment that would make adopt reject a duplicate slug.
+    await fs.mkdir(path.join(workspace.changesPath, 'release-2'), { recursive: true });
+    await seedPlan(workspace, manifest({ id: 'demo', changes: [] }));
+
+    const result = await adoptChange(workspace, 'demo', '2026-08-01-release-2');
+    expect(result.change).toBe('release-2');
+    expect((await loadPlan(workspace.projectRoot, 'demo')).manifest.changes[0].slug).toBe('release-2');
+  });
+
+  it('refuses an archive identity ending in a number when context cannot disambiguate it', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedArchivedChange(workspace, 'release-2', '2026-08-01');
+    await seedPlan(workspace, manifest({ id: 'demo', changes: [] }));
+
+    await expect(adoptChange(workspace, 'demo', '2026-08-01-release-2')).rejects.toMatchObject({
+      code: 'ambiguous_archive_identity',
+    });
+    const adopted = await adoptChange(workspace, 'demo', '2026-08-01-release-2', {
+      slug: 'release-2',
+    });
+    expect(adopted.change).toBe('release-2');
+    expect((await loadPlan(workspace.projectRoot, 'demo')).manifest.changes[0].slug).toBe('release-2');
+  });
+
   it('refuses a target that is a path instead of a directory name (I-8, NFR-08)', async () => {
     const workspace = await makePlanWorkspace();
     await seedPlan(workspace, manifest({ id: 'demo', changes: [] }));
@@ -292,6 +320,22 @@ describe('linkChange — trabalho já arquivado', () => {
     expect(result.archivePath).toBe('spec/changes/archive/2026-09-02-auth');
   });
 
+  it('ordena colisões pelo sufixo numérico, não pela ordem lexical', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedArchivedChange(workspace, 'auth', '2026-09-02');
+    const second = path.join(workspace.archivePath, '2026-09-02-auth-2');
+    await fs.mkdir(second, { recursive: true });
+    await fs.writeFile(path.join(second, 'proposal.md'), '# archived\n');
+    // Add -10 to expose lexical ordering.
+    const tenth = path.join(workspace.archivePath, '2026-09-02-auth-10');
+    await fs.mkdir(tenth, { recursive: true });
+    await fs.writeFile(path.join(tenth, 'proposal.md'), '# archived\n');
+    await seedPlan(workspace, manifest({ id: 'demo', changes: [change({ id: 'CH-001', slug: 'auth' })] }));
+
+    const result = await linkChange(workspace, 'demo', 'CH-001', 'auth');
+    expect(result.archivePath).toBe('spec/changes/archive/2026-09-02-auth-10');
+  });
+
   it('sem diretório ativo nem archive, o erro cita os dois lugares', async () => {
     const workspace = await makePlanWorkspace();
     await seedPlan(
@@ -321,6 +365,21 @@ describe('diagnósticos de archive órfão e execução ambígua', () => {
     expect(found!.path).toBe('spec/changes/archive/2026-09-01-bug-fixes');
     // É exatamente o vão entre `specs status` (1 arquivada) e o plano (0/1).
     expect(status.progress.archived).toBe(0);
+  });
+
+  it('expõe a ambiguidade de um archive numérico sem adivinhar o slug', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedArchivedChange(workspace, 'release-2');
+    await seedPlan(workspace, manifest({ id: 'demo', changes: [] }));
+
+    const status = await computeProjectStatus(workspace, 'demo');
+    const diagnostic = status.diagnostics.find((entry) => entry.code === 'ambiguous_archive_identity');
+    expect(diagnostic).toMatchObject({
+      level: 'WARNING',
+      fix: 'specs project adopt 2026-09-01-release-2 --slug <slug>',
+    });
+    expect(diagnostic?.message).toContain('release-2');
+    expect(status.diagnostics.some((entry) => entry.code === 'unclaimed_archive')).toBe(false);
   });
 
   it('o fix sugerido é executável quando adopt é mesmo a resposta', async () => {
@@ -353,6 +412,31 @@ describe('diagnósticos de archive órfão e execução ambígua', () => {
     expect(status.diagnostics.some((d) => d.code === 'unclaimed_archive')).toBe(false);
   });
 
+  it('não cria unclaimed_archive para um slug que termina em número', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedArchivedChange(workspace, 'release-2');
+    await seedPlan(
+      workspace,
+      manifest({
+        id: 'demo',
+        changes: [
+          change({
+            id: 'CH-001',
+            slug: 'release-2',
+            link: {
+              name: 'release-2',
+              active_path: 'spec/changes/release-2',
+              archive_path: 'spec/changes/archive/2026-09-01-release-2',
+              linked_at: '2026-09-01',
+            },
+          }),
+        ],
+      })
+    );
+    const status = await computeProjectStatus(workspace, 'demo');
+    expect(status.diagnostics.some((d) => d.code === 'unclaimed_archive')).toBe(false);
+  });
+
   it('avisa quando um slug tem diretório ativo E archive ao mesmo tempo', async () => {
     const workspace = await makePlanWorkspace();
     await seedArchivedChange(workspace, 'auth');
@@ -377,4 +461,3 @@ describe('diagnósticos de archive órfão e execução ambígua', () => {
     expect(found!.message).toContain('invisível');
   });
 });
-

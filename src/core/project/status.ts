@@ -15,6 +15,7 @@ import { parsePlannedChange } from './planned-change.js';
 import { validatePlannedChangeContent } from './validate.js';
 import { safeResolve } from './paths.js';
 import { readEvidence } from './evidence.js';
+import { parseArchiveIdentity, sortArchiveDirs } from './archive-identity.js';
 import { sha256, sourceHash, type HashableSource } from './hashes.js';
 import { resolveWithinRoot } from './paths.js';
 import {
@@ -145,6 +146,7 @@ export async function computeProjectStatus(
   // Materialization
   const materialization = new Map<string, MaterializationState>();
   const briefRevision = new Map<string, number>();
+  const recordHashMissing = new Set<string>();
   /** Increments whose brief exists but does not satisfy §7.3. */
   const invalidBrief = new Map<string, string[]>();
   for (const change of manifest.changes) {
@@ -168,6 +170,7 @@ export async function computeProjectStatus(
       })
     );
     briefRevision.set(change.id, ref.generated_from_plan_revision);
+    if (ref.record_hash === undefined) recordHashMissing.add(change.id);
 
     // A matching hash proves the bytes are the ones recorded; it does NOT prove
     // the document is structurally valid. Without this an invalid brief read as
@@ -188,6 +191,9 @@ export async function computeProjectStatus(
   const linkTasks = new Map<string, { total: number; completed: number } | null>();
   const linkArchivePath = new Map<string, string | null>();
   const ambiguousArchive = new Map<string, string[]>();
+  const invalidArchivePaths = new Map<string, string>();
+  const unsafeLinks = new Map<string, Array<'active_path' | 'archive_path'>>();
+  const mismatchedLinks = new Map<string, Array<'active_path'>>();
   const resumedSlugs = new Map<string, string>();
   for (const id2 of order) {
     const change = byId.get(id2)!;
@@ -198,6 +204,13 @@ export async function computeProjectStatus(
     linkTasks.set(id2, evidence.tasks ?? null);
     linkArchivePath.set(id2, evidence.archivePath ?? change.link?.archive_path ?? null);
     if (evidence.ambiguousArchive.length > 0) ambiguousArchive.set(id2, evidence.ambiguousArchive);
+    if (evidence.invalidArchivePath !== undefined) {
+      invalidArchivePaths.set(id2, evidence.invalidArchivePath);
+    }
+    if (evidence.unsafe && evidence.unsafe.length > 0) unsafeLinks.set(id2, evidence.unsafe);
+    if (evidence.mismatched && evidence.mismatched.length > 0) {
+      mismatchedLinks.set(id2, evidence.mismatched);
+    }
     // Both an active directory AND an archive answer to this slug. `executionOf`
     // reports `archived` (the archive wins, §7.7), which silently presents brand
     // new work as delivered. Keep the documented state, surface the collision.
@@ -281,6 +294,10 @@ export async function computeProjectStatus(
     anySourceMissing,
     anySourceChanged,
     ambiguousArchive,
+    invalidArchivePaths,
+    recordHashMissing,
+    unsafeLinks,
+    mismatchedLinks,
   });
 
   for (const [id2, messages] of invalidBrief) {
@@ -314,9 +331,27 @@ export async function computeProjectStatus(
   // increment claims, the DIRECTORY name (date prefix and collision suffix
   // included) is what `adopt` takes as its argument. Keeping only the slug is
   // what made the old fix hint unrunnable.
+  // `-N` is a collision suffix only when the context says so: a change actually
+  // named `release-2` used to be grouped as `release`, which raised a bogus
+  // `unclaimed_archive` whose `fix` then adopted the work under a truncated
+  // slug (F-07).
+  const knownSlugs = new Set<string>(activeChangeNames);
+  for (const change of manifest.changes) {
+    knownSlugs.add(change.slug);
+    if (change.link) knownSlugs.add(change.link.name);
+  }
   const archivedBySlug = new Map<string, string[]>();
+  const ambiguousArchiveIdentities: Array<{ name: string; alternatives: string[] }> = [];
   for (const name of await listArchivedChanges(workspace)) {
-    const slug = name.replace(/^\d{4}-\d{2}-\d{2}-/, '').replace(/-\d+$/, '');
+    const identity = parseArchiveIdentity(name, knownSlugs);
+    if (identity.ambiguous) {
+      ambiguousArchiveIdentities.push({
+        name,
+        alternatives: identity.alternatives ?? [identity.slug],
+      });
+      continue;
+    }
+    const { slug } = identity;
     archivedBySlug.set(slug, [...(archivedBySlug.get(slug) ?? []), name]);
   }
   const archivedSlugs = new Set(archivedBySlug.keys());
@@ -325,7 +360,7 @@ export async function computeProjectStatus(
   );
   for (const [slug, dirs] of [...archivedBySlug].sort(([a], [b]) => a.localeCompare(b))) {
     if (claimedNames.has(slug)) continue;
-    const newest = [...dirs].sort((a, b) => b.localeCompare(a))[0];
+    const newest = sortArchiveDirs(dirs)[0];
     // `adopt` creates a NEW increment. When the plan already carries this slug,
     // adopting writes a duplicate slug: a plan that fails validation and that
     // `project status` then refuses to load. So the increment that is already
@@ -345,6 +380,15 @@ export async function computeProjectStatus(
       path: `${WORKSPACE_DIR}/${CHANGES_DIR}/${ARCHIVE_DIR}/${newest}`,
       message: `a change "${slug}" está arquivada, mas nenhum incremento do plano a reivindica — o progresso do plano não a conta`,
       fix,
+    });
+  }
+  for (const archive of ambiguousArchiveIdentities) {
+    diagnostics.push({
+      level: 'WARNING',
+      code: 'ambiguous_archive_identity',
+      path: `${WORKSPACE_DIR}/${CHANGES_DIR}/${ARCHIVE_DIR}/${archive.name}`,
+      message: `o archive "${archive.name}" pode ser a change "${archive.alternatives.join('" ou "')}"; informe o slug explicitamente`,
+      fix: `specs project adopt ${archive.name} --slug <slug>`,
     });
   }
 
@@ -458,6 +502,14 @@ interface DiagnosticsInput {
   anySourceMissing: boolean;
   anySourceChanged: boolean;
   ambiguousArchive: Map<string, string[]>;
+  /** Increment id -> the persisted `archive_path` that was refused (F-04). */
+  invalidArchivePaths: Map<string, string>;
+  /** Increments whose brief predates the record identity hash. */
+  recordHashMissing: Set<string>;
+  /** Increment id -> unsafe declared link path fields. */
+  unsafeLinks: Map<string, Array<'active_path' | 'archive_path'>>;
+  /** Increment id -> safe declared link path fields targeting another identity. */
+  mismatchedLinks: Map<string, Array<'active_path'>>;
 }
 
 function collectDiagnostics(input: DiagnosticsInput): DiagnosticView[] {
@@ -489,6 +541,50 @@ function collectDiagnostics(input: DiagnosticsInput): DiagnosticView[] {
         path: `changes.${view.id}.link`,
         message: `o vínculo de ${view.id} aponta para "${view.link.name}", que não existe ativa nem arquivada`,
         fix: 'specs project sync',
+      });
+    }
+  }
+
+  for (const [id, rejected] of input.invalidArchivePaths) {
+    diagnostics.push({
+      level: 'WARNING',
+      code: 'invalid_archive_path',
+      path: `changes.${id}.link.archive_path`,
+      message: `o archive_path de ${id} aponta para "${rejected}", que não é um diretório de archive da change vinculada — o campo foi ignorado`,
+      fix: 'specs project sync',
+    });
+  }
+
+  for (const id of input.recordHashMissing) {
+    diagnostics.push({
+      level: 'WARNING',
+      code: 'record_hash_missing',
+      path: `changes.${id}.planned_change.record_hash`,
+      message: `o Planned Change de ${id} não tem record_hash; a atualidade do registro não pode ser comprovada`,
+      fix: 'specs project generate',
+    });
+  }
+
+  for (const [id, fields] of input.unsafeLinks) {
+    for (const field of fields) {
+      diagnostics.push({
+        level: 'ERROR',
+        code: 'unsafe_plan_path',
+        path: `changes.${id}.link.${field}`,
+        message: `o caminho ${field} de ${id} não resolve dentro do workspace`,
+        fix: 'specs project link ou specs project sync',
+      });
+    }
+  }
+
+  for (const [id, fields] of input.mismatchedLinks) {
+    for (const field of fields) {
+      diagnostics.push({
+        level: 'ERROR',
+        code: 'link_target_mismatch',
+        path: `changes.${id}.link.${field}`,
+        message: `o caminho ${field} de ${id} aponta para outra change que não a identidade declarada`,
+        fix: 'specs project link ou specs project sync',
       });
     }
   }

@@ -9,7 +9,7 @@ import {
 } from '../../src/core/project/model.js';
 import { planPaths, plannedChangeFileName } from '../../src/core/project/paths.js';
 import { renderPlannedChange } from '../../src/core/project/planned-change.js';
-import { sha256, sourceHash } from '../../src/core/project/hashes.js';
+import { recordHash, sha256, sourceHash } from '../../src/core/project/hashes.js';
 import { emptyRoadmapBlock } from '../../src/core/project/templates.js';
 
 export { makeWorkspace as makePlanWorkspace };
@@ -138,6 +138,12 @@ export async function withBrief(
       generated_from_plan_revision: 0,
       source_hash: sourceHash([]),
       content_hash: sha256(content),
+      record_hash: recordHash({
+        slug: c.slug,
+        title: c.title,
+        dependsOn: c.depends_on,
+        milestone: c.milestone,
+      }),
     },
   };
 }

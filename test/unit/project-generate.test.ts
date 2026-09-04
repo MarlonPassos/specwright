@@ -136,6 +136,25 @@ describe('generatePlannedChanges', () => {
     expect((await computeProjectStatus(workspace, 'demo')).changes.find((c) => c.id === 'CH-002')!.plannedChange!.state).toBe('current');
   });
 
+  it('migrates a legacy brief without record_hash and reports the missing proof', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedPlan(workspace, manifest({ id: 'demo', changes: [change({ id: 'CH-001', slug: 'x' })] }));
+    await generatePlannedChanges(workspace, 'demo', { changeIds: ['CH-001'] });
+
+    const yamlPath = path.join(workspace.projectRoot, 'planning/demo/plan.yaml');
+    const legacy = (await fs.readFile(yamlPath, 'utf8')).replace(/\n\s+record_hash: [^\n]+/, '');
+    await fs.writeFile(yamlPath, legacy);
+
+    const before = await computeProjectStatus(workspace, 'demo');
+    expect(before.changes[0].plannedChange!.state).toBe('outdated');
+    expect(before.diagnostics.some((diagnostic) => diagnostic.code === 'record_hash_missing')).toBe(true);
+
+    await generatePlannedChanges(workspace, 'demo', { changeIds: ['CH-001'] });
+    const after = await computeProjectStatus(workspace, 'demo');
+    expect(after.changes[0].plannedChange!.state).toBe('current');
+    expect((await fs.readFile(yamlPath, 'utf8'))).toContain('record_hash:');
+  });
+
   it('detects an outdated brief when the source changes (AC-12)', async () => {
     const workspace = await planWithSource();
     await seedPlan(

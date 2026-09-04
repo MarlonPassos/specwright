@@ -61,7 +61,14 @@ ${RESOLVE_CHANGE}
    ainda não tinha vínculo. Quando isso acontece, a saída do \`specs archive\` traz um bloco
    \`plan\` com o incremento vinculado - reporte-o ao usuário.
 
-   Se existe \`planning/\` na raiz e o bloco \`plan\` **não** veio, confirme por quê:
+   Se existe \`planning/\` na raiz e o bloco \`plan\` **não** veio, há três razões possíveis:
+   nenhum incremento planejava aquele slug; o plano está ausente, ilegível ou recusou a
+   escrita; ou **mais de um** incremento planejava o slug - nesse caso o \`specs archive\`
+   traz um bloco \`planAmbiguity\` listando os candidatos e **não grava em plano nenhum**,
+   porque escolher por conta própria trocaria o dono do trabalho. Rode o \`fix\` do candidato
+   que o usuário confirmar.
+
+   Confirme por quê:
 
    \`\`\`bash
    specs project status --json
