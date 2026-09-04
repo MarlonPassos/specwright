@@ -77,6 +77,7 @@ export function registerWorkflowCommands(program: Command): void {
     .option('--goal <text>', 'Objetivo registrado nos metadados da change')
     .option('--skip-specs', 'Declara que a change não altera nenhum comportamento observável')
     .option('--parallel', 'Habilita dispatch paralelo isolado por worktree para esta change')
+    .option('--no-parallel', 'Desliga mesmo se spec/config.yaml declarar defaultParallel: true')
     .option('--json', 'Saída em JSON')
     .action(async (name: string, options: { schema?: string; goal?: string; skipSpecs?: boolean; parallel?: boolean; json?: boolean }) => {
       try {

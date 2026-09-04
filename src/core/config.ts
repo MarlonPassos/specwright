@@ -17,6 +17,15 @@ export const WorkspaceConfigSchema = z.object({
   context: z.string().optional(),
   rules: z.record(z.string(), z.array(z.string())).optional(),
   harnesses: z.array(z.string()).optional(),
+  /**
+   * Default for a new change's own `parallel:` field in `.change.yaml`, used
+   * only at `specs new change` time. This is a convenience, not a second
+   * gate: `specs instructions implement` never reads this file for the
+   * decision, only the change's own `.change.yaml` - so flipping this later
+   * can never retroactively enable parallel dispatch on a change that
+   * already exists.
+   */
+  defaultParallel: z.boolean().optional(),
 });
 
 export type WorkspaceConfig = z.infer<typeof WorkspaceConfigSchema>;
@@ -65,5 +74,6 @@ export function renderConfig(config: WorkspaceConfig): string {
   if (config.context !== undefined) document.context = config.context;
   if (config.rules !== undefined) document.rules = config.rules;
   if (config.harnesses !== undefined) document.harnesses = config.harnesses;
+  if (config.defaultParallel !== undefined) document.defaultParallel = config.defaultParallel;
   return stringifyYaml(document);
 }

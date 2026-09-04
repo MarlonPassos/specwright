@@ -1,8 +1,9 @@
-import { buildDashboard, type DashboardData, type DashboardOptions } from './dashboard.js';
+import { buildDashboard, type DashboardArtifact, type DashboardData, type DashboardOptions } from './dashboard.js';
 import { listPlanIds } from './project/paths.js';
 import { computeProjectStatus, type PlanStatus } from './project/status.js';
-import { recommendNext } from './project/next.js';
+import { recommendNext, startCommands } from './project/next.js';
 import { invocationFor } from './harness/registry.js';
+import type { TaskSummary } from './change/status.js';
 import type { Workspace } from './workspace.js';
 
 /** One piece of work in flight, seen from both layers at once. */
@@ -11,9 +12,15 @@ export interface OverviewFocus {
   change?: {
     id: string;
     phase: string;
-    tasks?: { total: number; completed: number };
+    /** Same shape `specs status`/CHANGES already show - each artifact's state, doc-openable when done. */
+    artifacts: DashboardArtifact[];
+    /** Artifact ids still missing before implementation can start. */
+    blockedBy: string[];
+    tasks?: TaskSummary;
     /** The command that moves it forward, spelled for the running harness. */
     next: string;
+    /** Set only when the change could not be read at all. */
+    error?: string;
   };
   /** The increment linked to it, when the plan carries one. */
   increment?: {
@@ -25,6 +32,10 @@ export interface OverviewFocus {
     /** Materialization state of the brief, when there is one. */
     brief: string | null;
   };
+  /** Harness commands that move this one piece of work forward right now. */
+  harnessCommands: string[];
+  /** The same, in plain `specs` CLI form. */
+  terminalCommands: string[];
 }
 
 export interface OverviewData {
@@ -223,15 +234,22 @@ async function loadPlanStatus(
 function focusFromChanges(dashboard: DashboardData): OverviewFocus[] {
   return dashboard.changes
     .filter((change) => change.phase !== 'ready-to-archive')
-    .map((change) => ({ change: changeSide(change) }));
+    .map((change) => ({
+      change: changeSide(change),
+      harnessCommands: [change.next],
+      terminalCommands: [`specs status --change ${change.id}`],
+    }));
 }
 
 function changeSide(change: DashboardData['changes'][number]): NonNullable<OverviewFocus['change']> {
   return {
     id: change.id,
     phase: change.phase,
+    artifacts: change.artifacts,
+    blockedBy: change.blockedBy,
     ...(change.tasks ? { tasks: change.tasks } : {}),
     next: change.next,
+    ...(change.error ? { error: change.error } : {}),
   };
 }
 
@@ -255,6 +273,18 @@ function joinFocus(dashboard: DashboardData, status: PlanStatus): OverviewFocus[
     if (!change && !running) continue;
     if (change) paired.add(change.id);
 
+    // Linked: the change already exists, so its own next step is the honest
+    // answer and `specs status` is what a terminal reads it back with - the
+    // same pairing PLANO uses for a linked, unarchived increment. Unlinked
+    // but running: nothing to check status ON yet, so both command sets are
+    // about creating and linking the change in the first place.
+    const terminal = change
+      ? [`specs status --change ${change.id}`]
+      : (() => {
+          const { startWith, thenLink } = startCommands(view, status);
+          return [startWith, thenLink];
+        })();
+
     focus.push({
       ...(change ? { change: changeSide(change) } : {}),
       increment: {
@@ -265,12 +295,18 @@ function joinFocus(dashboard: DashboardData, status: PlanStatus): OverviewFocus[
         unlocks: view.unlocks,
         brief: view.plannedChange ? view.plannedChange.state : null,
       },
+      harnessCommands: change ? [change.next] : harnessStepsFor(view.id, dashboard, status),
+      terminalCommands: terminal,
     });
   }
 
   for (const change of inFlight) {
     if (paired.has(change.id)) continue;
-    focus.push({ change: changeSide(change) });
+    focus.push({
+      change: changeSide(change),
+      harnessCommands: [change.next],
+      terminalCommands: [`specs status --change ${change.id}`],
+    });
   }
 
   return focus;

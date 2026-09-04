@@ -79,9 +79,15 @@ async function projections(workspace: Workspace, planId: string | undefined) {
       const id = planId ?? (ids.length === 1 ? ids[0] : undefined);
       if (id === undefined) return { plan: null, message: 'Vários planos: informe qual.', plans: ids };
       const status = await computeProjectStatus(workspace, id);
+      const next = recommendNext(status);
       return dashboardEnvelope({
         ...statusPayload(status),
-        recommended: recommendNext(status).recommended,
+        recommended: next.recommended,
+        // `parallelReady` is every eligible increment, not just the
+        // recommended one - the panel marks each ready row that has company,
+        // not only the single pick `recommended` carries.
+        parallelReady: next.parallelReady,
+        parallelCaveat: next.parallelCaveat,
       });
     },
     /**

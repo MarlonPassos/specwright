@@ -83,6 +83,15 @@ async function busyPlan(): Promise<Workspace> {
   return workspace;
 }
 
+/** Two increments, neither depending on the other, both ready to start. */
+async function twoIndependentReady(): Promise<Workspace> {
+  const workspace = await makePlanWorkspace();
+  const a = await withBrief(workspace, 'demo', change({ id: 'CH-001', slug: 'a', title: 'A' }));
+  const b = await withBrief(workspace, 'demo', change({ id: 'CH-002', slug: 'b', title: 'B' }));
+  await seedPlan(workspace, manifest({ id: 'demo', name: 'Plano', status: 'active', changes: [a, b] }));
+  return workspace;
+}
+
 describe('renderProjectDashboard — estrutura visual', () => {
   it('desenha as mesmas seções ruladas que o painel de status', async () => {
     const out = await render(await busyPlan());
@@ -120,6 +129,18 @@ describe('renderProjectDashboard — estrutura visual', () => {
     const out = (await render(await busyPlan())).replace(ANSI, '');
     expect(out).toMatch(/1\/2\s+50%/); // a checklist do CH-002
     expect(out).toMatch(/[#.]{12} 1\/5/); // incrementos concluídos no resumo
+  });
+
+  it('marca cada pronta com as outras com que pode rodar junto, e o aviso uma única vez', async () => {
+    const out = (await render(await twoIndependentReady())).replace(ANSI, '');
+    expect(out).toContain('paralelizável com CH-002');
+    expect(out).toContain('paralelizável com CH-001');
+    expect(out).toContain('conflito de código');
+  });
+
+  it('não marca nada quando só existe uma pronta', async () => {
+    const out = (await render(await busyPlan())).replace(ANSI, '');
+    expect(out).not.toContain('paralelizável');
   });
 
   it('traduz os códigos de razão para português no próximo passo', async () => {

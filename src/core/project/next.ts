@@ -42,7 +42,7 @@ const CAVEAT =
  * the archive first, so the increment reported `concluída` the moment it was
  * linked, and the empty change became invisible.
  */
-function startCommands(
+export function startCommands(
   view: ProjectChangeView,
   status: PlanStatus
 ): { startWith: string; thenLink: string } {

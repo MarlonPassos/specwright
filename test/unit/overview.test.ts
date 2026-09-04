@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { buildOverview } from '../../src/core/overview.js';
 import { renderOverview } from '../../src/cli/overview-view.js';
 import { makePlanWorkspace, seedPlan, manifest, change, withBrief } from '../helpers/plan.js';
-import { seedChange } from '../helpers/workspace.js';
+import { seedChange, writeFile } from '../helpers/workspace.js';
 
 const PLAIN = { color: false, width: 100 };
 
@@ -97,6 +97,52 @@ describe('buildOverview', () => {
     // Meia tela quebrada é pior que meia tela: o lado que funciona continua.
     expect(data.plan).toBeUndefined();
     expect(data.changes.active).toBe(1);
+  });
+});
+
+describe('buildOverview — o que o card EM ANDAMENTO precisa para não mandar o leitor pra outra tela', () => {
+  it('uma change vinculada carrega seus artefatos, o que falta, e os dois idiomas de comando', async () => {
+    const workspace = await makePlanWorkspace();
+    const dir = await seedChange(workspace, 'fund-refactor', {
+      tasks: '## 1\n- [x] 1.1 feito\n- [ ] 1.2 falta\n',
+    });
+    await fs.rm(path.join(dir, 'design.md'));
+    await seedPlan(
+      workspace,
+      manifest({
+        id: 'demo',
+        changes: [
+          change({ id: 'CH-019', slug: 'fund-refactor', title: 'Refactorings', link: linked('fund-refactor') }),
+        ],
+      })
+    );
+
+    const data = await buildOverview(workspace);
+    const entry = data.focus[0];
+
+    expect(entry.change!.artifacts.map((a) => a.id).sort()).toEqual(['design', 'proposal', 'specs', 'tasks']);
+    // design.md foi removido, mas a dependência dele (proposal) está feita,
+    // então o estado é "pronto pra escrever", não "bloqueado".
+    expect(entry.change!.artifacts.find((a) => a.id === 'design')!.state).toBe('ready');
+    expect(entry.change!.blockedBy).toEqual(['design']);
+    expect(entry.change!.tasks).toMatchObject({ total: 2, completed: 1 });
+    // TaskSummary inteiro, não só os totais - é o que alimenta a prévia de
+    // tarefas abertas no card, exatamente como CHANGES já mostra.
+    expect(entry.change!.tasks!.open).toEqual([{ number: '1.2', text: 'falta', group: '1' }]);
+    expect(entry.harnessCommands).toEqual([entry.change!.next]);
+    expect(entry.terminalCommands).toEqual(['specs status --change fund-refactor']);
+  });
+
+  it('uma change sem incremento no plano ainda carrega artefatos e os dois comandos', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedChange(workspace, 'orfa');
+
+    const data = await buildOverview(workspace);
+    const entry = data.focus.find((e) => e.change?.id === 'orfa')!;
+
+    expect(entry.change!.artifacts.length).toBeGreaterThan(0);
+    expect(entry.harnessCommands).toEqual([entry.change!.next]);
+    expect(entry.terminalCommands).toEqual(['specs status --change orfa']);
   });
 });
 

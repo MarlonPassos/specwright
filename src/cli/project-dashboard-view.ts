@@ -163,11 +163,6 @@ export function renderProjectDashboard(
     }
     lines.push('   ' + theme.arrow + ' ' + theme.cyan + pick.startWith + theme.off);
     lines.push('   ' + theme.arrow + ' ' + theme.cyan + pick.thenLink + theme.off);
-    if (next.parallelReady.length > 1) {
-      lines.push(
-        '   ' + theme.arrow + ' em paralelo: ' + next.parallelReady.filter((id) => id !== pick.id).join(', ')
-      );
-    }
   } else if (counts.total > 0 && counts.archived === counts.total) {
     lines.push(
       ' ' + theme.green + theme.mark.done + theme.off + ' Todos os incrementos foram concluídos.'
@@ -197,6 +192,12 @@ export function renderProjectDashboard(
   }
 
   // INCREMENTOS, grouped
+  // Only a `pronta` increment is a real "start it now" candidate - an id in
+  // `next.parallelReady` that is already claimed and in progress belongs in
+  // the set for scheduling purposes, but is not something to invite the
+  // reader to start alongside another.
+  const readyIds = new Set(status.changes.filter((change) => change.presentation === 'pronta').map((change) => change.id));
+
   const placed = new Set<string>();
   for (const section of SECTIONS) {
     const members = status.changes.filter(
@@ -207,6 +208,9 @@ export function renderProjectDashboard(
     const accent = section.accent(theme);
 
     rule(section.title);
+    if (section.title === 'PRONTAS PARA COMEÇAR' && readyIds.size > 1) {
+      lines.push('   ' + theme.off + next.parallelCaveat);
+    }
     lines.push(
       '   ' + pad('ID', ID_WIDTH) + pad('INCREMENTO', nameWidth) + '  ' + pad('BRIEF', BRIEF_WIDTH) +
         '  PROGRESSO'
@@ -229,6 +233,19 @@ export function renderProjectDashboard(
       }
       if (change.unlocks.length > 0 && change.execution !== 'archived') {
         lines.push('   ' + theme.arrow + ' desbloqueia ' + change.unlocks.join(', '));
+      }
+      // Marked on the row itself, not only once under PRÓXIMO PASSO: a reader
+      // scanning this section needs to know WITH WHICH other startable
+      // increments this one has no declared dependency. `others` is
+      // intersected with `readyIds` - `next.parallelReady` also includes an
+      // increment already claimed and in progress (readiness tracks the
+      // dependency graph, not execution), and naming THAT one here would read
+      // as an invitation to start it again.
+      if (change.presentation === 'pronta' && next.parallelReady.includes(change.id)) {
+        const others = next.parallelReady.filter((id) => id !== change.id && readyIds.has(id));
+        if (others.length > 0) {
+          lines.push('   ' + theme.cyan + theme.arrow + theme.off + ' paralelizável com ' + others.join(', '));
+        }
       }
     }
   }

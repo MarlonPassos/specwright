@@ -56,6 +56,10 @@ export async function createChange(
 
   const config = await loadConfig(workspace);
   const schema = await loadSchema(options.schema ?? config.schema, workspace);
+  // An explicit --parallel/--no-parallel always wins; absent, the workspace's
+  // own default (if any) decides. Either way the resolved value is what gets
+  // written - never re-derived later from config.yaml.
+  const parallel = options.parallel ?? config.defaultParallel;
 
   await ensureDir(dir);
   await writeChangeMetadata(dir, {
@@ -63,7 +67,7 @@ export async function createChange(
     created: localDateStamp(),
     ...(options.goal ? { goal: options.goal } : {}),
     ...(options.skipSpecs ? { skip_specs: true } : {}),
-    ...(options.parallel ? { parallel: true } : {}),
+    ...(parallel ? { parallel: true } : {}),
   });
 
   return {
