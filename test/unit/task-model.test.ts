@@ -38,6 +38,13 @@ describe('markTaskDone', () => {
     expect(content).toBe('- [x] 1.1 Faz X `files: a.ts` — nota\n- [ ] 1.2 Faz Y\n');
   });
 
+  it('touches only the first of two duplicate-numbered lines - specs validate only warns about the duplicate, it never blocks it', async () => {
+    const dir = await tasksFile('- [ ] 1.1 Faz X\n- [ ] 1.1 Faz Y (duplicata)\n');
+    await markTaskDone(dir, '1.1');
+    const content = await fs.readFile(path.join(dir, 'tasks.md'), 'utf8');
+    expect(content).toBe('- [x] 1.1 Faz X\n- [ ] 1.1 Faz Y (duplicata)\n');
+  });
+
   it('is idempotent on an already-done task', async () => {
     const dir = await tasksFile('- [x] 1.1 Faz X\n');
     const before = await fs.readFile(path.join(dir, 'tasks.md'), 'utf8');

@@ -163,11 +163,18 @@ export async function markTaskDone(dir: string, number: string): Promise<{ chang
   const lines = raw.replace(/\r\n?/g, '\n').split('\n');
   let found = false;
   let changed = false;
+  // `specs validate` only warns about a duplicated task number - it never
+  // blocks. If two lines share one, only the first is ever touched here, so
+  // this never silently flips a second, unrelated task along with the one
+  // that was actually asked for.
+  let handled = false;
 
   const updated = lines.map((line) => {
+    if (handled) return line;
     const match = TASK_LINE.exec(line);
     if (!match || (match[2] ?? '') !== number) return line;
     found = true;
+    handled = true;
     if (match[1].toLowerCase() === 'x') return line;
     changed = true;
     const [start, end] = match.indices![1]!;

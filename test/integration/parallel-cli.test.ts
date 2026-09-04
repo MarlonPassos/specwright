@@ -67,4 +67,33 @@ describe('specs tasks / specs worktree — end to end through the built CLI', ()
     expect(complete.code).toBe(1);
     expect(parseJson<{ error: { code: string } }>(complete.stdout).error.code).toBe('task_not_found');
   });
+
+  it('refuses `specs tasks ready` and `specs tasks complete` when cwd is inside a linked worktree', async () => {
+    const workspace = await makeGitWorkspace();
+    await seedChange(workspace, 'demo', {
+      tasks: '- [ ] 1.1 Faz X `files: src/x.ts`\n- [ ] 1.2 Faz Y `files: src/y.ts`\n',
+    });
+    await commitAll(workspace.projectRoot, 'seed demo');
+
+    const create = await runCli(
+      ['worktree', 'create', '--change', 'demo', '--task', '1.1', '--json'],
+      workspace.projectRoot
+    );
+    const created = parseJson<{ path: string }>(create.stdout);
+
+    const readyFromWorktree = await runCli(['tasks', 'ready', '--change', 'demo', '--json'], created.path);
+    expect(readyFromWorktree.code).toBe(1);
+    expect(parseJson<{ error: { code: string } }>(readyFromWorktree.stdout).error.code).toBe(
+      'must_run_from_main_worktree'
+    );
+
+    const completeFromWorktree = await runCli(
+      ['tasks', 'complete', '--change', 'demo', '--task', '1.2', '--json'],
+      created.path
+    );
+    expect(completeFromWorktree.code).toBe(1);
+    expect(parseJson<{ error: { code: string } }>(completeFromWorktree.stdout).error.code).toBe(
+      'must_run_from_main_worktree'
+    );
+  });
 });

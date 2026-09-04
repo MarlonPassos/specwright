@@ -106,6 +106,78 @@ describe('createWorktree / finishWorktree — happy path', () => {
 
     await expect(finishWorktree(workspace, 'demo', '1.1')).rejects.toMatchObject({ code: 'main_tree_dirty' });
   });
+
+  it('reports a real commit failure instead of silently treating it as "nothing to do"', async () => {
+    const workspace = await makeGitWorkspace();
+    await seedGitChange(workspace, 'demo', '- [ ] 1.1 Faz X `files: a.ts`\n');
+    const created = await createWorktree(workspace, 'demo', '1.1');
+    await writeFile(path.join(created.path, 'a.ts'), 'work');
+    await git(['add', '-A'], created.path);
+    await git(['commit', '-q', '-m', 'work'], created.path);
+
+    // pre-commit does not gate a clean merge commit (only pre-merge-commit
+    // does), so the merge itself still succeeds - only the follow-up
+    // "mark task done" commit this hook is meant to simulate a real failure
+    // of is affected. `core.hooksPath` is forced back to the repo's own
+    // `.git/hooks` because a machine-wide override (a global gitconfig
+    // pointing hooks elsewhere) would otherwise make this hook a no-op.
+    await git(['config', 'core.hooksPath', '.git/hooks'], workspace.projectRoot);
+    const hookPath = path.join(workspace.projectRoot, '.git', 'hooks', 'pre-commit');
+    await writeFile(hookPath, '#!/bin/sh\nexit 1\n');
+    await fs.chmod(hookPath, 0o755);
+
+    await expect(finishWorktree(workspace, 'demo', '1.1')).rejects.toMatchObject({
+      code: 'task_completion_commit_failed',
+    });
+  });
+});
+
+describe('createWorktree — input validation', () => {
+  it('refuses a change that does not exist', async () => {
+    const workspace = await makeGitWorkspace();
+    await expect(createWorktree(workspace, 'ghost', '1.1')).rejects.toMatchObject({ code: 'change_not_found' });
+  });
+
+  it('refuses a task number tasks.md never declared', async () => {
+    const workspace = await makeGitWorkspace();
+    await seedGitChange(workspace, 'demo', '- [ ] 1.1 Faz X `files: a.ts`\n');
+    await expect(createWorktree(workspace, 'demo', '9.9')).rejects.toMatchObject({ code: 'task_not_found' });
+  });
+
+  it('refuses a change id that attempts path traversal', async () => {
+    const workspace = await makeGitWorkspace();
+    await expect(createWorktree(workspace, '../../etc', '1.1')).rejects.toMatchObject({
+      code: 'invalid_change_name',
+    });
+  });
+
+  it('refuses a task number that attempts path traversal', async () => {
+    const workspace = await makeGitWorkspace();
+    await seedGitChange(workspace, 'demo', '- [ ] 1.1 Faz X `files: a.ts`\n');
+    await expect(createWorktree(workspace, 'demo', '../../etc/passwd')).rejects.toMatchObject({
+      code: 'invalid_task_number',
+    });
+  });
+
+  it('reports a corrupted registry file with a structured, recoverable error', async () => {
+    const workspace = await makeGitWorkspace();
+    await seedGitChange(workspace, 'demo', '- [ ] 1.1 Faz X `files: a.ts`\n');
+    await createWorktree(workspace, 'demo', '1.1');
+
+    const registryFile = path.join(
+      workspace.projectRoot,
+      '.specwright',
+      'parallel',
+      'demo',
+      'worktrees',
+      '1.1.json'
+    );
+    await fs.writeFile(registryFile, '{not valid json');
+
+    await expect(createWorktree(workspace, 'demo', '1.1')).rejects.toMatchObject({
+      code: 'worktree_registry_corrupt',
+    });
+  });
 });
 
 describe('merge conflict and resume', () => {

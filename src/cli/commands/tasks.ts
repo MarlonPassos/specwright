@@ -4,6 +4,7 @@ import { requireWorkspace } from '../../core/workspace.js';
 import { resolveChangeContext, resolveChangeId } from '../../core/change/status.js';
 import { markTaskDone, readTaskProgress } from '../../core/change/model.js';
 import { DEFAULT_BATCH_LIMIT, TaskGraph, type TaskNode } from '../../core/change/taskGraph.js';
+import { assertMainWorktree } from '../../core/change/worktree.js';
 import { fail, printJson, printLines } from '../output.js';
 
 interface TasksReadyOptions {
@@ -45,6 +46,7 @@ export function registerTaskCommands(program: Command): void {
     .action(async (options: TasksReadyOptions) => {
       try {
         const workspace = await requireWorkspace();
+        await assertMainWorktree(workspace.projectRoot);
         const changeId = await resolveChangeId(workspace, options.change);
         const context = await resolveChangeContext(workspace, changeId);
         const limit = parseLimit(options.limit);
@@ -100,6 +102,7 @@ export function registerTaskCommands(program: Command): void {
     .action(async (options: TasksCompleteOptions) => {
       try {
         const workspace = await requireWorkspace();
+        await assertMainWorktree(workspace.projectRoot);
         const changeId = await resolveChangeId(workspace, options.change);
         const context = await resolveChangeContext(workspace, changeId);
 

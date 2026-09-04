@@ -2,9 +2,10 @@ import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { SpecError } from '../../util/errors.js';
-import { ensureDir, pathExists, readFileIfExists, writeFileAtomic } from '../../util/fs.js';
+import { ensureDir, isDirectory, pathExists, readFileIfExists, writeFileAtomic } from '../../util/fs.js';
 import { changeDir, type Workspace } from '../workspace.js';
 import { markTaskDone, readTaskProgress, TASKS_FILE } from './model.js';
+import { SLUG_PATTERN } from './create.js';
 
 export type WorktreeStatus = 'active' | 'merging' | 'merge_conflict' | 'cleanup_pending';
 
@@ -77,6 +78,51 @@ function worktreePath(projectRoot: string, changeId: string, task: string): stri
 
 function branchName(changeId: string, task: string): string {
   return `specwright/${changeId}/${task}`;
+}
+
+const TASK_NUMBER_PATTERN = /^[0-9]+(\.[0-9]+)*$/;
+
+/**
+ * Both `changeId` and `task` end up interpolated straight into filesystem
+ * paths (`worktreePath`, `registryPath`, ...) and into a git branch name.
+ * Rejecting anything but the shapes those values are already constrained to
+ * elsewhere - `changeId` to the same kebab-case a change id has always had to
+ * be, `task` to the digits-and-dots a task number is parsed as - closes off
+ * path traversal through a `--change`/`--task` flag before any path is ever
+ * built from them.
+ */
+function assertSafeChangeId(changeId: string): void {
+  if (!SLUG_PATTERN.test(changeId)) {
+    throw new SpecError(`"${changeId}" não é um nome de change válido`, { code: 'invalid_change_name' });
+  }
+}
+
+function assertSafeTaskNumber(task: string): void {
+  if (!TASK_NUMBER_PATTERN.test(task)) {
+    throw new SpecError(`"${task}" não é um número de tarefa válido`, { code: 'invalid_task_number' });
+  }
+}
+
+function assertSafeIdentifiers(changeId: string, task: string): void {
+  assertSafeChangeId(changeId);
+  assertSafeTaskNumber(task);
+}
+
+/** Resolves the change directory, refusing a change that does not exist. */
+async function assertChangeExists(workspace: Workspace, changeId: string): Promise<string> {
+  const dir = changeDir(workspace, changeId);
+  if (!(await isDirectory(dir))) {
+    throw new SpecError(`A change "${changeId}" não existe`, { code: 'change_not_found', fix: 'specs list' });
+  }
+  return dir;
+}
+
+/** Resolves the change directory and refuses a task number tasks.md never declared. */
+async function assertTaskExists(changeDirPath: string, task: string): Promise<void> {
+  const progress = await readTaskProgress(changeDirPath);
+  if (!progress || !progress.tasks.some((entry) => entry.number === task)) {
+    throw new SpecError(`Tarefa "${task}" não existe em tasks.md`, { code: 'task_not_found' });
+  }
 }
 
 // --- git plumbing ----------------------------------------------------------
@@ -199,9 +245,17 @@ async function ensureExcluded(gitCommonDir: string): Promise<void> {
 // --- registry --------------------------------------------------------------
 
 async function readRegistry(projectRoot: string, changeId: string, task: string): Promise<WorktreeEntry | undefined> {
-  const raw = await readFileIfExists(registryPath(projectRoot, changeId, task));
+  const target = registryPath(projectRoot, changeId, task);
+  const raw = await readFileIfExists(target);
   if (raw === undefined) return undefined;
-  return JSON.parse(raw) as WorktreeEntry;
+  try {
+    return JSON.parse(raw) as WorktreeEntry;
+  } catch {
+    throw new SpecError(`Registro de worktree corrompido para a tarefa "${task}"`, {
+      code: 'worktree_registry_corrupt',
+      fix: `Inspecione e, se necessário, remova ${target} manualmente`,
+    });
+  }
 }
 
 async function writeRegistry(projectRoot: string, changeId: string, entry: WorktreeEntry): Promise<void> {
@@ -231,14 +285,45 @@ async function listRegisteredTasks(projectRoot: string, changeId: string): Promi
  * right away, so the main tree is never left dirty between one task's finish
  * and the next one's preflight check - `markTaskDone` alone only touches the
  * working copy. Idempotent: if a previous attempt already committed this
- * (crash recovery re-running the same step), `git commit` finds nothing
- * staged and fails harmlessly, which this ignores by design.
+ * (crash recovery re-running the same step), `git add`/`git commit` find
+ * nothing to stage and fail harmlessly - but that is only distinguishable
+ * from a real failure (permissions, disk full, a rejecting hook) by checking
+ * afterwards that the file is actually clean, which this does rather than
+ * trusting the commands' own exit codes for what "nothing to do" looks like.
  */
 async function commitTaskCompletion(projectRoot: string, changeDirPath: string, task: string): Promise<void> {
   await markTaskDone(changeDirPath, task);
   const relativeTasksFile = path.relative(projectRoot, path.join(changeDirPath, TASKS_FILE));
   await runGit(['add', relativeTasksFile], projectRoot);
   await runGit(['commit', '-q', '-m', `specwright: marca a tarefa ${task} concluída`], projectRoot);
+
+  const stillDirty = await runGit(['status', '--porcelain', '--', relativeTasksFile], projectRoot);
+  if (stillDirty.stdout.trim().length > 0) {
+    throw new SpecError(`Não foi possível commitar a conclusão da tarefa "${task}" em ${TASKS_FILE}`, {
+      code: 'task_completion_commit_failed',
+    });
+  }
+}
+
+/**
+ * Attempts to remove the worktree directory and delete its branch, then
+ * confirms both are actually gone rather than trusting the two commands'
+ * exit codes - `git worktree remove`/`git branch -d` can fail for reasons
+ * that have nothing to do with an already-clean state (a locked file, a
+ * branch git considers not-fully-merged from its own point of view). The
+ * registry entry is the only record that a worktree/branch pair is still
+ * owed a cleanup; deleting it before removal is confirmed would strand that
+ * pair with nothing left to retry it.
+ */
+async function removeWorktreeAndBranch(projectRoot: string, entryPath: string, branch: string): Promise<boolean> {
+  await runGit(['worktree', 'remove', entryPath], projectRoot);
+  await runGit(['branch', '-d', branch], projectRoot);
+
+  const worktrees = await listGitWorktrees(projectRoot);
+  const worktreeGone = !worktrees.some((entry) => path.resolve(entry.path) === path.resolve(entryPath));
+  const branchList = await runGit(['branch', '--list', branch], projectRoot);
+  const branchGone = branchList.stdout.trim().length === 0;
+  return worktreeGone && branchGone;
 }
 
 /**
@@ -275,8 +360,8 @@ async function reconcile(
   }
 
   if (entry.status === 'cleanup_pending') {
-    await runGit(['worktree', 'remove', entry.path], projectRoot);
-    await runGit(['branch', '-d', entry.branch], projectRoot);
+    const cleaned = await removeWorktreeAndBranch(projectRoot, entry.path, entry.branch);
+    if (!cleaned) return entry; // retried by the next call into reconcile
     await deleteRegistry(projectRoot, changeId, task);
     return undefined;
   }
@@ -339,7 +424,9 @@ export async function createWorktree(
 ): Promise<{ task: string; branch: string; path: string }> {
   const projectRoot = workspace.projectRoot;
   await assertMainWorktree(projectRoot);
-  const changeDirPath = changeDir(workspace, changeId);
+  assertSafeIdentifiers(changeId, task);
+  const changeDirPath = await assertChangeExists(workspace, changeId);
+  await assertTaskExists(changeDirPath, task);
 
   const gitCommonDir = await resolveGitCommonDir(projectRoot);
   await ensureExcluded(gitCommonDir);
@@ -416,18 +503,21 @@ async function finalizeAfterMerge(
     mergeCommitSha: head.ok ? head.stdout.trim() : entry.mergeCommitSha,
   });
 
-  await runGit(['worktree', 'remove', entry.path], projectRoot);
-  await runGit(['branch', '-d', entry.branch], projectRoot);
-  await deleteRegistry(projectRoot, changeId, entry.task);
+  // The merge and the task-done commit are already durable at this point -
+  // whether the worktree/branch removal below succeeds right now or has to
+  // be retried later by `reconcile`, the task itself is correctly done.
+  const removed = await removeWorktreeAndBranch(projectRoot, entry.path, entry.branch);
+  if (removed) await deleteRegistry(projectRoot, changeId, entry.task);
 
   const progress = await readTaskProgress(changeDirPath);
-  return { merged: true, removed: true, remaining: progress ? progress.total - progress.completed : 0 };
+  return { merged: true, removed, remaining: progress ? progress.total - progress.completed : 0 };
 }
 
 export async function finishWorktree(workspace: Workspace, changeId: string, task: string): Promise<FinishResult> {
   const projectRoot = workspace.projectRoot;
   await assertMainWorktree(projectRoot);
-  const changeDirPath = changeDir(workspace, changeId);
+  assertSafeIdentifiers(changeId, task);
+  const changeDirPath = await assertChangeExists(workspace, changeId);
 
   return withParallelLock(projectRoot, changeId, async () => {
     const entry = await reconcile(projectRoot, changeDirPath, changeId, task);
@@ -471,6 +561,18 @@ export async function finishWorktree(workspace: Workspace, changeId: string, tas
 
     const merge = await runGit(['merge', '--no-ff', '-m', `merge ${entry.branch}`, entry.branch], projectRoot);
     if (!merge.ok) {
+      // A real content conflict is the one failure mode of `git merge` that
+      // leaves MERGE_HEAD behind - everything else (an unknown ref, a
+      // rejecting hook, a misconfigured merge driver) fails before starting
+      // one. Folding both into "merge_conflict" would tell the operator to
+      // go resolve a conflict that was never actually opened.
+      const conflicted = await pathExists(path.join(gitCommonDir, 'MERGE_HEAD'));
+      if (!conflicted) {
+        await writeRegistry(projectRoot, changeId, { ...entry, status: 'active' });
+        throw new SpecError(`"git merge" falhou sem conflito de conteúdo: ${merge.stderr.trim()}`, {
+          code: 'merge_failed',
+        });
+      }
       await runGit(['merge', '--abort'], projectRoot);
       await writeRegistry(projectRoot, changeId, { ...entry, status: 'merge_conflict' });
       return { merged: false, conflict: true, path: entry.path, branch: entry.branch };
@@ -483,7 +585,8 @@ export async function finishWorktree(workspace: Workspace, changeId: string, tas
 export async function resumeWorktree(workspace: Workspace, changeId: string, task: string): Promise<FinishResult> {
   const projectRoot = workspace.projectRoot;
   await assertMainWorktree(projectRoot);
-  const changeDirPath = changeDir(workspace, changeId);
+  assertSafeIdentifiers(changeId, task);
+  const changeDirPath = await assertChangeExists(workspace, changeId);
 
   return withParallelLock(projectRoot, changeId, async () => {
     // Deliberately not `reconcile`: a merge_conflict entry never self-heals -
@@ -513,7 +616,8 @@ export async function resumeWorktree(workspace: Workspace, changeId: string, tas
 export async function listWorktrees(workspace: Workspace, changeId: string): Promise<WorktreeListResult> {
   const projectRoot = workspace.projectRoot;
   await assertMainWorktree(projectRoot);
-  const changeDirPath = changeDir(workspace, changeId);
+  assertSafeChangeId(changeId);
+  const changeDirPath = await assertChangeExists(workspace, changeId);
 
   const tasks = await listRegisteredTasks(projectRoot, changeId);
   const gitWorktrees = await listGitWorktrees(projectRoot);
@@ -551,7 +655,9 @@ export async function cleanupWorktree(
 ): Promise<CleanupResult> {
   const projectRoot = workspace.projectRoot;
   await assertMainWorktree(projectRoot);
-  const changeDirPath = changeDir(workspace, changeId);
+  assertSafeChangeId(changeId);
+  if (options.task) assertSafeTaskNumber(options.task);
+  const changeDirPath = await assertChangeExists(workspace, changeId);
 
   return withParallelLock(projectRoot, changeId, async () => {
     const tasks = options.task ? [options.task] : await listRegisteredTasks(projectRoot, changeId);
