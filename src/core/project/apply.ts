@@ -36,7 +36,7 @@ export interface ApplyResult {
   validation: { valid: boolean; errors: number; warnings: number };
   /** Completed increments this mutation reaches (FR-40). Reported by `--dry-run` too. */
   completedTouched: string[];
-  diagnostics: Array<{ level: string; code: string; message: string }>;
+  diagnostics: Array<{ level: string; code: string; message: string; fix?: string }>;
 }
 
 export async function applyPlanBundle(
@@ -140,7 +140,7 @@ export async function applyPlanBundle(
   ];
   const removed = result.briefRenames.map((rename) => `${planRel}/${rename.from}`);
 
-  const diagnostics = result.completedTouched.map((id) => ({
+  const diagnostics: ApplyResult['diagnostics'] = result.completedTouched.map((id) => ({
     level: 'WARNING',
     code: 'completed_change_protected',
     message:
@@ -247,6 +247,7 @@ export async function applyPlanBundle(
       level: 'WARNING',
       code: 'planned_change_invalid',
       message: `${changeId} já tinha um Planned Change inválido antes desta mutação: ${messages.join('; ')}`,
+      fix: `preencha Escopo e Critérios macro de ${changeId} com um bundle replacePlannedChange (specs project apply --dry-run --json), ou edite planned-changes/ à mão`,
     });
   }
 

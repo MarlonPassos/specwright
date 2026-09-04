@@ -33,6 +33,20 @@ ${PROJECT_BOUNDARY}
 Se vier \`planned_change_modified\`, mostre \`recordedContentHash\` e
 \`currentContentHash\`, explique o conflito e PARE. Não use \`--force\` sem o usuário pedir.
 
+**O campo \`skeletons\` do dry-run**: todo id ali listado nasce com Escopo e
+Critérios macro vazios de propósito (§7.5) — \`generate\` nunca inventa prosa,
+só formaliza o que o plano já tem. Isso é esperado para um incremento distante
+(guardrail 2) e não é um erro a corrigir agora. Mas para um incremento que o
+usuário pretende encarar em seguida, \`generate\` sozinho não basta: mostre o
+\`skeletons\` ANTES do sim do passo 4 e pergunte se o conteúdo (Escopo,
+Critérios macro) já existe para escrever agora, via \`op: "replacePlannedChange"\`
+no mesmo \`specs project bundle-schema --json\` — nesse caso monte esse bundle
+em vez de rodar \`generate\` vazio. Sem conteúdo ainda, siga com \`generate\` e
+avise que o incremento ficará \`inconsistente\`/bloqueado até alguém preencher
+essas seções. \`specs project validate\` depois de gerar um esqueleto vai mesmo
+acusar ERROR ali; isso não é um novo problema para investigar, é o mesmo aviso
+do dry-run confirmado no disco.
+
 Depois de materializar, aponte ${commandRef('project-next')} para escolher o
 próximo incremento.
 

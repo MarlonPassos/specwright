@@ -306,7 +306,11 @@ export async function computeProjectStatus(
       code: 'planned_change_invalid',
       path: `changes.${id2}.planned_change`,
       message: `o Planned Change de ${id2} não é válido: ${messages.join('; ')}`,
-      fix: 'specs project validate --json',
+      // `specs project validate --json` only re-reports the same gap - it never
+      // fills it. `generate`'s bare §7.5 skeleton is exactly this shape (empty
+      // Escopo/Critérios macro), so the actual fix is supplying that content,
+      // via a bundle or by hand, not re-running the command that found it.
+      fix: `preencha Escopo e Critérios macro de ${id2} com um bundle replacePlannedChange (specs project apply --dry-run --json), ou edite planned-changes/ à mão`,
     });
   }
 
