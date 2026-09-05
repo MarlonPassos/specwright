@@ -48,6 +48,24 @@ ${RESOLVE_CHANGE}
    - requisitos sem implementação -> a change não está pronta;
    - requisitos REMOVED cujo comportamento ainda existe -> a remoção está incompleta.
 
+5. **Grave o veredito**
+
+   Escreva \`verification.md\` no diretório da change, no formato do template
+   (\`specs instructions verify --change "<change>" --json\` traz o modelo):
+
+   - \`data:\` com o momento em que você rodou;
+   - **Comandos**: todo comando que você rodou e o resultado exato. Um resultado que diz
+     \`skipped\`, \`no tests ran\` ou \`0 selected\` para o alvo declarado é um achado, não
+     uma linha de sucesso;
+   - **Requirement → prova**: um requisito por linha, com o que prova cada um. O que você
+     não conseguir amarrar a nada entra como NÃO VERIFICADO - não presuma;
+   - **Código sem requirement**: comportamento que existe e nenhuma spec descreve;
+   - **Achados em aberto**: um por linha, ou \`nenhum\`. A seção ausente não conta como
+     limpa; conta como pergunta não respondida.
+
+   Este arquivo é o que faz a verificação deixar rastro. Sem ele, o passo mais valioso do
+   fluxo é também o único que não prova ter acontecido, e \`archive\` não tem como saber.
+
 **Saída**
 
 Um relatório curto:
@@ -56,12 +74,15 @@ Um relatório curto:
 - por capacidade: requisitos verificados, e como;
 - cenários não verificados e desvios, cada um com o que resolveria;
 - um veredito: pronta para arquivar, ou a lista do que corrigir antes;
+- onde o \`verification.md\` foi gravado;
 - próximo passo quando estiver pronta: "Rode \`${commandRef('archive')}\` para aplicar as specs e encerrar a change."
 
 **Guardrails**
 - Reporte o que encontrar. Não corrija código em silêncio enquanto verifica - diga o que está
   errado e deixe o usuário decidir, a menos que ele tenha pedido para corrigir no caminho.
 - Nunca afrouxe um requisito para a checagem passar.
+- Nunca escreva \`nenhum\` em Achados em aberto para fechar mais rápido. O valor deste
+  arquivo é inteiramente a honestidade dele.
 - Não arquive daqui; isso é o \`${commandRef('archive')}\`.`,
   };
 }

@@ -149,12 +149,17 @@ ainda está devendo.
 
 ### `specs instructions [artifact]`
 
-Imprime as instruções de um artefato, ou das fases `implement` / `archive`. Sem um
-artefato, serve o próximo que estiver pronto.
+Imprime as instruções de um artefato, ou das fases `implement` / `verify` / `archive`.
+Sem um artefato, serve o próximo que estiver pronto.
 
 O JSON carrega `instruction`, `template`, `context`, `rules`, `outputPath`,
 `outputIsPattern`, `dependencies`, e — quando a change abriu mão — `skipped` e `warning`.
 `context` e `rules` são restrições para quem escreve, nunca conteúdo para o arquivo.
+
+A fase `verify` traz também o `template` do `verification.md` e o `verification` que já
+estiver no disco — presença, data e achados em aberto. `verify` é uma fase e não um
+artefato porque acontece **depois** da implementação, e o grafo de artefatos só modela o
+que vem antes dela.
 
 ### `specs archive [change]`
 

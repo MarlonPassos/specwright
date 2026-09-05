@@ -165,6 +165,18 @@ Confere a change contra o que ela prometeu, e reporta.
 
 Ele reporta em vez de corrigir, a menos que o usuário peça outra coisa.
 
+E deixa rastro: `verification.md` no diretório da change, com a data, os comandos rodados e
+o resultado exato de cada um, o mapa requisito → prova, o código que nenhuma spec descreve,
+e os achados em aberto. Era o único passo do ciclo que não mudava arquivo nenhum — e também
+o que teria encontrado sozinho o requisito sem teste, o comportamento sem requisito e a
+tarefa cuja evidência é um teste pulado. Um passo assim ser o mais fácil de pular, e não
+provar ter acontecido quando roda, era a lacuna.
+
+A seção **Achados em aberto** ausente não conta como limpa: conta como pergunta não
+respondida. Só um `nenhum` explícito fecha.
+
+`specs instructions verify --change <change> --json` traz a instrução e o template.
+
 ## /spec-archive
 
 Aplica a change nas specs e a encerra.
@@ -200,7 +212,7 @@ normal e não diz nada. "Nunca chegou ao git" diz.
 | continue | `specs/**/spec.md`, `design.md` (quando se justifica), `tasks.md` |
 | revise | os mesmos artefatos, revisados; nenhum arquivo novo |
 | implement | boxes marcados no `tasks.md`, e o código |
-| verify | um relatório; nenhum arquivo muda |
+| verify | `verification.md` — o veredito, com os comandos rodados e os achados em aberto |
 | archive | `spec/specs/` atualizado, a change em `spec/changes/archive/` |
 
 ## Onde o plano encosta no ciclo (opcional)

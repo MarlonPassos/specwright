@@ -6,9 +6,15 @@ import { rulesFor } from '../config.js';
 import { detectHarness } from '../harness/current.js';
 import { isMainWorktree } from './worktree.js';
 import { computeStatus, type StatusContext } from './status.js';
+import type { VerificationVerdict } from './verification.js';
+
+/** Structure for the verdict `/spec-verify` persists. Not an artifact: it is
+ * written after implementation, and the artifact graph only models what comes
+ * before it. */
+const VERIFICATION_TEMPLATE = 'verification.md';
 
 /** Instruction surfaces that are phases of the workflow, not artifacts. */
-export const RESERVED_INSTRUCTION_IDS = ['implement', 'archive'] as const;
+export const RESERVED_INSTRUCTION_IDS = ['implement', 'verify', 'archive'] as const;
 export type ReservedInstructionId = (typeof RESERVED_INSTRUCTION_IDS)[number];
 
 export interface DependencyInstruction {
@@ -65,12 +71,35 @@ export interface PhaseInstructions {
    * in cannot enter parallel mode no matter how capable the harness is.
    */
   parallelDispatch?: { supported: boolean; primitive?: string };
+  /** Present only for `verify`: the structure `verification.md` has to follow. */
+  template?: string;
+  /** Present only for `verify`: the verdict already on disk, when there is one. */
+  verification?: VerificationVerdict;
 }
 
 export type Instructions = ArtifactInstructions | PhaseInstructions;
 
 const IMPLEMENT_FALLBACK =
   'Percorra os artefatos da change e conclua as tarefas pendentes em ordem.';
+
+const VERIFY_INSTRUCTION = [
+  'Confira uma change implementada contra o que ela prometeu, e grave o veredito.',
+  '',
+  'Passos:',
+  '1. Rode `specs validate <change> --strict` — as regras estruturais.',
+  '2. Confira cada box marcado contra o código. Um box marcado sem nada por trás é um',
+  '   achado, não uma formalidade.',
+  '3. Para cada cenário dos deltas, estabeleça o que o satisfaz: um teste, um comando cuja',
+  '   saída o mostre, ou código que se possa apontar. O que não se amarrar a nada entra',
+  '   como NÃO VERIFICADO.',
+  '4. Procure desvio nos dois sentidos: comportamento que nenhuma spec descreve, e',
+  '   requisito que ninguém construiu.',
+  '5. Grave `verification.md` no diretório da change, seguindo o template devolvido aqui.',
+  '',
+  'Um resultado de comando que diz `skipped`, `no tests ran` ou `0 selected` para o alvo',
+  'declarado é um achado, nunca uma linha de sucesso. A seção "Achados em aberto" ausente',
+  'não conta como limpa: conta como pergunta não respondida.',
+].join('\n');
 
 const ARCHIVE_INSTRUCTION = [
   'Encerre uma change que já foi implementada e verificada.',
@@ -134,13 +163,23 @@ export async function buildInstructions(
       workspace: context.workspace.root,
       changeRoot: context.dir,
       instruction:
-        phase === 'archive' ? ARCHIVE_INSTRUCTION : apply?.instruction?.trim() ?? IMPLEMENT_FALLBACK,
+        phase === 'archive'
+          ? ARCHIVE_INSTRUCTION
+          : phase === 'verify'
+            ? VERIFY_INSTRUCTION
+            : (apply?.instruction?.trim() ?? IMPLEMENT_FALLBACK),
       ...(context.config.context ? { context: context.config.context.trim() } : {}),
       requires: status.applyRequires,
       blockedBy: status.applyBlockedBy,
       ...(apply?.tracks ? { tracks: apply.tracks } : {}),
       ...(status.tasks ? { tasks: status.tasks } : {}),
       ...(phase === 'implement' ? { parallelDispatch: await resolveParallelDispatch(context) } : {}),
+      ...(phase === 'verify'
+        ? {
+            template: await readTemplate(context.schema, VERIFICATION_TEMPLATE),
+            verification: status.verification,
+          }
+        : {}),
     };
   }
 

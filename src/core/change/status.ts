@@ -7,6 +7,7 @@ import { loadConfig, type WorkspaceConfig } from '../config.js';
 import { changeDir, listChanges, type Workspace } from '../workspace.js';
 import { readChangeMetadata } from './metadata.js';
 import { readTaskProgress, type TaskProgress } from './model.js';
+import { readVerification, type VerificationVerdict } from './verification.js';
 
 /**
  * The change to act on: the one the caller named, or the sole active one when
@@ -55,6 +56,12 @@ export interface ChangeStatus {
   ready: boolean;
   next: string[];
   tasks?: TaskSummary;
+  /**
+   * The verdict `/spec-verify` left behind, when it left one. Absent means the
+   * change was never verified — which is a fact worth reporting, not the same
+   * as verified-and-clean.
+   */
+  verification: VerificationVerdict;
 }
 
 /**
@@ -178,6 +185,7 @@ export async function computeStatus(context: StatusContext): Promise<ChangeStatu
   });
 
   const tasks: TaskProgress | undefined = await readTaskProgress(dir);
+  const verification = await readVerification(dir);
 
   return {
     change: context.changeId,
@@ -191,6 +199,7 @@ export async function computeStatus(context: StatusContext): Promise<ChangeStatu
     ready: applyBlockedBy.length === 0,
     next: artifacts.filter((entry) => entry.state === 'ready').map((entry) => entry.id),
     ...(tasks ? { tasks: summarizeTasks(tasks) } : {}),
+    verification,
   };
 }
 
