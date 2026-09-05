@@ -41,7 +41,12 @@ ${PROJECT_BOUNDARY}
    vai carregá-la como requisito — uma invariante que fica só no documento de
    arquitetura não é verificável por ninguém, e a que vira requisito ganha um teste que
    a defende.
-5. Mostre o resumo, as suposições que fez e as dúvidas críticas que mudam escopo.
+5. Mostre o resumo, as suposições que fez e as dúvidas críticas que mudam escopo —
+   e **escreva cada uma no brief do incremento que ela afeta**, no mesmo bundle:
+   \`Riscos\` para o que mudaria o que vai ser construído, \`Notas para exploração\`
+   para o resto. Uma suposição que só aparece nesta mensagem some quando a conversa
+   fecha; escrita no brief, ela chega a quem for propor a change, que é o último
+   momento em que perguntar ainda é barato.
 6. \`specs project bundle-schema --json\` — o contrato do bundle. Leia antes de
    montar o primeiro; não descubra o formato errando contra \`apply\`.
 7. \`specs project apply --dry-run --json\` (bundle com \`expectRevision\`). Um
