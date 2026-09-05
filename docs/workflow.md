@@ -168,6 +168,15 @@ ser aplicado interrompe o arquivamento com o workspace intacto. Depois:
 
 O diretório da change então vai para `spec/changes/archive/<data>-<nome-da-change>/`.
 
+Num repositório git, o arquivamento também confere se o git algum dia rastreou algum
+arquivo daquela change. Se nunca rastreou, a saída traz `unversioned: true`: o trabalho
+existe só naquela árvore, e um clone não o traria. É aviso, nunca bloqueio — arquivar não
+falha por estado a jusante do trabalho, e o git é a jusante.
+
+A pergunta é deliberadamente essa, e não "está tudo commitado?": o arquivamento é um
+`mv`, então o destino fica sempre não rastreado logo depois, para toda change. Isso é
+normal e não diz nada. "Nunca chegou ao git" diz.
+
 ## O que cada etapa deixa para trás
 
 | Etapa | Artefatos depois dela |

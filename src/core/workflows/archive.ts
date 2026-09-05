@@ -90,7 +90,10 @@ ${RESOLVE_CHANGE}
 - onde a change foi arquivada;
 - capacidades criadas, atualizadas e aposentadas;
 - o incremento do plano que passou a contar como concluído, quando há plano;
-- qualquer coisa que reste para fazer à mão, como um propósito placeholder a substituir.
+- qualquer coisa que reste para fazer à mão, como um propósito placeholder a substituir;
+- \`unversioned: true\`, quando vier: o git nunca rastreou nenhum arquivo desta change, e o
+  trabalho existe só nesta árvore. Diga isso ao usuário. Não commite por conta própria -
+  quando e como commitar é decisão dele.
 
 **Guardrails**
 - O arquivamento reescreve as specs do workspace. Nunca o rode numa change não implementada.

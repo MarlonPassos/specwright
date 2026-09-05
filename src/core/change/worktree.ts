@@ -139,14 +139,14 @@ async function assertTaskExists(changeDirPath: string, task: string): Promise<vo
 // (git missing, permissions) resolves as `ok: false` like any other git
 // failure, so every call site has exactly one thing to check.
 
-interface GitResult {
+export interface GitResult {
   ok: boolean;
   stdout: string;
   stderr: string;
   code: number | null;
 }
 
-function runGit(args: string[], cwd: string): Promise<GitResult> {
+export function runGit(args: string[], cwd: string): Promise<GitResult> {
   return new Promise((resolve) => {
     let child;
     try {

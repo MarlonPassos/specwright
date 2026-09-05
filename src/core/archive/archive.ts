@@ -12,6 +12,7 @@ import { adviseLink, plansLinking, soleCandidate } from '../project/advice.js';
 import { linkChange } from '../project/link.js';
 import { syncPlan } from '../project/sync.js';
 import { mergeCapability } from './merge.js';
+import { reportUnversionedWork } from './versioning.js';
 
 export interface ArchiveOptions {
   /** Skip the spec merge entirely. For changes that carry no spec deltas. */
@@ -58,6 +59,12 @@ export interface ArchiveResult {
   planAmbiguity?: ArchivePlanAmbiguity;
   /** Plans whose link block `sync` repaired on the way out. */
   planSynced?: string[];
+  /**
+   * Set when the workspace is a git repository and git never tracked a single
+   * file of this change: the work exists only in this working tree. A warning —
+   * the archive itself succeeded.
+   */
+  unversioned?: true;
 }
 
 export async function archiveChange(
@@ -183,6 +190,7 @@ export async function archiveChange(
 
   const closure = await linkArchivedToPlan(workspace, changeId, archivedAs);
   const synced = await syncArchivedLink(workspace, changeId);
+  const versioning = await reportUnversionedWork(workspace.projectRoot, dir);
 
   return {
     change: changeId,
@@ -195,6 +203,7 @@ export async function archiveChange(
     ...(closure.plan ? { plan: closure.plan } : {}),
     ...(closure.ambiguity ? { planAmbiguity: closure.ambiguity } : {}),
     ...(synced.length > 0 ? { planSynced: synced } : {}),
+    ...(versioning.neverVersioned ? { unversioned: true as const } : {}),
   };
 }
 

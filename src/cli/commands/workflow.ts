@@ -315,12 +315,23 @@ export function registerWorkflowCommands(program: Command): void {
           ...(result.plan
             ? [`  Plano "${result.plan.plan}": ${result.plan.change} vinculado e concluído.`]
             : []),
+          ...(result.planSynced
+            ? [`  Vínculo reparado no plano: ${result.planSynced.join(', ')}.`]
+            : []),
           ...(result.planAmbiguity
             ? [
                 '  Mais de um incremento planejava este slug; nada foi gravado no plano.',
                 ...result.planAmbiguity.candidates.map(
                   (candidate) => `    ${candidate.plan}: ${candidate.change} — ${candidate.fix}`
                 ),
+              ]
+            : []),
+          ...(result.unversioned
+            ? [
+                '',
+                '  AVISO: o git nunca rastreou nenhum arquivo desta change. O trabalho existe',
+                '  só nesta árvore: um clone deste repositório não o traria. Commite antes de',
+                '  considerar a entrega feita.',
               ]
             : []),
         ]);
