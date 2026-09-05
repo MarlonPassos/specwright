@@ -249,7 +249,10 @@ comando e invoque **`$spec-loop <plan-id>` no Codex**, ou **`/spec-loop <plan-id
 nos outros harnesses. Esse pedido explícito autoriza o agente a escolher a ordem,
 avaliar paralelismo, percorrer propose → implement → verify e arquivar cada change
 verificada para liberar as dependências seguintes. Falhas dentro do escopo são
-corrigidas no próprio loop; decisões que exigem o usuário pausam a execução.
+corrigidas no próprio loop. Em escolhas técnicas abertas, o agente segue sua
+recomendação, registra a decisão e valida o resultado, sem pedir confirmação por
+biblioteca, driver ou caminho padrão. Impedimentos que realmente exigem o usuário
+pausam a execução.
 
 O loop retoma artefatos e tarefas existentes. Ele roda na sessão do agente, sem
 serviço em background nem ativação implícita por Planning Change ou configuração.

@@ -22,10 +22,19 @@ aprovação. Após verificar, o agente arquiva a change: é o archive que regist
 a conclusão e libera os dependentes no grafo existente. Tarefas marcadas e
 `execution: verifying` nunca substituem a verificação do comportamento.
 
+Decisões técnicas abertas são resolvidas pelo próprio agente: ele segue sua
+recomendação, registra a justificativa no design e continua, inclusive antes de
+escrever `tasks.md`. Isso inclui driver SQLite, caminho padrão de armazenamento,
+biblioteca TUI e estratégia de testes. Não há uma confirmação adicional para
+"seguir a recomendação". Quando necessário, o agente faz um spike, testa a escolha
+e adota um fallback compatível se ela falhar. Workers seguem a mesma política.
+Escolhas explícitas do usuário e requisitos existentes continuam sendo respeitados.
+
 O loop termina quando todos os incrementos não cancelados estiverem arquivados.
 Se há trabalho independente disponível, um bloqueio local não encerra o loop.
 Sem avanço possível, ele pausa com a causa, as tentativas e a decisão necessária:
-escopo ou aceite ambíguo, blocker manual, recurso externo indisponível, conflito
+objetivo/requisito de produto ou aceite ambíguo que uma escolha técnica não resolva,
+blocker manual, recurso externo indisponível, conflito
 de intenção ou falha sem correção justificada. Não há repetição indefinida do
 mesmo erro sem progresso. Planos pausados/arquivados e estados `idea`/`on_hold`
 são respeitados; não são alterados para forçar conclusão.
