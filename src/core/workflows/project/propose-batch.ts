@@ -29,8 +29,15 @@ em vez de seguir:
 ## Passos
 
 1. \`specs project next --json\`. Trabalhe só com \`proposeBatch.batch\`; \`excluded\`
-   explica quem ficou de fora e por quê (\`depends_on_not_proposed:<ids>\` é o caso
-   normal — aquele incremento entra numa onda futura).
+   explica quem ficou de fora e por quê:
+   - \`depends_on_not_proposed:<ids>\` — o caso normal, entra numa onda futura;
+   - \`change_already_exists\` — já existe uma change (ativa ou arquivada) com aquele
+     slug. Não crie de novo: o caminho é \`specs project link <CH-NNN> <slug>\`, fora
+     deste lote;
+   - \`slug_claimed_by:<CH-NNN>\` — outro incremento já responde por esse nome. Aí
+     linkar não resolve, é preciso um slug diferente — decisão do usuário, não sua;
+   - \`planned_change_invalid\` — o brief ainda é o esqueleto vazio do §7.5, sem
+     Escopo nem Critérios macro. Não há de onde explorar; preencha o brief antes.
 2. Mostre o lote ao usuário: id, título, slug e o \`plannedChange\` de cada um. Faça UMA
    pergunta de sim ou não e espere a confirmação em uma mensagem separada. Se o usuário
    quiser um subconjunto, respeite exatamente o que ele listou.

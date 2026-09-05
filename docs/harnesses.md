@@ -82,14 +82,14 @@ adaptador e registrá-lo — os corpos dos comandos, a CLI e o workflow ficam in
 
 ## Catálogo de comandos
 
-O catálogo gerado tem treze comandos, em duas listas:
+O catálogo gerado tem quatorze comandos, em duas listas:
 
 **Ciclo de change** — `spec-explore`, `spec-propose`, `spec-continue`,
 `spec-revise`, `spec-implement`, `spec-verify`, `spec-archive`.
 
 **Plano de projeto** — `spec-project-plan`, `spec-project-review`,
 `spec-project-generate`, `spec-project-status`, `spec-project-next`,
-`spec-project-refine`.
+`spec-project-propose-batch`, `spec-project-refine`.
 
-`specs init`/`update --harnesses all` escrevem 52 arquivos (13 × 4). Os comandos
+`specs init`/`update --harnesses all` escrevem 56 arquivos (14 × 4). Os comandos
 de plano são opt-in: sem `planning/<plan-id>/plan.yaml` eles não têm efeito.

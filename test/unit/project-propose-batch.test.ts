@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { computeProposeBatch } from '../../src/core/project/proposeBatch.js';
 import { computeProjectStatus } from '../../src/core/project/status.js';
 import { activePath } from '../../src/core/project/link.js';
-import { makePlanWorkspace, seedPlan, manifest, change, withBrief } from '../helpers/plan.js';
+import { makePlanWorkspace, seedPlan, manifest, change, withBrief, seedArchivedChange } from '../helpers/plan.js';
 import { seedChange, writeFile } from '../helpers/workspace.js';
 import type { WorkspaceConfig } from '../../src/core/config.js';
 import type { Workspace } from '../../src/core/workspace.js';
@@ -176,6 +176,59 @@ describe('computeProposeBatch', () => {
     expect(result.batch).toEqual([]);
     expect(result.excluded).toContainEqual({ id: 'CH-001', reason: 'execution_proposed' });
     expect(result.excluded).toContainEqual({ id: 'CH-002', reason: 'state_on_hold' });
+  });
+
+  it('excludes a slug some active change directory already answers to', async () => {
+    const workspace = await makePlanWorkspace();
+    const a = await proposable(workspace, 'demo', { id: 'CH-001', slug: 'alpha' });
+    await seedPlan(workspace, manifest({ id: 'demo', changes: [a] }));
+    // A change created by hand, never linked to the increment: `execution`
+    // still reads `unlinked`, but `specs new change alpha` would now fail.
+    await seedChange(workspace, 'alpha');
+
+    const status = await computeProjectStatus(workspace, 'demo');
+    const result = await computeProposeBatch(workspace, status, ON);
+
+    expect(result.batch).toEqual([]);
+    expect(result.excluded).toEqual([{ id: 'CH-001', reason: 'change_already_exists' }]);
+  });
+
+  it('excludes a slug only an ARCHIVE answers to — the empty-change trap', async () => {
+    const workspace = await makePlanWorkspace();
+    const a = await proposable(workspace, 'demo', { id: 'CH-001', slug: 'alpha' });
+    await seedPlan(workspace, manifest({ id: 'demo', changes: [a] }));
+    // Nothing active carries the name, so `specs new change alpha` would
+    // SUCCEED - into a directory the archive then masks (§7.7 resolves the
+    // archive first), which is exactly the state nobody can see.
+    await seedArchivedChange(workspace, 'alpha');
+
+    const status = await computeProjectStatus(workspace, 'demo');
+    const result = await computeProposeBatch(workspace, status, ON);
+
+    expect(result.batch).toEqual([]);
+    expect(result.excluded).toEqual([{ id: 'CH-001', reason: 'change_already_exists' }]);
+  });
+
+  it('names the increment whose LINK already owns the slug another one wants', async () => {
+    const workspace = await makePlanWorkspace();
+    // Two increments can never share a slug (`ProjectGraph.from` refuses it),
+    // but a link NAME is free to differ from the increment's own slug: CH-001
+    // is `alpha` linked to a change directory called `beta`. CH-002, planned
+    // as `beta`, now wants a name CH-001 already answers to - and linking is
+    // not the way out of that one, a different slug is.
+    await seedChange(workspace, 'beta');
+    const ownerBase = await withBrief(workspace, 'demo', change({ id: 'CH-001', slug: 'alpha' }));
+    const owner = { ...ownerBase, link: linkTo('beta') };
+    const wants = await proposable(workspace, 'demo', { id: 'CH-002', slug: 'beta' });
+    await seedPlan(workspace, manifest({ id: 'demo', changes: [owner, wants] }));
+
+    const status = await computeProjectStatus(workspace, 'demo');
+    const result = await computeProposeBatch(workspace, status, ON);
+
+    expect(result.batch).toEqual([]);
+    // The more specific reason wins over the bare `change_already_exists` the
+    // same directory would otherwise produce.
+    expect(result.excluded).toContainEqual({ id: 'CH-002', reason: 'slug_claimed_by:CH-001' });
   });
 
   it('excludes a change held by a manual blocker', async () => {

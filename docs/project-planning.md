@@ -2,7 +2,7 @@
 
 > **Status:** capacidade completa (Fases 1–5), opt-in. Modelo, proveniência,
 > validação, grafo, três dimensões de estado, `generate`, `status`, `next`,
-> `show`, dashboard (com `--watch`), os seis comandos de harness, vínculo
+> `show`, dashboard (com `--watch`), os sete comandos de harness, vínculo
 > (`link`/`unlink`/`adopt`/`sync`/`set-state`), mutação por bundle (`apply`),
 > `impact`, `list` e o ciclo de vida do plano (`pause`/`resume`/`archive`).
 
@@ -366,12 +366,13 @@ coisa. As rotas estão em [`docs/cli.md`](cli.md).
 
 ## Comandos de harness
 
-Seis comandos gerados para os quatro harnesses (`/spec-project-plan`,
-`-review`, `-generate`, `-status`, `-next`, `-refine`). Cada corpo instrui: não
+Sete comandos gerados para os quatro harnesses (`/spec-project-plan`,
+`-review`, `-generate`, `-status`, `-next`, `-propose-batch`, `-refine`). Cada
+corpo instrui: não
 implementar código, não criar artefatos de change, consultar estado por `--json`,
 mostrar preview e pedir confirmação em mensagem separada antes da primeira
 escrita, e rotular fato, cálculo e recomendação. O catálogo gerado passa de sete
-para treze comandos; `specs init`/`update --harnesses all` escrevem 52 arquivos.
+para quatorze comandos; `specs init`/`update --harnesses all` escrevem 56 arquivos.
 
 - `create` é idempotente por recusa: um plano existente falha com `plan_exists` e
   nenhum arquivo é modificado. Uma fonte fora da raiz do projeto (`..`, absoluto,

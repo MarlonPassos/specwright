@@ -58,6 +58,11 @@ export interface ProposeBatchResult {
  * both to qualify, the dependency would have to be simultaneously `unlinked`
  * (to be a candidate) and fully proposed (to satisfy its dependent) - so no
  * intra-batch ordering pass is needed on top of this filter.
+ *
+ * Every candidate must also be creatable: the batch opens each change with
+ * `specs new change <slug>`, so a slug some directory already answers to is
+ * excluded rather than dispatched into a command that would fail or, worse,
+ * quietly create a directory an archive of the same name masks.
  */
 export async function computeProposeBatch(
   workspace: Workspace,
@@ -130,6 +135,28 @@ export async function computeProposeBatch(
     }
     if (view.manualBlockers.length > 0) {
       excluded.push({ id: view.id, reason: 'manual_blocker_present' });
+      continue;
+    }
+    // The batch's first move is `specs new change <slug>`, so a slug that
+    // already answers to a directory cannot be in it: creating it again fails
+    // outright (`change_exists`) when the change is active, and when only an
+    // ARCHIVE carries the name it succeeds into a directory the archive then
+    // masks (§7.7 resolves the archive first) - the empty-change trap
+    // `startCommands` in next.ts already steers around. Which way out differs
+    // per case, and picking a fresh slug is not a call to make unattended, so
+    // both leave the batch with the reason that says what to do.
+    const claimedByOther = status.changes.find(
+      (other) => other.id !== view.id && other.link?.name === view.slug
+    );
+    if (claimedByOther) {
+      excluded.push({ id: view.id, reason: `slug_claimed_by:${claimedByOther.id}` });
+      continue;
+    }
+    if (
+      status.workspaceChanges.active.has(view.slug) ||
+      status.workspaceChanges.archivedSlugs.has(view.slug)
+    ) {
+      excluded.push({ id: view.id, reason: 'change_already_exists' });
       continue;
     }
 
