@@ -30,7 +30,7 @@ const EXPECTED_PROJECT_COMMANDS = [
   'project-propose-batch',
   'project-refine',
 ];
-const EXPECTED_COMMANDS = [...EXPECTED_WORKFLOW_COMMANDS, ...EXPECTED_PROJECT_COMMANDS];
+const EXPECTED_COMMANDS = [...EXPECTED_WORKFLOW_COMMANDS, ...EXPECTED_PROJECT_COMMANDS, 'loop'];
 
 /** How each harness spells a command, and therefore what its files may contain. */
 const EXPECTED_INVOCATION: Record<string, (id: string) => string> = {
@@ -64,9 +64,9 @@ describe('generated commands', () => {
     expect(workflowCommands().map((command) => command.id)).toEqual(EXPECTED_WORKFLOW_COMMANDS);
   });
 
-  it('exposes the seven plan commands and a catalogue of fourteen', () => {
+  it('exposes the seven plan commands and a catalogue of fifteen', () => {
     expect(projectCommands().map((command) => command.id)).toEqual(EXPECTED_PROJECT_COMMANDS);
-    expect(allCommands()).toHaveLength(14);
+    expect(allCommands()).toHaveLength(15);
     expect(allCommandIds()).toEqual(EXPECTED_COMMANDS);
   });
 

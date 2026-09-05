@@ -18,11 +18,11 @@ describe('project harness commands', () => {
     expect(projectCommands().map((command) => command.id)).toEqual(PROJECT_IDS);
   });
 
-  it('generate 14 commands × 4 harnesses = 56 files with unique paths', () => {
+  it('generate 15 commands × 4 harnesses = 60 files with unique paths', () => {
     const files = renderHarnesses(allHarnesses());
     expect(files).toHaveLength(allCommands().length * 4);
-    expect(files).toHaveLength(56);
-    expect(new Set(files.map((file) => file.path)).size).toBe(56);
+    expect(files).toHaveLength(60);
+    expect(new Set(files.map((file) => file.path)).size).toBe(60);
   });
 
   it('never leak another harness\'s invocation syntax or a raw placeholder', () => {

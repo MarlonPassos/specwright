@@ -6,6 +6,7 @@ import { validatePlan } from '../../core/project/validate.js';
 import { resolvePlanId, listPlanIds } from '../../core/project/paths.js';
 import { computeProjectStatus, showProjectChange, statusPayload } from '../../core/project/status.js';
 import { recommendNext } from '../../core/project/next.js';
+import { computeLoopSnapshot } from '../../core/project/loop.js';
 import { computeParallelImplementBatch } from '../../core/project/parallelImplement.js';
 import { computeProposeBatch } from '../../core/project/proposeBatch.js';
 import { loadConfig } from '../../core/config.js';
@@ -190,6 +191,29 @@ export function registerProjectCommands(program: Command): void {
         const next = recommendNext(status);
         if (json) printJson(statusPayload(status));
         else process.stdout.write(renderProjectDashboard(status, next, viewOptions(this)));
+      } catch (error) {
+        fail(error, { json, payload: { plan: null } });
+      }
+    });
+
+  project
+    .command('loop [plan-id]')
+    .description('Consulta a fronteira do spec-loop; não inicia execução autônoma')
+    .option('--json', 'Saída em JSON')
+    .action(async function (this: Command, planId: string | undefined) {
+      const json = wantsJson(this);
+      try {
+        const workspace = await requireWorkspace();
+        const id = await resolvePlanId(workspace.projectRoot, planId);
+        const snapshot = await computeLoopSnapshot(workspace, id);
+        if (json) printJson(snapshot);
+        else printLines([
+          `Loop do plano "${id}": ${snapshot.state}`,
+          `Concluídos: ${snapshot.completed.length}; cancelados: ${snapshot.cancelled.length}; pendentes: ${snapshot.remaining.length}`,
+          ...snapshot.candidates.map((entry) => `  ${entry.id} ${entry.change}: ${entry.action}`),
+          ...snapshot.blockers.map((entry) => `  ${entry.id ?? id}: ${entry.reasonCodes.join(', ')}`),
+          'Consulta somente leitura. Inicie spec-loop explicitamente no seu harness para executar.',
+        ]);
       } catch (error) {
         fail(error, { json, payload: { plan: null } });
       }

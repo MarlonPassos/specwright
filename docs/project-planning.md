@@ -114,6 +114,7 @@ specs project create <plan-id> [fontes...] [--name <nome>] [--owner <nome>] [--j
 specs project validate [<plan-id>] [--strict] [--json]
 specs project status   [<plan-id>] [--json]
 specs project next     [<plan-id>] [--json]
+specs project loop     [<plan-id>] [--json]
 specs project show     [<plan-id>] <change-id> [--json]
 specs project generate [<plan-id>] [--change <id>...] [--milestone <id>]
                                    [--dry-run] [--force] [--expect-revision <n>] [--json]
@@ -372,7 +373,16 @@ corpo instrui: não
 implementar código, não criar artefatos de change, consultar estado por `--json`,
 mostrar preview e pedir confirmação em mensagem separada antes da primeira
 escrita, e rotular fato, cálculo e recomendação. O catálogo gerado passa de sete
-para quatorze comandos; `specs init`/`update --harnesses all` escrevem 56 arquivos.
+para quinze comandos com o modo separado `spec-loop`;
+`specs init`/`update --harnesses all` escrevem 60 arquivos.
+
+`spec-loop` é a exceção explícita ao limite macro: ele executa o plano já definido,
+escreve artefatos de change, implementa e verifica, arquivando cada change aprovada
+para liberar as dependências. O agente decide a ordem e o paralelismo com base no
+grafo atual, sem confirmações por fase. O modo não muda estados de planejamento,
+blockers, dependências nem critérios de aceite para conseguir avançar. Cancelados
+ficam fora da execução; `idea` e `on_hold` continuam pendentes. Veja
+[o fluxo e as condições de parada](workflow.md#spec-loop).
 
 - `create` é idempotente por recusa: um plano existente falha com `plan_exists` e
   nenhum arquivo é modificado. Uma fonte fora da raiz do projeto (`..`, absoluto,
@@ -430,7 +440,8 @@ ativo fica invisível e o incremento é apresentado como concluído.
 
 - O core não faz análise semântica de documentos. Decompor, propor dependências e
   redigir prosa é trabalho do agente; o core valida a estrutura do resultado.
-- Nenhum comando de plano cria, implementa, verifica ou arquiva uma change.
+- Os comandos de planejamento não executam changes. A execução autônoma pertence
+  exclusivamente ao pedido explícito de `spec-loop`.
 - Nenhum conteúdo de documento-fonte é copiado para o manifesto, um Planned
   Change, um relatório ou um log — só o `path` e o `sha256`.
 - O bloco de roadmap dentro de `plan.md` é projetado **na escrita**, não na
