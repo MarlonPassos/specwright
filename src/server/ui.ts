@@ -13,6 +13,8 @@
  * they were. Dark is the default and mirrors the terminal
  * theme; the light palette is a token swap on `[data-theme=light]`.
  */
+import { GRAPH_SCRIPT } from './graph-ui.js';
+
 export const INDEX_HTML = String.raw`<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -167,26 +169,80 @@ details.card>.body{padding:0 18px 15px}
   background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;
   box-shadow:0 24px 60px rgba(0,0,0,.45)}
 #gmodal.on{display:flex}
-#gmodal .head{display:flex;align-items:center;gap:12px;padding:14px 18px;flex-wrap:wrap;
+#gmodal .head{display:flex;align-items:center;gap:11px;padding:12px 16px;flex-wrap:wrap;
   border-bottom:1px solid var(--line)}
 #gmodal .head h2{margin:0}
-#gmodal .head .grow{flex:1 1 40px}
-#gwrap{flex:1;min-height:0;overflow:hidden;background:var(--sunken);cursor:grab}
+#gmodal .grow{flex:1 1 40px}
+/* Segunda faixa: o que muda o DESENHO, separado do que fecha a janela. */
+#gmodal .bar2{display:flex;align-items:center;gap:8px;padding:9px 16px;flex-wrap:wrap;
+  border-bottom:1px solid var(--line);background:var(--sunken)}
+#gmodal .bar2 .sep{width:1px;height:15px;background:var(--line);flex:none}
+#gmodal select{background:var(--panel);border:1px solid var(--line);border-radius:99px;
+  color:var(--ink);font:inherit;font-size:11px;padding:3px 8px;cursor:pointer}
+#gmodal select:hover,#gmodal select:focus{border-color:var(--cyan);outline:none}
+.chip[aria-pressed=true]{background:var(--cyan);border-color:var(--cyan);color:var(--bg)}
+.chip:disabled{opacity:.35;cursor:default}
+.chip:disabled:hover{background:none}
+#gzoom{color:var(--dim);font-size:11px;min-width:44px;text-align:center}
+#gupdated{color:var(--dim);font-size:11px}
+/* Buscar é a saída quando o incremento procurado não está no ramo aberto. */
+.gfind{position:relative}
+#gresults{position:absolute;top:calc(100% + 6px);left:0;z-index:2;width:min(370px,74vw);
+  background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden;
+  box-shadow:0 14px 34px rgba(0,0,0,.4)}
+#gresults[hidden]{display:none}
+#gresults button{display:block;width:100%;text-align:left;background:none;border:0;
+  border-bottom:1px solid var(--line);color:var(--ink);cursor:pointer;font:inherit;
+  font-size:12px;padding:7px 11px}
+#gresults button:last-child{border-bottom:0}
+#gresults button:hover,#gresults button:focus{background:var(--sunken);outline:none}
+#gresults b{color:var(--cyan);margin-right:7px}
+#gresults span{display:block;padding:8px 11px;color:var(--dim);font-size:12px}
+.gbody{flex:1;min-height:0;display:flex}
+#gwrap{flex:1;min-width:0;position:relative;overflow:hidden;background:var(--sunken);cursor:grab}
 #gwrap.drag{cursor:grabbing}
 #gsvg{display:block;width:100%;height:100%;touch-action:none}
+#gempty{position:absolute;inset:0;margin:0;padding:0 26px;display:flex;align-items:center;
+  justify-content:center;text-align:center;color:var(--dim);font-size:13px}
+#gempty[hidden]{display:none}
+/* O nó selecionado por extenso: o desenho corta o título, esta coluna não. */
+#gdetail{width:300px;flex:none;overflow:auto;padding:14px 16px 22px;border-left:1px solid var(--line)}
+#gdetail[hidden]{display:none}
+#gdetail h2{margin:18px 0 8px}
+#gdetail h3{margin:5px 0 10px;font-size:14px;color:var(--ink);letter-spacing:0}
+#gdetail p{margin:6px 0}
+.gtitle{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.gtitle .id{min-width:0}
+.gactions{display:flex;gap:8px;flex-wrap:wrap;margin:13px 0 2px}
+.gblock{color:var(--yellow);font-size:12px}
+.grel{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;margin:0 0 6px;
+  background:var(--sunken);border:1px solid var(--line);border-radius:8px;color:var(--ink);
+  cursor:pointer;font:inherit;font-size:12px;padding:7px 10px}
+.grel:hover,.grel:focus{border-color:var(--cyan);outline:none}
+.grel .id{min-width:0;font-size:12px}
+.grel .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grel small{font-size:11px}
 #gmodal .foot{display:flex;align-items:center;gap:16px;flex-wrap:wrap;
   padding:10px 18px;border-top:1px solid var(--line);color:var(--dim);font-size:11px}
 .lg{display:inline-flex;align-items:center;gap:6px}
 .lg i{width:9px;height:9px;border-radius:3px;display:inline-block}
 .gwave{fill:var(--dim);font-size:10px;letter-spacing:.18em}
-.gedge{fill:none;stroke:var(--line);stroke-width:1.6}
+/* Acender a linhagem não pode apagar o aviso: o tracejado amarelo continua
+ * amarelo, e o que muda é só o peso e o quanto o resto recua. */
+.gedge{fill:none;stroke:var(--line);stroke-width:1.6;opacity:.55}
 .gedge.block{stroke:var(--yellow);stroke-dasharray:5 4}
-.gedge.lit{stroke:var(--cyan);stroke-width:2.2}
+.gedge.lit{stroke:var(--cyan);stroke-width:2.2;opacity:1}
+.gedge.block.lit{stroke:var(--yellow);stroke-width:2.4;opacity:1}
 .gn{cursor:pointer}
 .gn rect{fill:var(--panel);stroke:var(--line);stroke-width:1.5;rx:9}
 .gn .id{fill:var(--cyan);font-size:12px;font-weight:700}
-.gn .ti{fill:var(--ink);font-size:11px}
+.gn .ti{fill:var(--ink);font-size:11.5px}
 .gn .ms{fill:var(--dim);font-size:10px}
+.gn .gs{fill:var(--dim);font-size:10px;letter-spacing:.06em}
+.gn .gx{fill:var(--dim);font-size:10px;opacity:.75}
+.gn:hover .gx,.gn:focus .gx{fill:var(--cyan);opacity:1}
+.gn:focus{outline:none}
+.gn:focus rect{stroke:var(--cyan);stroke-width:2.4}
 .gn.s-green rect{stroke:var(--green)} .gn.s-green .id{fill:var(--green)}
 .gn.s-cyan rect{stroke:var(--cyan)}
 .gn.s-yellow rect{stroke:var(--yellow)} .gn.s-yellow .id{fill:var(--yellow)}
@@ -195,8 +251,11 @@ details.card>.body{padding:0 18px 15px}
 .gn.run rect{stroke-width:2.6;filter:drop-shadow(0 0 7px var(--cyan))}
 .gn.done rect{fill:color-mix(in srgb,var(--green) 12%,var(--panel))}
 .gn.off{opacity:.22}
-.gn.lit rect{stroke-width:2.6}
+.gn.lit rect{stroke-width:2.6;fill:color-mix(in srgb,var(--cyan) 10%,var(--panel))}
 svg .warn{fill:var(--yellow);font-size:11px}
+/* Sem largura para a coluna, ela vira uma faixa embaixo — some seria pior. */
+@media(max-width:860px){.gbody{flex-direction:column}
+  #gdetail{width:auto;flex:none;max-height:40%;border-left:0;border-top:1px solid var(--line)}}
 @media(max-width:640px){#gmodal{inset:8px}}
 #scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;
   transition:opacity .2s;z-index:8}
@@ -255,11 +314,63 @@ footer{padding:12px 22px 24px;color:var(--dim);font-size:12px;text-align:center}
     <h2>DEPENDÊNCIAS</h2>
     <span class="muted sm" id="ginfo"></span>
     <span class="grow"></span>
-    <button type="button" class="chip" id="gfit">enquadrar</button>
+    <span class="gfind">
+      <span class="srch">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.7-3.7"/></svg>
+        <input id="gsearch" type="text" autocomplete="off" placeholder="ir para um incremento"
+          aria-label="Buscar um incremento no grafo">
+      </span>
+      <div id="gresults" hidden></div>
+    </span>
     <button type="button" class="chip" id="gclose">fechar (Esc)</button>
   </div>
-  <div id="gwrap"><svg id="gsvg" role="img"></svg></div>
-  <div class="foot" id="gfoot"></div>
+  <div class="bar2">
+    <button type="button" class="chip" id="gfocusmode" aria-pressed="true"
+      title="Ver só o incremento em foco e o que ele abriu">relações</button>
+    <button type="button" class="chip" id="gall" aria-pressed="false"
+      title="Ver o plano inteiro de uma vez">plano completo</button>
+    <select id="gdirection" aria-label="Sentido das relações a seguir">
+      <option value="both">os dois sentidos</option>
+      <option value="deps">só do que depende</option>
+      <option value="next">só o que destrava</option>
+    </select>
+    <span class="sep"></span>
+    <button type="button" class="chip" id="gexpand"
+      title="Abrir o próximo nível de relações do que já está na tela">+ nível</button>
+    <button type="button" class="chip" id="gcollapse"
+      title="Voltar ao incremento em foco, sozinho">recolher</button>
+    <span class="sep"></span>
+    <button type="button" class="chip" id="gminus" aria-label="Diminuir o zoom">−</button>
+    <span id="gzoom">100%</span>
+    <button type="button" class="chip" id="gplus" aria-label="Aumentar o zoom">+</button>
+    <button type="button" class="chip" id="greadable"
+      title="Centrar no incremento em foco sem encolher as caixas">legível</button>
+    <button type="button" class="chip" id="gfit"
+      title="Reduzir até tudo o que está desenhado caber">enquadrar</button>
+    <span class="grow"></span>
+    <span id="gupdated"></span>
+    <span class="sep"></span>
+    <button type="button" class="chip" id="grefresh" title="Reler o plano do disco">atualizar</button>
+    <button type="button" class="chip" id="gpanel" aria-pressed="true" aria-expanded="true"
+      aria-controls="gdetail" title="Mostrar ou esconder o painel do incremento">detalhe</button>
+  </div>
+  <div class="gbody">
+    <div id="gwrap">
+      <svg id="gsvg" role="img" aria-label="Grafo de dependências do plano"></svg>
+      <p id="gempty" hidden></p>
+    </div>
+    <aside id="gdetail"></aside>
+  </div>
+  <div class="foot" id="gfoot">
+    <span class="lg"><i style="background:var(--green)"></i>concluída ou pronta</span>
+    <span class="lg"><i style="background:var(--cyan)"></i>em implementação</span>
+    <span class="lg"><i style="background:var(--yellow)"></i>bloqueada</span>
+    <span class="lg"><i style="background:var(--red)"></i>inconsistente</span>
+    <span class="lg"><i style="background:var(--dim)"></i>fora do fluxo</span>
+    <span class="lg"><i style="background:var(--yellow)"></i>seta tracejada = dependência que ainda barra</span>
+    <span class="lg">clique num nó para abrir o próximo nível  ·  duplo clique abre o resumo</span>
+  </div>
 </div>
 <aside id="drawer" aria-hidden="true">
   <div class="head">
@@ -924,7 +1035,10 @@ function show(id,force){
   active=id; drawTabs();
   if(location.hash.slice(1)!==id)history.replaceState(null,'','#'+id);
   if(cache[id]&&!force){render(id);return}
-  fetch(hq(tab.route)).then(function(r){return r.json()}).then(function(d){
+  // O PLANO passa pelo loadPlan porque o grafo lê o mesmo payload: um pedido só,
+  // e a resposta velha de um evento anterior nunca ganha da atual.
+  var pending=id==='plano'?loadPlan():fetch(hq(tab.route)).then(function(r){return r.json()});
+  pending.then(function(d){
     cache[id]=d;
     if(id==='docs'){DOCSET={};(d.documents||[]).forEach(function(x){DOCSET[x.id]=1})}
     if(active===id){E('screen').innerHTML=RENDER[id](d);stamp(d)}
@@ -1034,250 +1148,7 @@ E('theme').addEventListener('click',function(){
   theme(document.documentElement.getAttribute('data-theme')==='light'?'dark':'light');
 });
 
-/* ---------- grafo de dependências ---------- */
-
-/**
- * O plano desenhado como o DAG que ele é.
- *
- * Os dados já vêm em /api/plan (dependsOn, blockedBy, unlocks) junto com o estado
- * de cada incremento — e o core garante que o grafo é acíclico antes de gravar,
- * então aqui não há validação a refazer, só leitura. SVG à mão porque uma
- * biblioteca de grafo seria a primeira dependência de runtime do projeto.
- *
- * A camada de um nó é o caminho MAIS LONGO até ele. Com o mais curto, um
- * incremento apareceria antes de algo de que ele depende; com o mais longo,
- * toda aresta anda da esquerda para a direita e a coluna vira o que ela é de
- * fato: a ordem de execução, uma onda por vez.
- */
-var GW=196, GH=52, GAPX=76, GAPY=20, PADX=34, PADY=44;
-
-function graphLayers(changes){
-  var by={}; changes.forEach(function(c){by[c.id]=c});
-  var depth={}, busy={};
-  function deep(id){
-    if(depth[id]!=null)return depth[id];
-    if(busy[id])return 0;            // o core recusa ciclo; isto é só um cinto
-    busy[id]=1;
-    var deps=(by[id].dependsOn||[]).filter(function(d){return by[d]});
-    depth[id]=deps.length?1+Math.max.apply(null,deps.map(deep)):0;
-    busy[id]=0;
-    return depth[id];
-  }
-  changes.forEach(function(c){deep(c.id)});
-
-  var cols=[];
-  changes.forEach(function(c){
-    var d=depth[c.id];
-    (cols[d]=cols[d]||[]).push(c);
-  });
-
-  // Baricentro: cada nó desce para perto da média das suas dependências. Duas
-  // passadas tiram a maior parte dos cruzamentos sem virar um solver.
-  var row={};
-  cols.forEach(function(col){col.forEach(function(c,i){row[c.id]=i})});
-  for(var pass=0;pass<2;pass++){
-    cols.forEach(function(col,d){
-      if(!d)return;
-      col.sort(function(a,b){return bary(a)-bary(b)});
-      col.forEach(function(c,i){row[c.id]=i});
-    });
-  }
-  function bary(c){
-    var deps=(c.dependsOn||[]).filter(function(x){return by[x]});
-    if(!deps.length)return row[c.id];
-    var sum=deps.reduce(function(t,x){return t+row[x]},0);
-    return sum/deps.length;
-  }
-
-  var nodes=[];
-  cols.forEach(function(col,d){
-    col.forEach(function(c,i){
-      nodes.push({
-        c: c,
-        x: PADX + d*(GW+GAPX),
-        y: PADY + i*(GH+GAPY),
-        wave: d
-      });
-    });
-  });
-  return { nodes: nodes, cols: cols };
-}
-
-function graphSvg(changes){
-  var laid=graphLayers(changes), nodes=laid.nodes;
-  var at={}; nodes.forEach(function(n){at[n.c.id]=n});
-  var width=PADX*2+laid.cols.length*(GW+GAPX)-GAPX;
-  var tallest=laid.cols.reduce(function(m,col){return Math.max(m,col.length)},0);
-  var height=PADY*2+tallest*(GH+GAPY)-GAPY;
-
-  var edges='';
-  nodes.forEach(function(n){
-    (n.c.dependsOn||[]).forEach(function(dep){
-      var from=at[dep]; if(!from)return;
-      var x1=from.x+GW, y1=from.y+GH/2, x2=n.x, y2=n.y+GH/2, mid=(x1+x2)/2;
-      // Uma aresta que ainda barra o destino é a informação mais útil do grafo.
-      var blocking=(n.c.blockedBy||[]).indexOf(dep)>=0;
-      edges+='<path class="gedge'+(blocking?' block':'')+'" data-from="'+esc(dep)+'"'
-        +' data-to="'+esc(n.c.id)+'" d="M'+x1+' '+y1+'C'+mid+' '+y1+' '+mid+' '+y2+' '+x2+' '+y2+'"'
-        +' marker-end="url(#gtip'+(blocking?'b':'')+')"/>';
-    });
-  });
-
-  var waves=laid.cols.map(function(col,d){
-    if(!col.length)return '';
-    return '<text class="gwave" x="'+(PADX+d*(GW+GAPX))+'" y="24">'+(d+1)+'ª ONDA</text>';
-  }).join('');
-
-  var boxes=nodes.map(function(n){
-    var c=n.c, tone=PRES[c.presentation]||'t-dim';
-    var running=c.execution==='in_progress'||c.execution==='verifying';
-    var cls='gn s-'+tone.replace('t-','')
-      +(running?' run':'')+(c.execution==='archived'?' done':'');
-    var title=clipText(c.title,26);
-    var badge=(c.manualBlockers&&c.manualBlockers.length)?'<text class="warn" x="'+(n.x+GW-14)+'" y="'+(n.y+19)+'">!</text>':'';
-    return '<g class="'+cls+'" data-node="'+esc(c.id)+'" tabindex="0" role="button">'
-      +'<title>'+esc(c.id+' · '+c.title+' — '+c.presentation
-        +((c.blockedBy&&c.blockedBy.length)?' (falta '+c.blockedBy.join(', ')+')':''))+'</title>'
-      +'<rect x="'+n.x+'" y="'+n.y+'" width="'+GW+'" height="'+GH+'"/>'
-      +'<text class="id" x="'+(n.x+13)+'" y="'+(n.y+20)+'">'+esc(c.id)+'</text>'
-      +(c.milestone?'<text class="ms" x="'+(n.x+GW-13)+'" y="'+(n.y+20)+'" text-anchor="end">'+esc(c.milestone)+'</text>':'')
-      +'<text class="ti" x="'+(n.x+13)+'" y="'+(n.y+38)+'">'+esc(title)+'</text>'
-      +badge+'</g>';
-  }).join('');
-
-  var defs='<defs>'
-    +'<marker id="gtip" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7"'
-    +' orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--line)"/></marker>'
-    +'<marker id="gtipb" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7"'
-    +' orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--yellow)"/></marker>'
-    +'</defs>';
-
-  return { svg: defs+waves+edges+boxes, width: width, height: height };
-}
-
-function clipText(text,max){
-  var t=String(text||'');
-  return t.length>max?t.slice(0,max-1)+'…':t;
-}
-
-/* ---------- o modal ---------- */
-
-var GVIEW=null;
-function setView(v){
-  GVIEW=v;
-  E('gsvg').setAttribute('viewBox',v.x+' '+v.y+' '+v.w+' '+v.h);
-}
-
-function openGraph(){
-  var d=cache.plano;
-  if(!d||!d.plan||!(d.changes||[]).length){toast('nenhum plano para desenhar');return}
-  var drawn=graphSvg(d.changes);
-  E('gsvg').innerHTML=drawn.svg;
-  E('gsvg').setAttribute('preserveAspectRatio','xMidYMid meet');
-  setView({x:0,y:0,w:drawn.width,h:drawn.height});
-  GFIT={x:0,y:0,w:drawn.width,h:drawn.height};
-
-  var blocked=d.changes.filter(function(c){return (c.blockedBy||[]).length}).length;
-  E('ginfo').textContent=d.changes.length+' incrementos  ·  '
-    +graphLayers(d.changes).cols.length+' ondas'
-    +(blocked?'  ·  '+blocked+' bloqueado(s)':'');
-  E('gfoot').innerHTML=[
-    ['green','concluída'],['cyan','em implementação'],['green','pronta'],
-    ['yellow','bloqueada'],['red','inconsistente'],['dim','fora do fluxo']
-  ].map(function(l){
-    return '<span class="lg"><i style="background:var(--'+l[0]+')"></i>'+esc(l[1])+'</span>';
-  }).join('')
-    +'<span class="lg"><i style="background:var(--yellow)"></i>seta tracejada = dependência que ainda barra</span>'
-    +'<span class="lg">clique num nó para acender a linhagem  ·  duplo clique abre o resumo</span>';
-
-  E('gmodal').classList.add('on'); E('scrim').classList.add('on');
-  E('gclose').focus();
-}
-
-var GFIT=null;
-function closeGraph(){
-  E('gmodal').classList.remove('on');
-  if(!E('drawer').classList.contains('on'))E('scrim').classList.remove('on');
-}
-
-/** Acende o nó, tudo de que ele depende e tudo que depende dele. */
-function litLineage(id){
-  var d=cache.plano||{}, by={};
-  (d.changes||[]).forEach(function(c){by[c.id]=c});
-  var keep={}, seen={};
-  (function up(x){ if(!by[x]||seen['u'+x])return; seen['u'+x]=1; keep[x]=1;
-    (by[x].dependsOn||[]).forEach(up); })(id);
-  (function down(x){ if(!by[x]||seen['d'+x])return; seen['d'+x]=1; keep[x]=1;
-    (by[x].unlocks||[]).forEach(down); })(id);
-
-  [].forEach.call(document.querySelectorAll('#gsvg .gn'),function(g){
-    var on=keep[g.dataset.node];
-    g.classList.toggle('off',!on);
-    g.classList.toggle('lit',g.dataset.node===id);
-  });
-  [].forEach.call(document.querySelectorAll('#gsvg .gedge'),function(e){
-    var on=keep[e.dataset.from]&&keep[e.dataset.to];
-    e.classList.toggle('lit',!!on);
-    e.style.opacity=on?'1':'.18';
-  });
-}
-
-function clearLineage(){
-  [].forEach.call(document.querySelectorAll('#gsvg .gn'),function(g){
-    g.classList.remove('off','lit');
-  });
-  [].forEach.call(document.querySelectorAll('#gsvg .gedge'),function(e){
-    e.classList.remove('lit'); e.style.opacity='';
-  });
-}
-
-E('gclose').addEventListener('click',closeGraph);
-E('gfit').addEventListener('click',function(){if(GFIT)setView(GFIT); clearLineage()});
-
-E('gsvg').addEventListener('click',function(e){
-  var g=e.target.closest('.gn');
-  if(!g){clearLineage();return}
-  litLineage(g.dataset.node);
-});
-E('gsvg').addEventListener('dblclick',function(e){
-  var g=e.target.closest('.gn'); if(!g)return;
-  closeGraph(); openBrief(g.dataset.node);
-});
-E('gsvg').addEventListener('keydown',function(e){
-  var g=e.target.closest?e.target.closest('.gn'):null; if(!g)return;
-  if(e.key==='Enter'||e.key===' '){e.preventDefault(); litLineage(g.dataset.node)}
-});
-
-/* Roda dá zoom no ponteiro, arrastar move: um grafo maior que a tela precisa disso. */
-E('gwrap').addEventListener('wheel',function(e){
-  if(!GVIEW)return;
-  e.preventDefault();
-  var box=E('gsvg').getBoundingClientRect();
-  var fx=(e.clientX-box.left)/box.width, fy=(e.clientY-box.top)/box.height;
-  var k=e.deltaY>0?1.12:1/1.12;
-  var w=Math.min(Math.max(GVIEW.w*k,240),GVIEW.w*40), h=GVIEW.h*(w/GVIEW.w);
-  setView({x:GVIEW.x+(GVIEW.w-w)*fx, y:GVIEW.y+(GVIEW.h-h)*fy, w:w, h:h});
-},{passive:false});
-
-var GDRAG=null;
-E('gwrap').addEventListener('pointerdown',function(e){
-  if(!GVIEW)return;
-  GDRAG={x:e.clientX,y:e.clientY,v:GVIEW};
-  E('gwrap').classList.add('drag');
-  E('gwrap').setPointerCapture(e.pointerId);
-});
-E('gwrap').addEventListener('pointermove',function(e){
-  if(!GDRAG)return;
-  var box=E('gsvg').getBoundingClientRect();
-  setView({
-    x:GDRAG.v.x-(e.clientX-GDRAG.x)*(GDRAG.v.w/box.width),
-    y:GDRAG.v.y-(e.clientY-GDRAG.y)*(GDRAG.v.h/box.height),
-    w:GDRAG.v.w, h:GDRAG.v.h
-  });
-});
-['pointerup','pointercancel'].forEach(function(ev){
-  E('gwrap').addEventListener(ev,function(){GDRAG=null;E('gwrap').classList.remove('drag')});
-});
+${GRAPH_SCRIPT}
 
 /* ---------- harness ---------- */
 
@@ -1339,6 +1210,9 @@ function onOverview(ev){
   });
   // O stream só carrega o RESUMO; as outras telas recarregam sob demanda.
   delete cache.changes; delete cache.plano; delete cache.docs;
+  // O grafo aberto fica por cima da tela e não é repintado por ela: o evento
+  // invalida o pedido em voo e manda o modal reler o plano por conta própria.
+  PLAN_EPOCH++; refreshOpenGraph();
   // O catálogo muda quando um artefato nasce, e os chips do PLANO dependem dele:
   // recarrega primeiro, repinta depois, para a tela não mostrar um catálogo velho.
   loadCatalogue(function(){ show(active, active!=='resumo'&&active!=='docs') });
