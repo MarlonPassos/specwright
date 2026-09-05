@@ -64,6 +64,27 @@ artifacts:
       passo. Regra prática - se a implementação pode mudar sem mudar nada observável, não é
       material de spec.
 
+      Três reforços, cada um vindo de uma falha concreta:
+
+      **Capacidade de domínio precisa de requisito de exposição, ou marca de interna.** Se
+      uma spec exige uma transição, um estado ou uma operação, alguma spec precisa dizer
+      como alguém chega até ela - ou a spec declara explicitamente que é interna. Numa
+      auditoria real, uma transição obrigatória de estado foi especificada com regras de
+      ator e de guichê, o método existia no domínio, e nenhum caso de uso o chamava e nenhum
+      endpoint o expunha. Estado especificado e inalcançável em produção.
+
+      **Um exemplo dentro de um requisito precisa ser alcançável sob a regra que ele
+      ilustra.** Uma spec ilustrou numeração com "A001 para normal, P001 para prioridade"
+      sob uma regra de contador único por fila - regra que torna esse par impossível numa
+      fila mista. O exemplo é lido como contrato; se ele não pode acontecer, ou o exemplo
+      está errado ou a regra está.
+
+      **Requisito não funcional relevante é requisito.** Custo de consulta, limite de
+      volume, tempo de resposta e comportamento sob concorrência entram como requirement
+      quando importam. Nenhuma spec daquele projeto disse nada sobre custo de consulta, e o
+      dashboard carrega a fila inteira em memória a cada requisição sem violar spec alguma -
+      o que significa que nada nunca vai acusar isso.
+
       Escreva um arquivo por capacidade listada na proposta, em
       `specs/<caminho-da-capacidade>/spec.md` dentro do diretório da change.
       `<caminho-da-capacidade>` é o diretório relativo a `specs/`, por exemplo
