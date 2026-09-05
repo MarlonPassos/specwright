@@ -57,6 +57,22 @@ describe('createWorktree / finishWorktree — happy path', () => {
     expect(branches.stdout.trim()).toBe('');
   });
 
+  it('reports existsOnDisk: true for a worktree that is actually there', async () => {
+    // Regression: `git worktree list` reports paths through their real path
+    // (macOS's `/var` → `/private/var` symlink, notably), while a registry
+    // entry's path is whatever `workspace.projectRoot` was when it was
+    // written. Comparing both with plain `path.resolve` - which never
+    // follows symlinks - silently reported an existing worktree as gone.
+    const workspace = await makeGitWorkspace();
+    await seedGitChange(workspace, 'demo', '- [ ] 1.1 Faz X `files: a.ts`\n');
+    await createWorktree(workspace, 'demo', '1.1');
+
+    const listed = await listWorktrees(workspace, 'demo');
+    expect(listed.worktrees).toEqual([
+      expect.objectContaining({ task: '1.1', status: 'active', existsOnDisk: true }),
+    ]);
+  });
+
   it('keeps the merge commit and the task-completion commit distinct, in that order', async () => {
     const workspace = await makeGitWorkspace();
     await seedGitChange(workspace, 'demo', '- [ ] 1.1 Faz X `files: a.ts`\n');

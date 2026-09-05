@@ -657,7 +657,14 @@ export async function listWorktrees(workspace: Workspace, changeId: string): Pro
 
   const tasks = await listRegisteredTasks(projectRoot, changeId);
   const gitWorktrees = await listGitWorktrees(projectRoot);
-  const gitPaths = new Set(gitWorktrees.map((entry) => path.resolve(entry.path)));
+  // `git worktree list` reports paths through their real path (macOS's
+  // `/var` → `/private/var` symlink, notably); a registry entry's path is
+  // whatever `workspace.projectRoot` was when it was written. Comparing both
+  // with plain `path.resolve` - which never follows symlinks - reported an
+  // existing worktree as gone on exactly that platform.
+  const gitPaths = new Set(
+    await Promise.all(gitWorktrees.map((entry) => realpathOrResolve(entry.path)))
+  );
 
   const worktrees: WorktreeListEntry[] = [];
   for (const task of tasks) {
@@ -670,7 +677,7 @@ export async function listWorktrees(workspace: Workspace, changeId: string): Pro
       branch: entry.branch,
       path: entry.path,
       status: entry.status,
-      existsOnDisk: gitPaths.has(path.resolve(entry.path)),
+      existsOnDisk: gitPaths.has(await realpathOrResolve(entry.path)),
     });
   }
 
