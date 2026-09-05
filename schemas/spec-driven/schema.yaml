@@ -222,6 +222,10 @@ artifacts:
       - **a condição de sucesso nunca pode ser um teste ser pulado, ignorado ou condicional.**
         Se a change entrega um teste, a verificação é a execução dele. Se ele depende de um
         serviço externo, a tarefa declara como esse serviço é provido
+      - **nunca derive valores do que já está persistido.** Um enum, um conjunto de estados,
+        uma constraint - todos vêm da spec, jamais do schema do banco, de uma migration ou
+        de dados existentes. Uma tarefa que diz "criar o enum com os literais já
+        persistidos" inverteu a fonte de verdade
 
       Exemplo:
       ```
@@ -264,6 +268,14 @@ artifacts:
       SQLite da suíte padrão descarta em silêncio, e nunca foi exercida.
 
       Uma verificação que confirma um skip é uma tarefa que se autoaprova.
+
+      **Por que a regra sobre derivar do schema existe.** No mesmo projeto, uma change
+      inventou o valor `transferred` numa check constraint sem nenhum requisito por trás. A
+      change seguinte recebeu a tarefa "criar o tipo de evento com os literais JÁ
+      PERSISTIDOS" - e assim o schema virou fonte de verdade acima da spec. As duas changes
+      seguintes adiaram, e nada nunca implementou o comportamento. Sobrou um valor de enum
+      no domínio e no banco que requisito nenhum justifica, e que ninguém consegue remover
+      com segurança porque não se sabe o que ele deveria significar.
 
       Use as specs para o que construir e o design para como construir.
 
