@@ -38,6 +38,7 @@ describe('renderConfig — todo campo já vem no arquivo, ativo ou comentado com
       context: 'Monorepo TypeScript.',
       rules: { proposal: ['citar o ticket'] },
       defaultParallel: true,
+      parallelPropose: true,
     };
     const loaded = await roundTrip(written);
     expect(loaded).toEqual(written);

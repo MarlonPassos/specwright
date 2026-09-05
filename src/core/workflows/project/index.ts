@@ -4,9 +4,10 @@ import { projectReviewCommand } from './review.js';
 import { projectGenerateCommand } from './generate.js';
 import { projectStatusCommand } from './status.js';
 import { projectNextCommand } from './next.js';
+import { projectProposeBatchCommand } from './propose-batch.js';
 import { projectRefineCommand } from './refine.js';
 
-/** The six plan commands, in the order a plan is walked. */
+/** The plan commands, in the order a plan is walked. */
 export function projectCommands(): WorkflowCommand[] {
   return [
     projectPlanCommand(),
@@ -14,6 +15,7 @@ export function projectCommands(): WorkflowCommand[] {
     projectGenerateCommand(),
     projectStatusCommand(),
     projectNextCommand(),
+    projectProposeBatchCommand(),
     projectRefineCommand(),
   ];
 }

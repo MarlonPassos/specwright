@@ -27,6 +27,7 @@ const EXPECTED_PROJECT_COMMANDS = [
   'project-generate',
   'project-status',
   'project-next',
+  'project-propose-batch',
   'project-refine',
 ];
 const EXPECTED_COMMANDS = [...EXPECTED_WORKFLOW_COMMANDS, ...EXPECTED_PROJECT_COMMANDS];
@@ -63,9 +64,9 @@ describe('generated commands', () => {
     expect(workflowCommands().map((command) => command.id)).toEqual(EXPECTED_WORKFLOW_COMMANDS);
   });
 
-  it('exposes the six plan commands and a catalogue of thirteen', () => {
+  it('exposes the seven plan commands and a catalogue of fourteen', () => {
     expect(projectCommands().map((command) => command.id)).toEqual(EXPECTED_PROJECT_COMMANDS);
-    expect(allCommands()).toHaveLength(13);
+    expect(allCommands()).toHaveLength(14);
     expect(allCommandIds()).toEqual(EXPECTED_COMMANDS);
   });
 

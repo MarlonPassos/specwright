@@ -26,6 +26,14 @@ export const WorkspaceConfigSchema = z.object({
    * already exists.
    */
   defaultParallel: z.boolean().optional(),
+  /**
+   * Opt-in to `specs project next` OFFERING a batch of Planned Changes to
+   * propose in parallel. Separate from `defaultParallel` on purpose: that one
+   * seeds a new change's own `.change.yaml`, and at propose-batch time the
+   * changes do not exist yet - there is no `.change.yaml` to read the opt-in
+   * from, so the decision can only live at the workspace level.
+   */
+  parallelPropose: z.boolean().optional(),
 });
 
 export type WorkspaceConfig = z.infer<typeof WorkspaceConfigSchema>;
@@ -111,6 +119,12 @@ export function renderConfig(config: WorkspaceConfig): string {
       '# nova (`specs new change`). Uma change específica sempre pode ligar ou',
       '# desligar na hora com --parallel/--no-parallel, não importa este valor.',
       `defaultParallel: ${config.defaultParallel ?? false}`,
+    ].join('\n'),
+    [
+      '# Deixa `specs project next` oferecer um lote de Planned Changes pra',
+      '# propor em paralelo (um subagente por change, quando nenhuma delas',
+      '# depende da outra). Só oferece: quem dispara o lote é sempre você.',
+      `parallelPropose: ${config.parallelPropose ?? false}`,
     ].join('\n'),
   ];
   return sections.join('\n\n') + '\n';
