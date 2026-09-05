@@ -688,6 +688,39 @@ export interface CoverageLoss {
   lostRefs: Array<{ path: string; lines?: string }>;
 }
 
+/** `371-573` → `[371, 573]`; `371` → `[371, 371]`; anything else → undefined. */
+function parseRange(lines: string | undefined): [number, number] | undefined {
+  if (lines === undefined) return undefined;
+  const span = /^(\d+)\s*-\s*(\d+)$/.exec(lines.trim());
+  if (span) {
+    const from = Number(span[1]);
+    const to = Number(span[2]);
+    return from <= to ? [from, to] : [to, from];
+  }
+  const single = /^(\d+)$/.exec(lines.trim());
+  return single ? [Number(single[1]), Number(single[1])] : undefined;
+}
+
+/**
+ * The part of `range` that no interval in `covers` accounts for.
+ *
+ * Used to decide whether a split PARTITIONED a range or just kept a slice of
+ * it. Splitting `371-573` into `371-400` and `401-573` leaves nothing over and
+ * is the job being done correctly; keeping only `371-400` leaves `401-573` with
+ * nobody answering for it, and that is a loss whether or not the document is
+ * still cited somewhere.
+ */
+function uncovered(range: [number, number], covers: Array<[number, number]>): boolean {
+  let [from, to] = range;
+  for (const [start, end] of [...covers].sort((a, b) => a[0] - b[0])) {
+    if (end < from) continue;
+    if (start > from) return true;
+    from = Math.max(from, end + 1);
+    if (from > to) return false;
+  }
+  return from <= to;
+}
+
 /**
  * Which source pointers a re-decomposition drops on the floor.
  *
@@ -699,11 +732,18 @@ export interface CoverageLoss {
  * one re-decomposition, and the six code gaps that followed had that as their
  * shared root.
  *
- * The comparison is by source PATH, not by exact pointer. A successor that
- * narrows `371-573` to `371-400` is doing its job, and flagging it would train
- * everyone to ignore the finding. A source document that NO successor mentions
- * at all is unambiguous: whatever the retired increment answered for there,
- * nobody answers for now.
+ * Coverage is decided at two levels, because one alone is not enough.
+ *
+ * By PATH: a source document no successor mentions at all is unambiguous. This
+ * is the whole answer when the pointer carries no numeric range.
+ *
+ * By RANGE, when both sides carry numeric line spans: the successors' spans on
+ * that path are unioned, and what is left over is lost. Path alone was too weak
+ * to be useful in the common case of a plan with ONE source document — every
+ * split cites it somewhere, so nothing ever fired, no matter how much of the
+ * document stopped being answered for. Range alone would be too strict: it is
+ * the UNION that matters, so a split that partitions `371-573` into `371-400`
+ * and `401-573` is silent, as it should be.
  */
 export function supersessionCoverage(
   manifest: PlanManifest,
@@ -717,10 +757,22 @@ export function supersessionCoverage(
     const refs = retired?.source_refs ?? [];
     if (refs.length === 0) continue;
 
-    const covered = new Set(
-      to.flatMap((id) => (byId.get(id)?.source_refs ?? []).map((ref) => ref.path))
-    );
-    const lostRefs = refs.filter((ref) => !covered.has(ref.path));
+    const successorRefs = to.flatMap((id) => byId.get(id)?.source_refs ?? []);
+    const coveredPaths = new Set(successorRefs.map((ref) => ref.path));
+
+    const lostRefs = refs.filter((ref) => {
+      if (!coveredPaths.has(ref.path)) return true;
+      const range = parseRange(ref.lines);
+      // No numeric range on either side: the path is cited, and that is all
+      // this can honestly conclude.
+      if (range === undefined) return false;
+      const covers = successorRefs
+        .filter((other) => other.path === ref.path)
+        .map((other) => parseRange(other.lines))
+        .filter((span): span is [number, number] => span !== undefined);
+      if (covers.length === 0) return false;
+      return uncovered(range, covers);
+    });
     if (lostRefs.length === 0) continue;
 
     losses.push({

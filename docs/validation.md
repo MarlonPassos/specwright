@@ -142,10 +142,18 @@ discordam sobre os mesmos bytes.
 | --- | --- | --- |
 | WARNING (ERROR sob `--strict`) | `supersession_coverage_lost` | um `splitChange`/`mergeChanges` aposenta um incremento que citava um documento-fonte que **nenhum** sucessor cita |
 
-A comparação é por PATH, não por ponteiro exato: um sucessor que estreita
-`371-573` para `371-400` está fazendo o trabalho dele. Um documento que nenhum
-sucessor menciona é inequívoco — o que o incremento aposentado respondia ali,
-ninguém responde mais.
+A cobertura é decidida em dois níveis, porque um só não basta.
+
+Por **path**: um documento que nenhum sucessor menciona é inequívoco. É a
+resposta inteira quando o ponteiro não traz faixa numérica.
+
+Por **faixa**, quando os dois lados trazem linhas numéricas: as faixas dos
+sucessores naquele documento são unidas, e o que sobra é perda. Só path era
+fraco demais no caso comum de um plano com UM documento-fonte — todo split o
+cita em algum lugar, então nada nunca disparava por mais que o documento
+deixasse de ser respondido. Só faixa seria estrito demais: é a UNIÃO que
+importa, então um split que parte `371-573` em `371-400` e `401-573` fica em
+silêncio, como deve.
 
 Aparece no `apply --dry-run`, que é onde a decisão é tomada. Sem `--strict` é
 aviso: largar um escopo pode ser deliberado. Com `--strict`, `apply` recusa e

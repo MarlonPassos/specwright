@@ -235,7 +235,48 @@ describe('re-decomposição não pode perder a fonte em silêncio', () => {
     expect(after.changes.map((c) => c.id)).toEqual(['CH-001']);
   });
 
-  it('cala quando os sucessores cobrem todo documento que o original citava', async () => {
+  it('acusa a faixa que sobrou quando um sucessor fica só com um pedaço', async () => {
+    const workspace = await planWithCitedIncrement();
+    const result = await applyPlanBundle(workspace, 'p', {
+      ...splitLosing,
+      operations: [
+        {
+          ...splitLosing.operations[0],
+          into: [
+            {
+              ref: '$x',
+              slug: 'parte-a',
+              title: 'Parte A',
+              // Keeps 1-4 of a 1-9 range: 5-9 passa a não ter dono, mesmo com
+              // o documento ainda citado. Comparar só por path não pegaria.
+              plannedChange: {
+                objetivo: 'o',
+                escopo: ['x'],
+                criteriosMacro: ['y'],
+                referencias: ['docs/a.md:1-4'],
+              },
+            },
+            {
+              ref: '$y',
+              slug: 'parte-b',
+              title: 'Parte B',
+              plannedChange: {
+                objetivo: 'o',
+                escopo: ['x'],
+                criteriosMacro: ['y'],
+                referencias: ['docs/b.md:1-4'],
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const finding = result.diagnostics.find((d) => d.code === 'supersession_coverage_lost')!;
+    expect(finding.message).toContain('docs/a.md:1-9');
+  });
+
+  it('cala quando os sucessores particionam a faixa inteira entre si', async () => {
     const workspace = await planWithCitedIncrement();
     const result = await applyPlanBundle(workspace, 'p', {
       ...splitLosing,
@@ -251,7 +292,8 @@ describe('re-decomposição não pode perder a fonte em silêncio', () => {
                 objetivo: 'o',
                 escopo: ['x'],
                 criteriosMacro: ['y'],
-                // Narrower range on a.md — narrowing is the job, not a loss.
+                // 1-4 e 5-9 juntos cobrem o 1-9 original: é a divisão sendo
+                // feita, não perda. É a UNIÃO que importa.
                 referencias: ['docs/a.md:1-4'],
               },
             },
@@ -263,7 +305,7 @@ describe('re-decomposição não pode perder a fonte em silêncio', () => {
                 objetivo: 'o',
                 escopo: ['x'],
                 criteriosMacro: ['y'],
-                referencias: ['docs/b.md:1-4'],
+                referencias: ['docs/a.md:5-9', 'docs/b.md:1-4'],
               },
             },
           ],
