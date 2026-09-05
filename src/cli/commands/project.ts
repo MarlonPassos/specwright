@@ -6,6 +6,7 @@ import { validatePlan } from '../../core/project/validate.js';
 import { resolvePlanId, listPlanIds } from '../../core/project/paths.js';
 import { computeProjectStatus, showProjectChange, statusPayload } from '../../core/project/status.js';
 import { recommendNext } from '../../core/project/next.js';
+import { computeParallelImplementBatch } from '../../core/project/parallelImplement.js';
 import { generatePlannedChanges } from '../../core/project/generate.js';
 import { linkChange, unlinkChange, adoptChange, setPlanningState } from '../../core/project/link.js';
 import { syncPlan } from '../../core/project/sync.js';
@@ -203,12 +204,13 @@ export function registerProjectCommands(program: Command): void {
         const id = await resolvePlanId(workspace.projectRoot, planId);
         const status = await computeProjectStatus(workspace, id);
         const recommendation = recommendNext(status);
-        if (json) printJson(recommendation);
-        else printLines(formatNext(recommendation));
+        const implementBatch = await computeParallelImplementBatch(workspace, status);
+        if (json) printJson({ ...recommendation, implementBatch });
+        else printLines(formatNext(recommendation, implementBatch));
       } catch (error) {
         fail(error, {
           json,
-          payload: { recommended: null, alternatives: [], parallelReady: [] },
+          payload: { recommended: null, alternatives: [], parallelReady: [], implementBatch: { batch: [], excluded: [] } },
         });
       }
     });
@@ -652,7 +654,10 @@ function formatReports(reports: ValidationReport[], valid: boolean): string[] {
   return lines;
 }
 
-function formatNext(recommendation: ReturnType<typeof recommendNext>): string[] {
+function formatNext(
+  recommendation: ReturnType<typeof recommendNext>,
+  implementBatch: Awaited<ReturnType<typeof computeParallelImplementBatch>>
+): string[] {
   const lines: string[] = [];
   if (recommendation.recommended) {
     const r = recommendation.recommended;
@@ -677,6 +682,15 @@ function formatNext(recommendation: ReturnType<typeof recommendNext>): string[] 
       '',
       `Paralelas prontas: ${recommendation.parallelReady.join(', ')}`,
       `  ${recommendation.parallelCaveat}`
+    );
+  }
+  if (implementBatch.batch.length > 1) {
+    lines.push(
+      '',
+      `Lote pronto para implement paralelo (já propostas, sem capability em comum): ${implementBatch.batch
+        .map((entry) => entry.id)
+        .join(', ')}`,
+      '  specs worktree create --change <id> (uma por change do lote, sem --task)'
     );
   }
   if (recommendation.excluded.length > 0) {

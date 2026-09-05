@@ -108,6 +108,11 @@ function assertSafeIdentifiers(changeId: string, task: string): void {
   assertSafeTaskNumber(task);
 }
 
+/** Same fallback `assertMainWorktree` uses: a path that no longer exists can't be realpath'd. */
+async function realpathOrResolve(target: string): Promise<string> {
+  return fs.realpath(target).catch(() => path.resolve(target));
+}
+
 /** Resolves the change directory, refusing a change that does not exist. */
 async function assertChangeExists(workspace: Workspace, changeId: string): Promise<string> {
   const dir = changeDir(workspace, changeId);
@@ -729,5 +734,384 @@ export async function cleanupWorktree(
     }
 
     return { removed, skipped };
+  });
+}
+
+// --- change-level worktrees --------------------------------------------------
+//
+// One worktree for an ENTIRE change, not per task: `/spec-implement` (and
+// whatever it dispatches internally) runs inside it end to end, isolated from
+// any sibling change's own worktree. This is for the batch of changes a
+// project's `next` recommends as implement-ready and capability-disjoint, not
+// for tasks within one change - that is everything above this section.
+//
+// Reuses the git plumbing and the per-change lock above. The state machine is
+// smaller than the task one: there is no task-completion commit to make, so
+// landing the merge IS the finish - no `cleanup_pending` step is needed to
+// survive a crash between "merged" and "task marked done", because there is
+// no second write.
+
+export type ChangeWorktreeStatus = 'active' | 'merging' | 'merge_conflict';
+
+export interface ChangeWorktreeEntry {
+  branch: string;
+  /** Absolute. */
+  path: string;
+  /** HEAD of the main tree at creation time - the reconciliation anchor. */
+  baseSha: string;
+  createdAt: string;
+  status: ChangeWorktreeStatus;
+}
+
+export interface ChangeFinishResult {
+  merged: boolean;
+  removed?: boolean;
+  conflict?: boolean;
+  path?: string;
+  branch?: string;
+}
+
+export interface ChangeWorktreeListEntry {
+  change: string;
+  branch: string;
+  path: string;
+  status: ChangeWorktreeStatus;
+  existsOnDisk: boolean;
+}
+
+function changeRegistryPath(projectRoot: string, changeId: string): string {
+  return path.join(parallelDir(projectRoot, changeId), 'change.json');
+}
+
+function changeWorktreePath(projectRoot: string, changeId: string): string {
+  return path.join(projectRoot, '.specwright', 'worktrees', changeId, '_change');
+}
+
+/**
+ * A distinct top-level prefix from `specwright/<change>/<task>` - both are
+ * git ref namespaces (filesystem-like under `.git/refs/heads/`), and a ref
+ * cannot be both a leaf (`specwright/<id>`) and a directory
+ * (`specwright/<id>/<task>`) at once. Sharing the prefix would make task-level
+ * dispatch on a change that also has a change-level worktree fail with an
+ * opaque git error the moment both existed together.
+ */
+function changeBranchName(changeId: string): string {
+  return `specwright-change/${changeId}`;
+}
+
+async function readChangeRegistry(
+  projectRoot: string,
+  changeId: string
+): Promise<ChangeWorktreeEntry | undefined> {
+  const target = changeRegistryPath(projectRoot, changeId);
+  const raw = await readFileIfExists(target);
+  if (raw === undefined) return undefined;
+  try {
+    return JSON.parse(raw) as ChangeWorktreeEntry;
+  } catch {
+    throw new SpecError(`Registro de worktree corrompido para a change "${changeId}"`, {
+      code: 'worktree_registry_corrupt',
+      fix: `Inspecione e, se necessário, remova ${target} manualmente`,
+    });
+  }
+}
+
+async function writeChangeRegistry(
+  projectRoot: string,
+  changeId: string,
+  entry: ChangeWorktreeEntry
+): Promise<void> {
+  await writeFileAtomic(changeRegistryPath(projectRoot, changeId), JSON.stringify(entry, null, 2));
+}
+
+async function deleteChangeRegistry(projectRoot: string, changeId: string): Promise<void> {
+  await fs.rm(changeRegistryPath(projectRoot, changeId), { force: true });
+}
+
+/**
+ * Mirrors `reconcile`, minus the task-completion step: a `merging` entry whose
+ * branch already landed on HEAD just needs its worktree/branch cleaned up: it
+ * is fully done, not "done but with cleanup pending" as the task version has
+ * to model.
+ */
+async function reconcileChange(
+  projectRoot: string,
+  changeId: string
+): Promise<ChangeWorktreeEntry | undefined> {
+  let entry = await readChangeRegistry(projectRoot, changeId);
+  if (!entry) return undefined;
+
+  if (entry.status === 'merging') {
+    const ancestor = await runGit(['merge-base', '--is-ancestor', entry.branch, 'HEAD'], projectRoot);
+    if (!ancestor.ok) {
+      entry = { ...entry, status: 'active' };
+      await writeChangeRegistry(projectRoot, changeId, entry);
+      return entry;
+    }
+    const cleaned = await removeWorktreeAndBranch(projectRoot, entry.path, entry.branch);
+    if (!cleaned) return entry; // retried by the next call into reconcileChange
+    await deleteChangeRegistry(projectRoot, changeId);
+    return undefined;
+  }
+
+  return entry;
+}
+
+export async function createChangeWorktree(
+  workspace: Workspace,
+  changeId: string,
+  options: CreateWorktreeOptions = {}
+): Promise<{ branch: string; path: string }> {
+  const projectRoot = workspace.projectRoot;
+  await assertMainWorktree(projectRoot);
+  assertSafeChangeId(changeId);
+  await assertChangeExists(workspace, changeId);
+
+  const gitCommonDir = await resolveGitCommonDir(projectRoot);
+  await ensureExcluded(gitCommonDir);
+
+  return withParallelLock(projectRoot, changeId, async () => {
+    const existing = await reconcileChange(projectRoot, changeId);
+    if (existing) {
+      throw new SpecError(`Já existe um worktree ativo para a change "${changeId}" (status: ${existing.status})`, {
+        code: 'worktree_already_active',
+        fix: existing.status === 'merge_conflict' ? 'specs worktree resume --change ' + changeId : undefined,
+      });
+    }
+
+    const targetPath = changeWorktreePath(projectRoot, changeId);
+    if (await pathExists(targetPath)) {
+      throw new SpecError(`O diretório do worktree já existe sem estar registrado: ${targetPath}`, {
+        code: 'worktree_already_active',
+        fix: `specs worktree cleanup --change ${changeId} --force`,
+      });
+    }
+
+    const head = await runGit(['rev-parse', 'HEAD'], projectRoot);
+    if (!head.ok) {
+      throw new SpecError('Não foi possível resolver HEAD da árvore principal', { code: 'not_a_git_repo' });
+    }
+    const baseSha = head.stdout.trim();
+    const branch = changeBranchName(changeId);
+
+    const add = await runGit(['worktree', 'add', '-b', branch, targetPath, 'HEAD'], projectRoot);
+    if (!add.ok) {
+      throw new SpecError(`"git worktree add" falhou: ${add.stderr.trim()}`, { code: 'git_worktree_add_failed' });
+    }
+
+    try {
+      for (const relative of options.link ?? []) {
+        const tracked = await runGit(['ls-files', '--error-unmatch', relative], projectRoot);
+        if (tracked.ok) {
+          throw new SpecError(`"${relative}" é rastreado pelo git — não pode virar link simbólico`, {
+            code: 'link_target_tracked',
+          });
+        }
+        const source = path.join(projectRoot, relative);
+        if (await pathExists(source)) {
+          const destination = path.join(targetPath, relative);
+          await ensureDir(path.dirname(destination));
+          await fs.symlink(path.resolve(source), destination, 'dir');
+        }
+      }
+
+      await writeChangeRegistry(projectRoot, changeId, {
+        branch,
+        path: targetPath,
+        baseSha,
+        createdAt: new Date().toISOString(),
+        status: 'active',
+      });
+    } catch (error) {
+      await removeWorktreeAndBranch(projectRoot, targetPath, branch);
+      throw error;
+    }
+
+    return { branch, path: targetPath };
+  });
+}
+
+export async function finishChangeWorktree(workspace: Workspace, changeId: string): Promise<ChangeFinishResult> {
+  const projectRoot = workspace.projectRoot;
+  await assertMainWorktree(projectRoot);
+  assertSafeChangeId(changeId);
+  await assertChangeExists(workspace, changeId);
+
+  return withParallelLock(projectRoot, changeId, async () => {
+    const entry = await reconcileChange(projectRoot, changeId);
+    if (!entry) {
+      throw new SpecError(`Não há worktree ativo para a change "${changeId}"`, { code: 'worktree_not_found' });
+    }
+    if (entry.status !== 'active') {
+      throw new SpecError(`Worktree da change "${changeId}" está em "${entry.status}", não "active"`, {
+        code: 'worktree_invalid_state',
+        fix: entry.status === 'merge_conflict' ? 'specs worktree resume --change ' + changeId : undefined,
+      });
+    }
+
+    const gitCommonDir = await resolveGitCommonDir(projectRoot);
+    if (await pathExists(path.join(gitCommonDir, 'MERGE_HEAD'))) {
+      throw new SpecError('Já existe um merge em andamento na árvore principal', { code: 'merge_in_progress' });
+    }
+
+    const mainDirty = await runGit(['status', '--porcelain'], projectRoot);
+    if (mainDirty.stdout.trim().length > 0) {
+      throw new SpecError('A árvore principal tem alterações não commitadas — resolva antes de mesclar', {
+        code: 'main_tree_dirty',
+      });
+    }
+
+    const dirty = await runGit(['status', '--porcelain'], entry.path);
+    if (dirty.stdout.trim().length > 0) {
+      throw new SpecError(`O worktree da change "${changeId}" tem alterações não commitadas`, {
+        code: 'worktree_dirty',
+      });
+    }
+
+    const ahead = await runGit(['log', `${entry.baseSha}..${entry.branch}`, '--oneline'], projectRoot);
+    if (ahead.stdout.trim().length === 0) {
+      throw new SpecError(`A branch da change "${changeId}" não tem nenhum commit à frente de onde começou`, {
+        code: 'worktree_no_changes',
+      });
+    }
+
+    await writeChangeRegistry(projectRoot, changeId, { ...entry, status: 'merging' });
+
+    const merge = await runGit(['merge', '--no-ff', '-m', `merge ${entry.branch}`, entry.branch], projectRoot);
+    if (!merge.ok) {
+      const conflicted = await pathExists(path.join(gitCommonDir, 'MERGE_HEAD'));
+      if (!conflicted) {
+        await writeChangeRegistry(projectRoot, changeId, { ...entry, status: 'active' });
+        throw new SpecError(`"git merge" falhou sem conflito de conteúdo: ${merge.stderr.trim()}`, {
+          code: 'merge_failed',
+        });
+      }
+      await runGit(['merge', '--abort'], projectRoot);
+      await writeChangeRegistry(projectRoot, changeId, { ...entry, status: 'merge_conflict' });
+      return { merged: false, conflict: true, path: entry.path, branch: entry.branch };
+    }
+
+    const removed = await removeWorktreeAndBranch(projectRoot, entry.path, entry.branch);
+    if (removed) await deleteChangeRegistry(projectRoot, changeId);
+    else await writeChangeRegistry(projectRoot, changeId, { ...entry, status: 'merging' });
+    return { merged: true, removed };
+  });
+}
+
+export async function resumeChangeWorktree(workspace: Workspace, changeId: string): Promise<ChangeFinishResult> {
+  const projectRoot = workspace.projectRoot;
+  await assertMainWorktree(projectRoot);
+  assertSafeChangeId(changeId);
+  await assertChangeExists(workspace, changeId);
+
+  return withParallelLock(projectRoot, changeId, async () => {
+    // Deliberately not `reconcileChange`: a merge_conflict entry never
+    // self-heals - only a human merging by hand, outside this tool, resolves it.
+    const entry = await readChangeRegistry(projectRoot, changeId);
+    if (!entry) {
+      throw new SpecError(`Não há worktree registrado para a change "${changeId}"`, { code: 'worktree_not_found' });
+    }
+    if (entry.status !== 'merge_conflict') {
+      throw new SpecError(`Nada para retomar — estado atual é "${entry.status}"`, {
+        code: 'worktree_invalid_state',
+      });
+    }
+
+    const ancestor = await runGit(['merge-base', '--is-ancestor', entry.branch, 'HEAD'], projectRoot);
+    if (!ancestor.ok) {
+      throw new SpecError('O merge ainda não foi concluído na árvore principal', {
+        code: 'merge_not_completed',
+        fix: `cd na raiz do repositório e rode: git merge --no-ff ${entry.branch}`,
+      });
+    }
+
+    const removed = await removeWorktreeAndBranch(projectRoot, entry.path, entry.branch);
+    if (removed) await deleteChangeRegistry(projectRoot, changeId);
+    else await writeChangeRegistry(projectRoot, changeId, { ...entry, status: 'merging' });
+    return { merged: true, removed };
+  });
+}
+
+/** Across every change in the workspace - unlike task worktrees, at most one exists per change. */
+export async function listChangeWorktrees(workspace: Workspace): Promise<ChangeWorktreeListEntry[]> {
+  const projectRoot = workspace.projectRoot;
+  await assertMainWorktree(projectRoot);
+
+  const parallelRoot = path.join(projectRoot, '.specwright', 'parallel');
+  let changeIds: string[];
+  try {
+    changeIds = (await fs.readdir(parallelRoot, { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
+  } catch {
+    return [];
+  }
+
+  const gitWorktrees = await listGitWorktrees(projectRoot);
+  // `git worktree list` reports paths through their real path (macOS's
+  // `/var` → `/private/var` symlink, notably); a registry entry's path is
+  // whatever `workspace.projectRoot` was when it was written. Comparing both
+  // with plain `path.resolve` - which never follows symlinks - reported an
+  // existing worktree as gone on exactly that platform.
+  const gitPaths = new Set(
+    await Promise.all(gitWorktrees.map((entry) => realpathOrResolve(entry.path)))
+  );
+
+  const result: ChangeWorktreeListEntry[] = [];
+  for (const changeId of changeIds.sort()) {
+    if (!(await pathExists(changeRegistryPath(projectRoot, changeId)))) continue;
+    const entry = await withParallelLock(projectRoot, changeId, () => reconcileChange(projectRoot, changeId));
+    if (!entry) continue;
+    result.push({
+      change: changeId,
+      branch: entry.branch,
+      path: entry.path,
+      status: entry.status,
+      existsOnDisk: gitPaths.has(await realpathOrResolve(entry.path)),
+    });
+  }
+  return result;
+}
+
+export async function cleanupChangeWorktree(
+  workspace: Workspace,
+  changeId: string,
+  options: { force?: boolean } = {}
+): Promise<{ removed: boolean; reason?: string }> {
+  const projectRoot = workspace.projectRoot;
+  await assertMainWorktree(projectRoot);
+  assertSafeChangeId(changeId);
+  await assertChangeExists(workspace, changeId);
+
+  return withParallelLock(projectRoot, changeId, async () => {
+    const entry = await reconcileChange(projectRoot, changeId);
+    if (!entry) {
+      if (options.force) {
+        const conventionalPath = changeWorktreePath(projectRoot, changeId);
+        if (await pathExists(conventionalPath)) {
+          const cleaned = await removeWorktreeAndBranch(
+            projectRoot,
+            conventionalPath,
+            changeBranchName(changeId),
+            true
+          );
+          return cleaned ? { removed: true } : { removed: false, reason: 'removal_failed' };
+        }
+      }
+      return { removed: false, reason: 'not_found' };
+    }
+
+    if (!options.force) {
+      const merged = await runGit(['branch', '--merged', 'HEAD'], projectRoot);
+      const mergedBranches = merged.stdout.split('\n').map((line) => line.replace(/^\*?\s+/, '').trim());
+      if (!mergedBranches.includes(entry.branch)) {
+        return { removed: false, reason: 'not_merged' };
+      }
+    }
+
+    const cleaned = await removeWorktreeAndBranch(projectRoot, entry.path, entry.branch, options.force === true);
+    if (!cleaned) return { removed: false, reason: 'removal_failed' };
+    await deleteChangeRegistry(projectRoot, changeId);
+    return { removed: true };
   });
 }

@@ -5,10 +5,15 @@ import { commitAll, git, makeGitWorkspace } from '../helpers/git.js';
 import { seedChange, writeFile } from '../helpers/workspace.js';
 import {
   assertMainWorktree,
+  cleanupChangeWorktree,
   cleanupWorktree,
+  createChangeWorktree,
   createWorktree,
+  finishChangeWorktree,
   finishWorktree,
+  listChangeWorktrees,
   listWorktrees,
+  resumeChangeWorktree,
   resumeWorktree,
   withParallelLock,
 } from '../../src/core/change/worktree.js';
@@ -389,5 +394,140 @@ describe('withParallelLock', () => {
 
     await Promise.all([task(), task(), task()]);
     expect(maxConcurrent).toBe(1);
+  });
+});
+
+describe('createChangeWorktree / finishChangeWorktree — one worktree for the whole change', () => {
+  it('isolates a change, merges committed work back, and cleans up', async () => {
+    const workspace = await makeGitWorkspace();
+    await seedGitChange(workspace, 'demo', '- [ ] 1.1 Faz X `files: src/x.ts`\n');
+
+    const created = await createChangeWorktree(workspace, 'demo');
+    expect(created.branch).toBe('specwright-change/demo');
+    expect(await exists(created.path)).toBe(true);
+
+    await writeFile(path.join(created.path, 'src', 'x.ts'), 'export const x = 1;\n');
+    await git(['add', '-A'], created.path);
+    await git(['commit', '-q', '-m', 'implement the whole change'], created.path);
+
+    const result = await finishChangeWorktree(workspace, 'demo');
+    expect(result).toEqual({ merged: true, removed: true });
+    expect(await exists(created.path)).toBe(false);
+
+    const branches = await git(['branch', '--list', 'specwright-change/demo'], workspace.projectRoot);
+    expect(branches.stdout.trim()).toBe('');
+    // No task-completion commit is made - nothing in this module knows which
+    // task(s) the change-level worktree touched.
+    const log = await git(['log', '--format=%s', '-n', '2'], workspace.projectRoot);
+    expect(log.stdout).not.toContain('marca a tarefa');
+  });
+
+  it('does not collide with a task-level worktree on the same change (distinct branch/ref namespace)', async () => {
+    const workspace = await makeGitWorkspace();
+    await seedGitChange(workspace, 'demo', '- [ ] 1.1 Faz X `files: src/x.ts`\n');
+
+    const task = await createWorktree(workspace, 'demo', '1.1');
+    const change = await createChangeWorktree(workspace, 'demo');
+    expect(task.path).not.toBe(change.path);
+    expect(task.branch).not.toBe(change.branch);
+
+    await writeFile(path.join(task.path, 'src', 'x.ts'), 'x');
+    await git(['add', '-A'], task.path);
+    await git(['commit', '-q', '-m', 'task work'], task.path);
+    await finishWorktree(workspace, 'demo', '1.1');
+
+    // The change-level worktree survives the task-level one finishing.
+    expect(await exists(change.path)).toBe(true);
+    await cleanupChangeWorktree(workspace, 'demo', { force: true });
+  });
+
+  it('reports a conflict and lets a human resolution be picked up by resumeChangeWorktree', async () => {
+    const workspace = await makeGitWorkspace();
+    await seedGitChange(workspace, 'demo', '- [ ] 1.1 Faz X `files: src/x.ts`\n');
+    await writeFile(path.join(workspace.projectRoot, 'src', 'shared.ts'), 'export const v = 1;\n');
+    await commitAll(workspace.projectRoot, 'seed shared.ts');
+
+    const created = await createChangeWorktree(workspace, 'demo');
+    await writeFile(path.join(created.path, 'src', 'shared.ts'), 'export const v = 2;\n');
+    await git(['add', '-A'], created.path);
+    await git(['commit', '-q', '-m', 'change it in the worktree'], created.path);
+
+    // Diverge the main tree on the same line so the merge conflicts for real.
+    await writeFile(path.join(workspace.projectRoot, 'src', 'shared.ts'), 'export const v = 3;\n');
+    await commitAll(workspace.projectRoot, 'change it on main too');
+
+    const result = await finishChangeWorktree(workspace, 'demo');
+    expect(result.merged).toBe(false);
+    expect(result.conflict).toBe(true);
+
+    // resume before the human actually merges: refused, not attempted
+    await expect(resumeChangeWorktree(workspace, 'demo')).rejects.toMatchObject({
+      code: 'merge_not_completed',
+    });
+
+    // human resolves by hand, in the main tree, with plain git - same sequence
+    // the CLI text points to: start the merge themselves, resolve, commit.
+    await git(['merge', '--no-ff', result.branch!], workspace.projectRoot).catch(() => undefined);
+    await fs.writeFile(
+      path.join(workspace.projectRoot, 'src', 'shared.ts'),
+      'export const v = 2+3\n',
+      'utf8'
+    );
+    await git(['add', '-A'], workspace.projectRoot);
+    await git(['commit', '-q', '-m', 'resolve conflict'], workspace.projectRoot);
+
+    const resumed = await resumeChangeWorktree(workspace, 'demo');
+    expect(resumed).toEqual({ merged: true, removed: true });
+    expect(await exists(created.path)).toBe(false);
+  });
+
+  it('refuses a second active change-level worktree for the same change', async () => {
+    const workspace = await makeGitWorkspace();
+    await seedGitChange(workspace, 'demo', '- [ ] 1.1 Faz X `files: a.ts`\n');
+    await createChangeWorktree(workspace, 'demo');
+
+    await expect(createChangeWorktree(workspace, 'demo')).rejects.toMatchObject({
+      code: 'worktree_already_active',
+    });
+  });
+
+  it('refuses to finish with no commit ahead of base', async () => {
+    const workspace = await makeGitWorkspace();
+    await seedGitChange(workspace, 'demo', '- [ ] 1.1 Faz X `files: a.ts`\n');
+    await createChangeWorktree(workspace, 'demo');
+
+    await expect(finishChangeWorktree(workspace, 'demo')).rejects.toMatchObject({
+      code: 'worktree_no_changes',
+    });
+  });
+
+  it('lists change-level worktrees across every change in the workspace', async () => {
+    const workspace = await makeGitWorkspace();
+    await seedGitChange(workspace, 'demo-a', '- [ ] 1.1 Faz X `files: a.ts`\n');
+    await seedGitChange(workspace, 'demo-b', '- [ ] 1.1 Faz Y `files: b.ts`\n');
+    await createChangeWorktree(workspace, 'demo-a');
+    await createChangeWorktree(workspace, 'demo-b');
+
+    const listed = await listChangeWorktrees(workspace);
+    expect(listed.map((entry) => entry.change).sort()).toEqual(['demo-a', 'demo-b']);
+    expect(listed.every((entry) => entry.status === 'active' && entry.existsOnDisk)).toBe(true);
+  });
+
+  it('cleanup refuses an unmerged worktree without --force, and removes a merged one', async () => {
+    const workspace = await makeGitWorkspace();
+    await seedGitChange(workspace, 'demo', '- [ ] 1.1 Faz X `files: a.ts`\n');
+    const created = await createChangeWorktree(workspace, 'demo');
+    await writeFile(path.join(created.path, 'a.ts'), 'x');
+    await git(['add', '-A'], created.path);
+    await git(['commit', '-q', '-m', 'work'], created.path);
+
+    const refused = await cleanupChangeWorktree(workspace, 'demo');
+    expect(refused).toEqual({ removed: false, reason: 'not_merged' });
+    expect(await exists(created.path)).toBe(true);
+
+    await finishChangeWorktree(workspace, 'demo');
+    // Already gone after finish - cleanup has nothing left to do.
+    const afterFinish = await cleanupChangeWorktree(workspace, 'demo');
+    expect(afterFinish).toEqual({ removed: false, reason: 'not_found' });
   });
 });
