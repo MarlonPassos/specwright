@@ -69,6 +69,23 @@ que repare; com isso, divergência não declarada é a diferença entre duas lis
 A serialização é determinística: `load → save → load` é byte-idêntico. As chaves
 saem em ordem fixa, `changes` na ordem de declaração e `milestones` por `order`.
 
+### Invariantes em `architecture.md`
+
+A seção `## Invariantes` guarda as regras estruturais que precisam continuar valendo
+depois de toda change, e **cada uma nomeia a capability que vai carregá-la** como
+requisito.
+
+A exigência não é decorativa. Num projeto real, a pureza do domínio virou requisito de
+spec e ganhou uma varredura que proíbe imports de framework — zero violações. A regra de
+dependência da camada de aplicação ficou só no documento de arquitetura, e terminou com
+onze imports de infraestrutura em cinco de cinco módulos de caso de uso. O teste espelhou
+fielmente o que foi especificado; a lacuna era da spec, não da disciplina de quem
+implementou.
+
+A promoção não é conferida por comando nenhum: casar uma frase de arquitetura com um
+requisito é juízo semântico, fora da fronteira da CLI. `/spec-project-review` pede que o
+agente olhe para isso, e `/spec-project-verify` também.
+
 ### `/spec-project-verify` — conferir o que foi entregue
 
 `/spec-verify` confere UMA change contra os deltas dela. `/spec-project-review`

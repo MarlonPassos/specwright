@@ -36,6 +36,11 @@ ${PROJECT_BOUNDARY}
    ponteiros. Com \`source_documents\` declarado, essa seção é **obrigatória**: um
    brief que não aponta para lugar nenhum não tem como ser conferido contra
    nada, e é assim que um item de escopo some sem ninguém notar.
+4b. Registre em \`architecture.md\` as **Invariantes**: as regras estruturais que
+   precisam continuar valendo depois de toda change. Cada uma nomeia a capability que
+   vai carregá-la como requisito — uma invariante que fica só no documento de
+   arquitetura não é verificável por ninguém, e a que vira requisito ganha um teste que
+   a defende.
 5. Mostre o resumo, as suposições que fez e as dúvidas críticas que mudam escopo.
 6. \`specs project bundle-schema --json\` — o contrato do bundle. Leia antes de
    montar o primeiro; não descubra o formato errando contra \`apply\`.

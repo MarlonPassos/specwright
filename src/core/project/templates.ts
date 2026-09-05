@@ -89,5 +89,23 @@ Desempenho, segurança, disponibilidade, custo.
 ## Decisões
 
 Decisões transversais que afetam mais de um incremento, com a razão de cada uma.
+
+## Invariantes
+
+Regras estruturais que precisam continuar valendo depois de toda change: regra de
+dependência entre camadas, o que o domínio não pode importar, o que nunca atravessa
+uma fronteira.
+
+Cada invariante nomeia a **capability** que vai carregá-la como requisito. Uma invariante
+que fica só aqui não é verificável por ninguém: ela vira comentário. A que virou requisito
+ganha um teste que a defende.
+
+O contraste é observável. Num projeto real, a pureza do domínio virou requisito de spec e
+ganhou uma varredura que proíbe imports de framework — zero violações. A regra de
+dependência da camada de aplicação ficou só nesta seção, e terminou com onze imports de
+infraestrutura em cinco de cinco módulos de caso de uso. O teste espelhou fielmente o que
+foi especificado; a lacuna era da spec.
+
+- <!-- invariante --> → capability: <!-- caminho/da/capability -->
 `;
 }

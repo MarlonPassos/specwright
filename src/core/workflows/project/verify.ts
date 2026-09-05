@@ -71,7 +71,9 @@ pedido?".
      paginação, envelope de erro, formato de id;
    - **exemplo impossível**: um exemplo dentro de um requisito que a própria regra dele
      torna inalcançável;
-   - **divergência não declarada**: o design contraria a fonte sem a subseção de divergência.
+   - **divergência não declarada**: o design contraria a fonte sem a subseção de divergência;
+   - **invariante sem guarda**: uma invariante de \`architecture.md\` que não virou requisito
+     de nenhuma capability, e portanto não tem teste que a defenda.
 
 5. **Documentação de entrega**
 
