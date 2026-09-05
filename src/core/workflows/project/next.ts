@@ -37,7 +37,10 @@ ${PROJECT_BOUNDARY}
       podem divergir, e \`--change\` só aceita o slug.
    b. Para cada uma, \`specs worktree create --change <link> --whole-change --json\`
       (isola a change inteira, não uma tarefa — \`--whole-change\` é obrigatório
-      aqui, não é o padrão ao omitir \`--task\`).
+      aqui, não é o padrão ao omitir \`--task\`). Se vier
+      \`change_artifacts_uncommitted\`, os artefatos daquela change ainda não
+      estão commitados: o worktree sai de HEAD e nasceria sem eles. Mostre o
+      \`fix\` devolvido e **pergunte** antes de commitar por conta própria.
    c. Dispare um subagente por change do lote **na mesma mensagem**, cada um
       trabalhando só dentro do \`path\` do worktree dele, seguindo
       ${commandRef('implement')} (e, se quiser, ${commandRef('verify')}) até o fim.
@@ -60,6 +63,9 @@ ${PROJECT_BOUNDARY}
    prioridade venceu). Rode-a depois, sozinha. \`implement_blocked:<...>\` também
    não é bug — a change ainda não tem os artefatos que ${commandRef('implement')}
    precisa; trate como \`excluded\` normal, aponte ${commandRef('propose')}.
+   \`worktree_active\` significa que aquela change já tem um worktree aberto
+   (alguém está nela agora, ou um crash deixou registro para trás): não
+   redespache, veja \`specs worktree list --whole-change --json\`.
 
 ${EVIDENCE_LABELS}
 

@@ -1,5 +1,6 @@
 import { readDeltaSpecs } from '../change/model.js';
 import { resolveChangeContext, computeStatus } from '../change/status.js';
+import { hasRegisteredWorktree } from '../change/worktree.js';
 import { changeDir, type Workspace } from '../workspace.js';
 import { PRIORITY_RANK } from './state.js';
 import type { PlanStatus } from './status.js';
@@ -68,6 +69,14 @@ export async function computeParallelImplementBatch(
     }
     if (view.execution !== 'proposed') {
       excluded.push({ id: view.id, reason: `execution_${view.execution}` });
+      continue;
+    }
+    // An open worktree does not move `execution` off `proposed` - the change
+    // directory looks untouched from the plan's side while a subagent works
+    // in the isolated copy. Recommending it again would hand the operator a
+    // `worktree create` that fails with `worktree_already_active`.
+    if (await hasRegisteredWorktree(workspace.projectRoot, view.link.name)) {
+      excluded.push({ id: view.id, reason: 'worktree_active' });
       continue;
     }
 

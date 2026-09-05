@@ -340,8 +340,14 @@ async function removeWorktreeAndBranch(
   await runGit(['worktree', 'remove', ...(force ? ['--force'] : []), entryPath], projectRoot);
   await runGit(['branch', force ? '-D' : '-d', branch], projectRoot);
 
+  // Both sides through realpath: git reports a worktree by its real path, the
+  // registry stores whatever `workspace.projectRoot` was. Comparing raw meant
+  // a still-present worktree read as gone on macOS (`/var` → `/private/var`)
+  // - and "gone" is what makes the caller delete the registry entry, which is
+  // the only record that this pair still owes a cleanup.
   const worktrees = await listGitWorktrees(projectRoot);
-  const worktreeGone = !worktrees.some((entry) => path.resolve(entry.path) === path.resolve(entryPath));
+  const stillListed = await Promise.all(worktrees.map((entry) => realpathOrResolve(entry.path)));
+  const worktreeGone = !stillListed.includes(await realpathOrResolve(entryPath));
   const branchList = await runGit(['branch', '--list', branch], projectRoot);
   const branchGone = branchList.stdout.trim().length === 0;
   return worktreeGone && branchGone;
@@ -681,12 +687,19 @@ export async function listWorktrees(workspace: Workspace, changeId: string): Pro
     });
   }
 
-  const registeredPaths = new Set(worktrees.map((entry) => path.resolve(entry.path)));
-  const conventionRoot = path.resolve(projectRoot, '.specwright', 'worktrees', changeId) + path.sep;
-  const unregistered = gitWorktrees
-    .filter((entry) => path.resolve(entry.path).startsWith(conventionRoot))
-    .filter((entry) => !registeredPaths.has(path.resolve(entry.path)))
-    .map((entry) => ({ path: entry.path, branch: entry.branch }));
+  // Same realpath normalization as `existsOnDisk` above: comparing a
+  // git-reported path against one built from `projectRoot` raw made this
+  // silently report nothing at all on macOS.
+  const registeredPaths = new Set(await Promise.all(worktrees.map((entry) => realpathOrResolve(entry.path))));
+  const conventionRoot =
+    (await realpathOrResolve(path.join(projectRoot, '.specwright', 'worktrees', changeId))) + path.sep;
+  const resolvedGitWorktrees = await Promise.all(
+    gitWorktrees.map(async (entry) => ({ entry, resolved: await realpathOrResolve(entry.path) }))
+  );
+  const unregistered = resolvedGitWorktrees
+    .filter(({ resolved }) => resolved.startsWith(conventionRoot))
+    .filter(({ resolved }) => !registeredPaths.has(resolved))
+    .map(({ entry }) => ({ path: entry.path, branch: entry.branch }));
 
   return { worktrees, unregistered };
 }
@@ -847,6 +860,21 @@ async function deleteChangeRegistry(projectRoot: string, changeId: string): Prom
 }
 
 /**
+ * Whether this change already has a worktree registered - a change-level one,
+ * a task-level one, or both. Pure filesystem: no git, no lock, no throw on a
+ * workspace that is not a git repository at all, so a caller that only needs
+ * "is something already running here?" (the project batch deciding what to
+ * recommend) can ask cheaply and safely. A registry entry left behind by a
+ * crash counts as active on purpose - that is precisely a change nobody
+ * should be dispatched onto until someone looks at it.
+ */
+export async function hasRegisteredWorktree(projectRoot: string, changeId: string): Promise<boolean> {
+  if (!SLUG_PATTERN.test(changeId)) return false;
+  if (await pathExists(changeRegistryPath(projectRoot, changeId))) return true;
+  return (await listRegisteredTasks(projectRoot, changeId)).length > 0;
+}
+
+/**
  * Mirrors `reconcile`, minus the task-completion step: a `merging` entry whose
  * branch already landed on HEAD just needs its worktree/branch cleaned up: it
  * is fully done, not "done but with cleanup pending" as the task version has
@@ -883,7 +911,7 @@ export async function createChangeWorktree(
   const projectRoot = workspace.projectRoot;
   await assertMainWorktree(projectRoot);
   assertSafeChangeId(changeId);
-  await assertChangeExists(workspace, changeId);
+  const changeDirPath = await assertChangeExists(workspace, changeId);
 
   const gitCommonDir = await resolveGitCommonDir(projectRoot);
   await ensureExcluded(gitCommonDir);
@@ -903,6 +931,26 @@ export async function createChangeWorktree(
         code: 'worktree_already_active',
         fix: `specs worktree cleanup --change ${changeId} --force`,
       });
+    }
+
+    // A worktree is checked out from HEAD: anything not committed in the main
+    // tree simply is not in it. Task-level dispatch tolerates that because the
+    // coordinator hands each subagent its task text - a change-level subagent
+    // instead READS proposal/design/tasks/deltas from disk inside its
+    // worktree, while `computeParallelImplementBatch` judged those very files
+    // in the main tree. An uncommitted change would be reported
+    // implement-ready and then arrive empty, so refuse before dispatching
+    // into a hole rather than after.
+    const changeRelative = path.relative(projectRoot, changeDirPath);
+    const uncommitted = await runGit(['status', '--porcelain', '--', changeRelative], projectRoot);
+    if (uncommitted.stdout.trim().length > 0) {
+      throw new SpecError(
+        `A change "${changeId}" tem artefatos não commitados — o worktree sai de HEAD e não os teria`,
+        {
+          code: 'change_artifacts_uncommitted',
+          fix: `git add ${changeRelative} && git commit`,
+        }
+      );
     }
 
     const head = await runGit(['rev-parse', 'HEAD'], projectRoot);

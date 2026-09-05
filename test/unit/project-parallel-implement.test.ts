@@ -144,6 +144,47 @@ describe('computeParallelImplementBatch', () => {
     expect(result.excluded[0].reason).toContain('proposal');
   });
 
+  it('excludes a change that already has a worktree registered', async () => {
+    // An open worktree never moves `execution` off `proposed` - the change
+    // directory looks untouched from the plan's side while a subagent works
+    // in the isolated copy. Without this, a second `project next` would
+    // recommend the same change and `worktree create` would then refuse it.
+    const workspace = await makePlanWorkspace();
+    const busy = await readyProposedChange(workspace, 'demo', { id: 'CH-001', slug: 'alpha' });
+    const free = await readyProposedChange(workspace, 'demo', { id: 'CH-002', slug: 'beta' }, { capability: 'cap-b' });
+    await seedPlan(workspace, manifest({ id: 'demo', changes: [busy, free] }));
+
+    // The registry is what `hasRegisteredWorktree` reads - written here
+    // directly so the check is exercised without needing a git repo.
+    await writeFile(
+      path.join(workspace.projectRoot, '.specwright', 'parallel', 'alpha', 'change.json'),
+      JSON.stringify({ branch: 'specwright-change/alpha', path: '/tmp/x', baseSha: 'abc', createdAt: '', status: 'active' })
+    );
+
+    const status = await computeProjectStatus(workspace, 'demo');
+    expect(status.changes[0].execution).toBe('proposed'); // confirms the gap this closes
+    const result = await computeParallelImplementBatch(workspace, status);
+
+    expect(result.batch.map((entry) => entry.id)).toEqual(['CH-002']);
+    expect(result.excluded).toContainEqual({ id: 'CH-001', reason: 'worktree_active' });
+  });
+
+  it('excludes a change whose task worktree is registered, too', async () => {
+    const workspace = await makePlanWorkspace();
+    const busy = await readyProposedChange(workspace, 'demo', { id: 'CH-001', slug: 'alpha' });
+    await seedPlan(workspace, manifest({ id: 'demo', changes: [busy] }));
+    await writeFile(
+      path.join(workspace.projectRoot, '.specwright', 'parallel', 'alpha', 'worktrees', '1.1.json'),
+      JSON.stringify({ task: '1.1', branch: 'specwright/alpha/1.1', path: '/tmp/x', baseSha: 'abc', createdAt: '', status: 'active' })
+    );
+
+    const status = await computeProjectStatus(workspace, 'demo');
+    const result = await computeParallelImplementBatch(workspace, status);
+
+    expect(result.batch).toEqual([]);
+    expect(result.excluded).toContainEqual({ id: 'CH-001', reason: 'worktree_active' });
+  });
+
   it('excludes a change that already has implementation started (execution beyond "proposed")', async () => {
     const workspace = await makePlanWorkspace();
     const started = await readyProposedChange(

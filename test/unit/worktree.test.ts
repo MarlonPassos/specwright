@@ -497,6 +497,25 @@ describe('createChangeWorktree / finishChangeWorktree — one worktree for the w
     expect(await exists(created.path)).toBe(false);
   });
 
+  it('refuses to isolate a change whose own artifacts are not committed yet', async () => {
+    // The worktree is checked out from HEAD, and a change-level subagent reads
+    // proposal/design/tasks/deltas from disk inside it - so an uncommitted
+    // change would arrive empty after the batch judged it implement-ready
+    // against the main tree.
+    const workspace = await makeGitWorkspace();
+    await seedGitChange(workspace, 'demo', '- [ ] 1.1 Faz X `files: a.ts`\n');
+    await writeFile(path.join(workspace.changesPath, 'demo', 'design.md'), '# Design\n\nnão commitado\n');
+
+    await expect(createChangeWorktree(workspace, 'demo')).rejects.toMatchObject({
+      code: 'change_artifacts_uncommitted',
+    });
+
+    // committed → allowed, and the artifact really is inside the worktree
+    await commitAll(workspace.projectRoot, 'commit design');
+    const created = await createChangeWorktree(workspace, 'demo');
+    expect(await exists(path.join(created.path, 'spec', 'changes', 'demo', 'design.md'))).toBe(true);
+  });
+
   it('refuses a second active change-level worktree for the same change', async () => {
     const workspace = await makeGitWorkspace();
     await seedGitChange(workspace, 'demo', '- [ ] 1.1 Faz X `files: a.ts`\n');
