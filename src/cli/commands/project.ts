@@ -7,6 +7,8 @@ import { resolvePlanId, listPlanIds } from '../../core/project/paths.js';
 import { computeProjectStatus, showProjectChange, statusPayload } from '../../core/project/status.js';
 import { recommendNext } from '../../core/project/next.js';
 import { computeParallelImplementBatch } from '../../core/project/parallelImplement.js';
+import { computeProposeBatch } from '../../core/project/proposeBatch.js';
+import { loadConfig } from '../../core/config.js';
 import { generatePlannedChanges } from '../../core/project/generate.js';
 import { linkChange, unlinkChange, adoptChange, setPlanningState } from '../../core/project/link.js';
 import { syncPlan } from '../../core/project/sync.js';
@@ -205,12 +207,19 @@ export function registerProjectCommands(program: Command): void {
         const status = await computeProjectStatus(workspace, id);
         const recommendation = recommendNext(status);
         const implementBatch = await computeParallelImplementBatch(workspace, status);
-        if (json) printJson({ ...recommendation, implementBatch });
-        else printLines(formatNext(recommendation, implementBatch));
+        const proposeBatch = await computeProposeBatch(workspace, status, await loadConfig(workspace));
+        if (json) printJson({ ...recommendation, implementBatch, proposeBatch });
+        else printLines(formatNext(recommendation, implementBatch, proposeBatch));
       } catch (error) {
         fail(error, {
           json,
-          payload: { recommended: null, alternatives: [], parallelReady: [], implementBatch: { batch: [], excluded: [] } },
+          payload: {
+            recommended: null,
+            alternatives: [],
+            parallelReady: [],
+            implementBatch: { batch: [], excluded: [] },
+            proposeBatch: { enabled: false, batch: [], excluded: [] },
+          },
         });
       }
     });
@@ -656,7 +665,8 @@ function formatReports(reports: ValidationReport[], valid: boolean): string[] {
 
 function formatNext(
   recommendation: ReturnType<typeof recommendNext>,
-  implementBatch: Awaited<ReturnType<typeof computeParallelImplementBatch>>
+  implementBatch: Awaited<ReturnType<typeof computeParallelImplementBatch>>,
+  proposeBatch: Awaited<ReturnType<typeof computeProposeBatch>>
 ): string[] {
   const lines: string[] = [];
   if (recommendation.recommended) {
@@ -682,6 +692,21 @@ function formatNext(
       '',
       `Paralelas prontas: ${recommendation.parallelReady.join(', ')}`,
       `  ${recommendation.parallelCaveat}`
+    );
+  }
+  // Um lote de 1 não é lote: propor sozinho é exatamente o fluxo normal que a
+  // recomendação acima já aponta, então oferecer o batch ali só duplicaria.
+  if (proposeBatch.enabled && proposeBatch.batch.length > 1) {
+    lines.push(
+      '',
+      'Lote pronto para propose paralelo (nenhuma depende da outra):',
+      ...proposeBatch.batch.map((entry) => `  ${entry.id} — ${entry.title} (slug: ${entry.slug})`),
+      // Estes mesmos ids aparecem em "Excluídas" logo abaixo, como
+      // `dependency_pending`. Não é contradição: aquilo mede prontidão para
+      // IMPLEMENTAR (dependência arquivada), isto para PROPOR (dependência
+      // decidida). Dizer isso aqui evita o "afinal, está pronta ou não?".
+      '  propor não espera a dependência ser arquivada, só proposta — por isso podem'
+        + ' aparecer como bloqueadas abaixo'
     );
   }
   if (implementBatch.batch.length > 1) {

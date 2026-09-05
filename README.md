@@ -233,12 +233,14 @@ Specwright tem uma camada de **plano** acima da unidade change. É **opt-in dupl
 (`specs project create`). Sem `planning/<plan-id>/plan.yaml`, o produto se comporta
 exatamente como antes.
 
-Seis comandos de harness conduzem o plano: `/spec-project-plan` (analisa fontes e
+Sete comandos de harness conduzem o plano: `/spec-project-plan` (analisa fontes e
 monta o plano), `/spec-project-review` (valida e critica), `/spec-project-generate`
 (materializa os briefs), `/spec-project-status` (progresso e bloqueios),
-`/spec-project-next` (recomenda o próximo incremento) e `/spec-project-refine`
-(granularidade, split, merge). A CLI determinística por trás deles é o grupo
-`specs project`. Veja [docs/project-planning.md](docs/project-planning.md).
+`/spec-project-next` (recomenda o próximo incremento),
+`/spec-project-propose-batch` (explora e propõe em paralelo os incrementos que o
+plano libera ao mesmo tempo) e `/spec-project-refine` (granularidade, split,
+merge). A CLI determinística por trás deles é o grupo `specs project`. Veja
+[docs/project-planning.md](docs/project-planning.md).
 
 ## Créditos
 

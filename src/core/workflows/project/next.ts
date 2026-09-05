@@ -26,6 +26,13 @@ ${PROJECT_BOUNDARY}
 5. Lembre o usuário de rodar \`specs project link <change-id> <change-name>\` depois
    que a change existir.
 
+5b. **Se \`proposeBatch.enabled\` for true E \`proposeBatch.batch\` tiver mais de um
+   incremento**: o plano libera esses vários ao mesmo tempo (nenhum depende do outro)
+   e todos ainda estão por propor. Ofereça ${commandRef('project-propose-batch')} como
+   alternativa ao passo 4 — explorar e propor os N em paralelo, um subagente por
+   incremento, em vez de um de cada vez. Um lote de 0 ou 1, ou \`enabled: false\`, não
+   muda nada: siga o passo 4 normalmente e não mencione o lote.
+
 6. **Se \`implementBatch.batch\` tiver mais de um incremento**: essas changes já estão
    propostas (proposal/design/tasks/deltas escritos — confirmado contra o status
    nativo da change, não só contra o \`execution\` do plano) e não compartilham
