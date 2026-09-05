@@ -166,6 +166,12 @@ O `specs project sync` e o `status` reportam, como diagnóstico de leitura:
 | WARNING | `invalid_archive_path` | o `archive_path` persistido não é um diretório de archive válido e foi ignorado |
 | WARNING | `ambiguous_archive_identity` | o nome do archive pode ser um slug terminado em número ou uma colisão; use `adopt --slug` |
 | WARNING | `stale_projection` | `plan.md` está projetado de uma revisão anterior à do manifesto |
+| WARNING | `pending_followup` | o design de uma change ativa declara um `FU-` sem destino |
+
+`pending_followup` só vale enquanto a change está ativa: depois de arquivada, o
+design é registro, não lista de pendências. A janela entre declarar um
+follow-up e arquivar é exatamente onde ele ainda pode ser despachado barato — e
+era onde nada dizia que ele existia.
 
 `stale_projection` é a rede de segurança da reprojeção: `link`, `unlink`,
 `adopt`, `set-state` e `sync` já reemitem o bloco depois de gravar, então este

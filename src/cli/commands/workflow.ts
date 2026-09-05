@@ -343,6 +343,13 @@ export function registerWorkflowCommands(program: Command): void {
                 '  AVISO: esta change não tem verification.md — nada prova que ela foi',
                 '  verificada contra o que prometeu.',
               ]),
+          ...(result.pendingFollowUps.length > 0
+            ? [
+                `  AVISO: ${result.pendingFollowUps.length} follow-up(s) sem destino saem`,
+                '  arquivados junto com esta change:',
+                ...result.pendingFollowUps.map((entry) => `    - ${entry.id}: ${entry.text}`),
+              ]
+            : []),
           ...(result.unversioned
             ? [
                 '',

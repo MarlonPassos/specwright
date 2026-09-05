@@ -15,6 +15,7 @@ import { parsePlannedChange } from './planned-change.js';
 import { validatePlannedChangeContent } from './validate.js';
 import { safeResolve } from './paths.js';
 import { readEvidence } from './evidence.js';
+import { pendingFollowUps, readFollowUps } from '../change/followups.js';
 import { parseArchiveIdentity, sortArchiveDirs } from './archive-identity.js';
 import { sha256, sourceHash, type HashableSource } from './hashes.js';
 import { resolveWithinRoot } from './paths.js';
@@ -316,6 +317,26 @@ export async function computeProjectStatus(
       // via a bundle or by hand, not re-running the command that found it.
       fix: `preencha Escopo e Critérios macro de ${id2} com um bundle replacePlannedChange (specs project apply --dry-run --json), ou edite planned-changes/ à mão`,
     });
+  }
+
+  // Follow-ups declared in an ACTIVE change's design. Once the change is
+  // archived the design is a record, not a to-do list — but between declaring
+  // one and archiving is exactly the window where it can still be dispatched
+  // cheaply, and where nothing used to say it existed.
+  for (const view of views) {
+    if (!view.link || view.execution === 'archived') continue;
+    const changeDir = safeResolve(workspace.changesPath, view.link.name);
+    if (changeDir === undefined) continue;
+    const pending = pendingFollowUps(await readFollowUps(changeDir));
+    for (const followUp of pending) {
+      diagnostics.push({
+        level: 'WARNING',
+        code: 'pending_followup',
+        path: `changes.${view.id}.design`,
+        message: `${view.id} declara ${followUp.id} sem destino: ${followUp.text}`,
+        fix: `Crie o incremento que o cobre (specs project apply com addChange), ou marque ${followUp.id} como despachado com a justificativa`,
+      });
+    }
   }
 
   if (projected !== undefined && projected !== manifest.revision) {

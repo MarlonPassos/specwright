@@ -14,6 +14,7 @@ import { syncPlan } from '../project/sync.js';
 import { mergeCapability } from './merge.js';
 import { reportUnversionedWork } from './versioning.js';
 import { readVerification, type VerificationVerdict } from '../change/verification.js';
+import { pendingFollowUps, readFollowUps, type FollowUp } from '../change/followups.js';
 
 export interface ArchiveOptions {
   /** Skip the spec merge entirely. For changes that carry no spec deltas. */
@@ -73,6 +74,8 @@ export interface ArchiveResult {
   unversioned?: true;
   /** The verdict `/spec-verify` left, or its absence. Always reported. */
   verification: VerificationVerdict;
+  /** Follow-ups the design declared and nobody dispatched. Reported, never a gate. */
+  pendingFollowUps: FollowUp[];
 }
 
 export async function archiveChange(
@@ -112,6 +115,8 @@ export async function archiveChange(
   }
 
   const verification = await assertVerified(dir, options.requireVerify === true);
+  // Read BEFORE the move: after it, `dir` no longer exists.
+  const followUps = pendingFollowUps(await readFollowUps(dir));
 
   const metadata = await readChangeMetadata(dir);
   const specsSkipped = options.skipSpecs === true || metadata.skipSpecs;
@@ -204,6 +209,7 @@ export async function archiveChange(
 
   return {
     verification,
+    pendingFollowUps: followUps,
     change: changeId,
     archivedAs,
     archivePath: destination,

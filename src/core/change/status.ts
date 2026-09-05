@@ -8,6 +8,7 @@ import { changeDir, listChanges, type Workspace } from '../workspace.js';
 import { readChangeMetadata } from './metadata.js';
 import { readTaskProgress, type TaskProgress } from './model.js';
 import { readVerification, type VerificationVerdict } from './verification.js';
+import { pendingFollowUps, readFollowUps, type FollowUp } from './followups.js';
 
 /**
  * The change to act on: the one the caller named, or the sole active one when
@@ -62,6 +63,12 @@ export interface ChangeStatus {
    * as verified-and-clean.
    */
   verification: VerificationVerdict;
+  /**
+   * Follow-ups the design declared and nobody has dispatched. A follow-up is
+   * work this change says belongs to another one; unreported, it is archived
+   * along with the change and never happens.
+   */
+  pendingFollowUps: FollowUp[];
 }
 
 /**
@@ -186,6 +193,7 @@ export async function computeStatus(context: StatusContext): Promise<ChangeStatu
 
   const tasks: TaskProgress | undefined = await readTaskProgress(dir);
   const verification = await readVerification(dir);
+  const followUps = pendingFollowUps(await readFollowUps(dir));
 
   return {
     change: context.changeId,
@@ -200,6 +208,7 @@ export async function computeStatus(context: StatusContext): Promise<ChangeStatu
     next: artifacts.filter((entry) => entry.state === 'ready').map((entry) => entry.id),
     ...(tasks ? { tasks: summarizeTasks(tasks) } : {}),
     verification,
+    pendingFollowUps: followUps,
   };
 }
 

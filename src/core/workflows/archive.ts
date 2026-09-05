@@ -34,6 +34,11 @@ ${RESOLVE_CHANGE}
 
    Reporte o que vier em \`verification\` ao usuário, em qualquer um dos três casos.
 
+   O mesmo vale para \`pendingFollowUps\`: cada \`FU-\` que o design declarou e ninguém
+   despachou sai arquivado junto com a change. Leve a lista ao usuário e pergunte o destino
+   de cada um antes de arquivar - incremento novo no plano, item de backlog, ou descarte com
+   justificativa. Marcar a caixa do \`FU-\` no design é o que registra que ele teve destino.
+
 2. **Leia o que o arquivamento vai mudar**
 
    \`\`\`bash
