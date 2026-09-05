@@ -62,18 +62,25 @@ Cria o workspace e escreve os arquivos de comando do harness.
 
 | Opção | Significado |
 | --- | --- |
-| `--harnesses <list>` | `all` (padrão), ou uma lista separada por vírgula de `claude`, `codex`, `opencode`, `kiro` |
+| `--harnesses <list>` | `all`, ou uma lista separada por vírgula de `claude`, `codex`, `opencode`, `kiro`. **Padrão: o harness em uso** |
 | `--schema <name>` | Schema de workflow para novas changes; padrão `spec-driven` |
 | `--json` | Saída em JSON |
 
-Rodar o `init` de novo é seguro: ele mantém o schema configurado, adiciona os harnesses
-recém-selecionados aos existentes, regera todos os arquivos de comando e nunca sobrescreve
-o `spec/project.md`.
+O padrão é o harness detectado, não os quatro. Materializar todos por omissão punha 60
+arquivos de prompt num projeto que usava um só — 18,75 % dos arquivos versionados — e nada
+nunca removia os outros três. Quem quer os quatro pede `--harnesses all`.
+
+Rodar o `init` de novo é seguro: ele mantém o schema e a seleção de harnesses que o
+workspace já declara, regera os arquivos de comando e nunca sobrescreve o `spec/project.md`.
 
 ### `specs update [path]`
 
-Regera os arquivos de comando dos harnesses que o workspace declara. Passe
-`--harnesses <list>` para adicionar harnesses; essa seleção é então persistida.
+Regera os arquivos de comando dos harnesses que o workspace declara.
+
+`--harnesses <list>` **substitui** a seleção e apaga os arquivos de comando dos harnesses
+que saírem — só os arquivos que o próprio gerador produz, num diretório que fica vazio.
+Antes a seleção era monotônica: todo harness já escolhido ficava para sempre, e não havia
+como devolver um.
 
 ### `specs harnesses`
 

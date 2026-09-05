@@ -9,10 +9,12 @@ export function registerSetupCommands(program: Command): void {
   program
     .command('init [path]')
     .description('Cria o workspace e gera os comandos dos harnesses')
+    // No commander default: omitting the flag has to reach the core as
+    // `undefined`, which is what lets it fall back to the harness in use (or to
+    // what an existing workspace already declared) instead of to all four.
     .option(
       '--harnesses <list>',
-      `Harnesses a configurar: "all" ou uma lista separada por vírgula de ${harnessIds().join(', ')}`,
-      'all'
+      `Harnesses a configurar: "all" ou uma lista separada por vírgula de ${harnessIds().join(', ')}. Por padrão, o harness em uso`
     )
     .option('--schema <name>', 'Schema de workflow para novas changes')
     .option('--json', 'Saída em JSON')
@@ -70,7 +72,10 @@ export function registerSetupCommands(program: Command): void {
   program
     .command('update [path]')
     .description('Regera os arquivos de comando dos harnesses')
-    .option('--harnesses <list>', 'Harnesses a (re)gerar; por padrão, os já configurados')
+    .option(
+      '--harnesses <list>',
+      'Harnesses a (re)gerar; SUBSTITUI a seleção e apaga os arquivos dos que saírem. Por padrão, os já configurados'
+    )
     .option('--json', 'Saída em JSON')
     .action(async (target: string | undefined, options: { harnesses?: string; json?: boolean }) => {
       try {
@@ -89,6 +94,9 @@ export function registerSetupCommands(program: Command): void {
 
         printLines([
           `${result.files.length} arquivos de comando regerados para: ${result.harnesses.join(', ')}`,
+          ...(result.removed.length > 0
+            ? [`${result.removed.length} arquivo(s) de harness fora da seleção foram removidos`]
+            : []),
           ...result.files.map((file) => `  ${file.path}`),
         ]);
       } catch (error) {
