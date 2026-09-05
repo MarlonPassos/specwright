@@ -69,6 +69,18 @@ que repare; com isso, divergência não declarada é a diferença entre duas lis
 A serialização é determinística: `load → save → load` é byte-idêntico. As chaves
 saem em ordem fixa, `changes` na ordem de declaração e `milestones` por `order`.
 
+### Onde a incerteza do planejamento é registrada
+
+Ler um documento-fonte sempre produz suposições: o documento não responde tudo, e para
+desenhar os incrementos é preciso preencher o vazio. Essas suposições vão para o **brief
+do incremento que elas afetam** — `Riscos` quando mudariam o que vai ser construído,
+`Notas para exploração` para o resto — e não só para o relatório da conversa.
+
+A diferença é que o `/spec-propose` abre o Planned Change antes de escrever a proposta.
+Uma suposição registrada no brief chega a quem vai implementar, no último momento em que
+perguntar ainda é barato. Uma que ficou só na mensagem some quando a conversa fecha, e
+reaparece como decisão que ninguém lembra de ter tomado.
+
 ### Invariantes em `architecture.md`
 
 A seção `## Invariantes` guarda as regras estruturais que precisam continuar valendo
