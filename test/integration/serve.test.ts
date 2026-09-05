@@ -697,6 +697,40 @@ describe('specs serve — o grafo de dependências', () => {
     expect(INDEX_HTML).toMatch(/\.gn\.run rect\{/);
   });
 
+  it('abre legível e centrado numa change, não no plano inteiro encolhido', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    // Enquadrar 31 incrementos na largura da tela dá caixas ilegíveis: o padrão
+    // é uma raiz e as relações dela, com um piso de escala.
+    expect(INDEX_HTML).toContain('function pickGraphRoot(d)');
+    expect(INDEX_HTML).toContain('Math.max(scale,.85)');
+    expect(INDEX_HTML).toContain("GMODE='focus'");
+  });
+
+  it('cada nó abre o próximo nível sem tirar o leitor do lugar', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    expect(INDEX_HTML).toContain('function toggleGraphNode(id)');
+    expect(INDEX_HTML).toContain('function graphVisible(changes)');
+    // O redesenho ancora no nó selecionado em vez de reenquadrar tudo.
+    expect(INDEX_HTML).toContain('x:GVIEW.x+after.x-before.x');
+    expect(INDEX_HTML).toContain('function ensureVisible(ids)');
+  });
+
+  it('o grafo aberto se redesenha quando o plano muda no disco', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    // O evento invalida o pedido em voo e o modal relê /api/plan sozinho — sem
+    // isto, o stream só limparia o cache de uma tela que ninguém está vendo.
+    expect(INDEX_HTML).toContain('function refreshOpenGraph()');
+    expect(INDEX_HTML).toContain('PLAN_EPOCH++; refreshOpenGraph()');
+    expect(INDEX_HTML).toMatch(/if\(entry\.epoch!==PLAN_EPOCH\)return loadPlan\(\)/);
+  });
+
+  it('o painel do incremento é uma gaveta, e a escolha fica gravada', async () => {
+    const { INDEX_HTML } = await import('../../src/server/ui.js');
+    expect(INDEX_HTML).toContain('id="gpanel"');
+    expect(INDEX_HTML).toContain('function toggleDetail(on)');
+    expect(INDEX_HTML).toContain("localStorage.setItem('sw-gdetail'");
+  });
+
   it('a projeção do plano publica tudo que o grafo desenha', async () => {
     const workspace = await makeWorkspace();
     const cli = (args: string[]) => runCli(args, workspace.projectRoot);
