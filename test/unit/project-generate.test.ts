@@ -2,7 +2,7 @@ import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { generatePlannedChanges } from '../../src/core/project/generate.js';
-import { computeProjectStatus } from '../../src/core/project/status.js';
+import { computeProjectStatus, showProjectChange } from '../../src/core/project/status.js';
 import { sha256 } from '../../src/core/project/hashes.js';
 import { parseManifest } from '../../src/core/project/repository.js';
 import { makePlanWorkspace, seedPlan, manifest, change } from '../helpers/plan.js';
@@ -337,6 +337,24 @@ describe('generatePlannedChanges', () => {
           report.issues.filter((issue) => issue.level === 'ERROR')
         )
       ).toEqual([]);
+    });
+
+    it('show hands the source pointers over already structured', async () => {
+      const workspace = await makePlanWorkspace();
+      await seedPlan(workspace, manifest({ id: 'demo', changes: [change({ id: 'CH-001', slug: 'x' })] }));
+      await fs.mkdir(path.join(workspace.projectRoot, 'planning/demo/planned-changes'), {
+        recursive: true,
+      });
+      await fs.writeFile(
+        path.join(workspace.projectRoot, 'planning/demo/planned-changes/CH-001-x.md'),
+        '---\nschema_version: 1\nid: CH-001\nslug: x\ntitle: X\nplan_revision: 0\n---\n\n' +
+          '# Objetivo\n\nJá escrito.\n\n# Escopo\n\n- a\n\n# Critérios macro\n\n- b\n\n' +
+          '# Referências da fonte\n\n- docs/fonte.md:10-20\n'
+      );
+      await generatePlannedChanges(workspace, 'demo', { changeIds: ['CH-001'] });
+
+      const payload = await showProjectChange(workspace, 'demo', 'CH-001');
+      expect(payload.sourceRefs).toEqual([{ path: 'docs/fonte.md', lines: '10-20' }]);
     });
 
     it('stays empty when nothing new is written (idempotent second run)', async () => {

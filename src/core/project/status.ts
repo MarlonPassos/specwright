@@ -656,7 +656,8 @@ export async function showProjectChange(
   }
 
   let plannedChange: unknown = null;
-  const ref = status.manifest.changes.find((entry) => entry.id === changeId)?.planned_change;
+  const record = status.manifest.changes.find((entry) => entry.id === changeId);
+  const ref = record?.planned_change;
   if (ref) {
     const briefAbsolute = safeResolve(
       path.join(workspace.projectRoot, status.plan.path),
@@ -691,6 +692,9 @@ export async function showProjectChange(
   return {
     change: view,
     plannedChange,
+    // Already structured, so whoever writes the proposal does not have to
+    // re-parse the brief's Markdown to know what this increment answers for.
+    sourceRefs: record?.source_refs ?? [],
     dependencies: resolve(view.dependsOn),
     dependents: resolve(view.unlocks),
     ancestors: status.graph.ancestors(changeId),

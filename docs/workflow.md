@@ -127,6 +127,17 @@ acontecem conforme o trabalho entra, não em lote no final.
 
 As delta specs são os critérios de aceite: cada cenário é um teste que vale ter.
 
+### Quando a change nasce de um plano
+
+`specs new change` devolve o bloco `plan` quando um incremento planeja exatamente aquele
+slug. O `/spec-propose` então **lê o Planned Change desse incremento** antes de escrever a
+proposta — `specs project show <CH-NNN> --json` traz Escopo, Critérios macro e Referências
+da fonte, e `sourceRefs` traz os ponteiros já estruturados.
+
+A proposta registra isso em `## Origem`. É o único lugar onde a origem da change fica
+dentro da própria change: sem ele, o plano diz uma coisa, a change faz outra, e nada acusa
+a diferença até alguém auditar o código.
+
 ## /spec-verify
 
 Confere a change contra o que ela prometeu, e reporta.

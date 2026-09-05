@@ -57,6 +57,24 @@ ${CLI_NOTE}
    arquivada. Diga ao usuário qual incremento você vinculou. Sem a chave \`plan\`, siga em
    frente - o projeto não tem plano, ou nenhum incremento reivindica este nome.
 
+3b. **Leia o Planned Change do incremento** (só quando o passo 3 vinculou um)
+
+   \`\`\`bash
+   specs project show "<CH-NNN>" --json
+   \`\`\`
+   \`plannedChange.sections\` traz Objetivo, Escopo, Critérios macro e Referências da fonte;
+   \`sourceRefs\` traz os mesmos ponteiros já estruturados.
+
+   **Este passo não é opcional.** O incremento é o que alguém decidiu que esta change
+   entrega, e as Referências da fonte são o único caminho de volta ao documento que
+   originou o pedido. Uma proposta escrita sem ler isso reinventa o escopo do zero: o
+   plano continua dizendo uma coisa, a change faz outra, e nada acusa a diferença até
+   alguém auditar o código muito depois.
+
+   Se \`plannedChange\` vier \`null\` ou com Escopo e Critérios macro vazios, o brief é o
+   esqueleto vazio (§7.5) - não há de onde partir. Diga isso ao usuário e pergunte se ele
+   quer preencher o brief antes, em vez de escrever a proposta no escuro.
+
 4. **Escreva a proposta**
 
 ${ARTIFACT_RULES.split('\n').map((line) => (line ? `   ${line}` : '')).join('\n')}
@@ -64,6 +82,12 @@ ${ARTIFACT_RULES.split('\n').map((line) => (line ? `   ${line}` : '')).join('\n'
    A seção Capabilities da proposta é o contrato contra o qual os deltas de spec são
    escritos, então nomeie cada capacidade com precisão e use os caminhos de capacidade
    existentes tal como são.
+
+   Quando o passo 3b leu um incremento, preencha \`## Origem\` com o id dele e as
+   Referências da fonte, copiadas como estão, e escreva What Changes a partir do Escopo
+   do brief - não de uma releitura sua do pedido. Um item do Escopo que você deixar de
+   fora é uma decisão de escopo: leve ao usuário em vez de decidir sozinho. Sem plano,
+   apague a seção \`## Origem\`.
 
 5. **Reporte**
 
@@ -74,6 +98,7 @@ ${ARTIFACT_RULES.split('\n').map((line) => (line ? `   ${line}` : '')).join('\n'
 **Saída**
 
 - o nome da change e onde ela fica;
+- o incremento do plano que a originou, quando há um, e o que você leu do brief dele;
 - um resumo de duas linhas do problema e do escopo proposto;
 - as capacidades que a change vai adicionar ou modificar;
 - próximo passo: "Rode \`${commandRef('continue')}\` quando a proposta estiver boa."

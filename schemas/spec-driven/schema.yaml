@@ -11,6 +11,14 @@ artifacts:
       Escreva o documento que responde POR QUE esta change existe e O QUE ela cobre.
 
       Seções obrigatórias:
+      - **Origem**: só quando a change nasce de um incremento de um Project Plan. O id do
+        incremento (`CH-NNN`) e as referências da fonte que o Planned Change dele declara,
+        copiadas como estão - são ponteiros, não prosa a reescrever. Apague a seção quando
+        não houver plano.
+
+        Esta seção não é decorativa: ela é o único lugar onde a origem da change fica
+        registrada dentro da própria change. Sem ela, um requisito do documento-fonte pode
+        sumir entre o plano e o código sem que nada acuse.
       - **Why**: uma ou duas frases nomeando o problema ou a oportunidade, e por que importa agora.
       - **What Changes**: uma lista de mudanças concretas. Nomeie comportamento novo, comportamento alterado e remoções. Prefixe um item com **BREAKING** quando ele quebra um contrato existente.
       - **Capabilities**: as specs que esta change vai tocar.

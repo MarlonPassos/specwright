@@ -28,7 +28,10 @@ ${CLI_NOTE}
 **Entrada**: o que vier depois de \`${commandRef('explore')}\` é o que o usuário quer pensar. Pode ser:
 - uma ideia vaga: "colaboração em tempo real"
 - um problema concreto: "a autenticação virou um nó"
-- o nome de uma change: "add-dark-mode" (para pensar no contexto dela)
+- o nome de uma change: "add-dark-mode" (para pensar no contexto dela). Se essa change
+  está vinculada a um incremento de um plano, leia o Planned Change dele primeiro
+  (\`specs project show <CH-NNN> --json\`): Escopo, Critérios macro e Referências da fonte
+  são o que alguém já decidiu que ela entrega, e explorar sem isso é reinventar o escopo
 - uma comparação: "postgres ou sqlite aqui"
 - nada (só entrar em modo exploração)
 
