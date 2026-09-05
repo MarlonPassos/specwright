@@ -57,9 +57,11 @@ ${RESOLVE_CHANGE}
 
 5. **Feche o plano, se houver um**
 
-   O arquivamento já vincula sozinho o incremento que planejava exatamente aquele slug e
-   ainda não tinha vínculo. Quando isso acontece, a saída do \`specs archive\` traz um bloco
-   \`plan\` com o incremento vinculado - reporte-o ao usuário.
+   O arquivamento faz duas coisas no plano, sozinho. Vincula o incremento que planejava
+   exatamente aquele slug e ainda não tinha vínculo - aí a saída traz o bloco \`plan\`. E
+   roda o reparo de vínculo (\`sync\`) no plano que já tinha o vínculo, movendo
+   \`active_path\` para \`archive_path\` - aí a saída traz \`planSynced\` com o id do plano.
+   Reporte os dois ao usuário.
 
    Se existe \`planning/\` na raiz e o bloco \`plan\` **não** veio, há três razões possíveis:
    nenhum incremento planejava aquele slug; o plano está ausente, ilegível ou recusou a

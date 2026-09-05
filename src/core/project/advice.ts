@@ -84,3 +84,35 @@ export async function adviseLink(
 export function soleCandidate(advice: LinkAdviceSet): LinkAdvice | undefined {
   return advice.candidates.length === 1 ? advice.candidates[0] : undefined;
 }
+
+/**
+ * Which plans already carry a link for this change name.
+ *
+ * `adviseLink` deliberately answers the opposite question — which increments
+ * have NO link yet — because its job is to propose adopting one. The archive
+ * needs both halves: adopt a link the plan foresaw and had not recorded, and
+ * PROMOTE one it recorded at creation from `active_path` to `archive_path`.
+ * The second case is the normal one, and it fell through the crack.
+ *
+ * Fail-soft, like everything else here: no planning area, or a plan that will
+ * not load, contributes nothing.
+ */
+export async function plansLinking(projectRoot: string, changeName: string): Promise<string[]> {
+  let planIds: string[];
+  try {
+    planIds = await listPlanIds(projectRoot);
+  } catch {
+    return [];
+  }
+
+  const owners: string[] = [];
+  for (const planId of planIds) {
+    try {
+      const { manifest } = await loadPlan(projectRoot, planId);
+      if (manifest.changes.some((entry) => entry.link?.name === changeName)) owners.push(planId);
+    } catch {
+      continue;
+    }
+  }
+  return owners;
+}

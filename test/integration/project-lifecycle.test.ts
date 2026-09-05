@@ -182,3 +182,62 @@ describe('project lifecycle', () => {
     expect(status.milestones[0]).toMatchObject({ id: 'M1', archived: 1, total: 2 });
   });
 });
+
+describe('archive fecha o vínculo que já existia', () => {
+  it('promove active_path para archive_path de um incremento vinculado na criação', async () => {
+    const workspace = await makeWorkspace();
+    const root = workspace.projectRoot;
+    await writeFile(path.join(root, 'docs/vision.md'), '# Visão\n\nAuth.\n');
+    await createPlan(root, 'shop', { name: 'Loja', sources: ['docs/vision.md'] });
+    await applyPlanBundle(workspace, 'shop', {
+      bundleVersion: BUNDLE_VERSION,
+      expectRevision: 0,
+      plan: { status: 'active' },
+      operations: [
+        {
+          op: 'addChange',
+          ref: '$a',
+          slug: 'auth',
+          title: 'Autenticação',
+          plannedChange: {
+            objetivo: 'o',
+            escopo: ['x'],
+            criteriosMacro: ['y'],
+            referencias: ['docs/vision.md:1-3'],
+          },
+        },
+      ],
+    });
+
+    // Linked while the work is still ACTIVE — the normal order, and the case
+    // `linkArchivedToPlan`'s `!entry.link` filter excludes.
+    await seedChange(workspace, 'auth');
+    await linkChange(workspace, 'shop', 'CH-001', 'auth');
+    const linked = (await loadPlan(root, 'shop')).manifest.changes[0].link!;
+    expect(linked.active_path).toBe('spec/changes/auth');
+    expect(linked.archive_path).toBeNull();
+
+    const result = await archiveChange(workspace, 'auth', {
+      now: new Date(2026, 0, 1),
+      validate: false,
+      force: true,
+    });
+    expect(result.planSynced).toEqual(['shop']);
+
+    const after = (await loadPlan(root, 'shop')).manifest.changes[0].link!;
+    expect(after.archive_path).toBe('spec/changes/archive/2026-01-01-auth');
+    expect(after.active_path).toBeNull();
+  });
+
+  it('não falha o arquivamento quando não há plano nenhum', async () => {
+    const workspace = await makeWorkspace();
+    await seedChange(workspace, 'solta');
+    const result = await archiveChange(workspace, 'solta', {
+      now: new Date(2026, 0, 1),
+      validate: false,
+      force: true,
+    });
+    expect(result.archivedAs).toBe('2026-01-01-solta');
+    expect(result.planSynced).toBeUndefined();
+  });
+});

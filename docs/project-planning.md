@@ -302,6 +302,11 @@ catálogo publicado não diverge da união zod que o parser usa de verdade.
   dígitos, `_` ou `-` — espelhar o slug (`$bug-fixes`) é a convenção mais simples.
 - Nenhuma operação atinge um incremento `archived` sem `--allow-completed` (e aí
   o relatório traz um `WARNING`).
+O `specs archive` roda `sync` no plano que carrega o vínculo daquela change,
+depois de mover o diretório: `archive_path` passa a apontar para o archive e
+`active_path` é limpo. Best effort — arquivar nunca falha por causa do estado
+de um plano. O que ele reparou vem em `planSynced`.
+
 Uma re-decomposição que aposenta um incremento cujas `source_refs` citam um
 documento que nenhum sucessor cita emite `supersession_coverage_lost` — aviso
 por padrão, recusa sob `specs project apply --strict`.

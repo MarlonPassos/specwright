@@ -8,8 +8,9 @@ import { readDeltaSpecs, readTaskProgress } from '../change/model.js';
 import { specPath } from '../specs.js';
 import { validateChange } from '../validate/change-validator.js';
 import { ARCHIVE_DIR, CHANGES_DIR, WORKSPACE_DIR, changeDir, type Workspace } from '../workspace.js';
-import { adviseLink, soleCandidate } from '../project/advice.js';
+import { adviseLink, plansLinking, soleCandidate } from '../project/advice.js';
 import { linkChange } from '../project/link.js';
+import { syncPlan } from '../project/sync.js';
 import { mergeCapability } from './merge.js';
 
 export interface ArchiveOptions {
@@ -55,6 +56,8 @@ export interface ArchiveResult {
    * NOTHING was written. The archive itself is unaffected (I-4).
    */
   planAmbiguity?: ArchivePlanAmbiguity;
+  /** Plans whose link block `sync` repaired on the way out. */
+  planSynced?: string[];
 }
 
 export async function archiveChange(
@@ -179,6 +182,7 @@ export async function archiveChange(
   }
 
   const closure = await linkArchivedToPlan(workspace, changeId, archivedAs);
+  const synced = await syncArchivedLink(workspace, changeId);
 
   return {
     change: changeId,
@@ -190,7 +194,44 @@ export async function archiveChange(
     specsSkipped,
     ...(closure.plan ? { plan: closure.plan } : {}),
     ...(closure.ambiguity ? { planAmbiguity: closure.ambiguity } : {}),
+    ...(synced.length > 0 ? { planSynced: synced } : {}),
   };
+}
+
+/**
+ * Moves an ALREADY LINKED increment's paths from active to archive.
+ *
+ * `linkArchivedToPlan` handles only the increment with no link yet — its filter
+ * is `!entry.link` — because it exists to close a link the plan foresaw. The
+ * common case is the opposite: the change was linked when it was created, and
+ * on archiving its `active_path` starts pointing at a directory that no longer
+ * exists while `archive_path` stays null. Loosening that filter would not work
+ * either: `linkChange` refuses an increment whose derived execution is already
+ * `archived` (`completed_change_protected`), which is exactly this one.
+ *
+ * The repair already existed, in `sync`: it fills `archive_path` from resolved
+ * evidence and clears a stale `active_path`. Nothing ever called it — every
+ * link diagnostic printed `fix: specs project sync` and waited for a human.
+ * Now the archive runs it itself.
+ *
+ * Best effort, same contract as the link closure above: archiving never fails,
+ * and never behaves differently, because of the state of a plan (I-4).
+ */
+async function syncArchivedLink(workspace: Workspace, changeId: string): Promise<string[]> {
+  const repaired: string[] = [];
+  try {
+    for (const planId of await plansLinking(workspace.projectRoot, changeId)) {
+      try {
+        const result = await syncPlan(workspace, planId);
+        if (result.synced) repaired.push(planId);
+      } catch {
+        continue;
+      }
+    }
+  } catch {
+    return repaired;
+  }
+  return repaired;
 }
 
 /**
