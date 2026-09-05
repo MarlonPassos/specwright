@@ -42,13 +42,32 @@ ${RESOLVE_CHANGE}
    apontar. Rode a suíte de testes do projeto. Reporte como não verificado o cenário que você
    não conseguir amarrar a nada - não presuma.
 
-4. **Procure desvios**
+4. **Confira os critérios macro do plano, quando há um**
+
+   Se esta change está vinculada a um incremento:
+
+   \`\`\`bash
+   specs project show "<CH-NNN>" --json
+   \`\`\`
+   Cada item de **Critérios macro** do brief precisa de pelo menos uma tarefa que o exerça,
+   e você precisa conseguir apontar qual. Um critério sem tarefa nenhuma é um achado: era
+   uma condição de pronto que o plano declarou e a change não cobriu.
+
+   O caso real: "\`docker compose up --build\` funciona" era critério macro de uma change de
+   entrega, e nenhuma das tarefas dela o verificava. A change fechou com todos os boxes
+   marcados e o critério nunca foi exercido.
+
+   Isto é conferência, não validação: critérios e tarefas são prosa em artefatos
+   diferentes, e casá-los exige ler os dois. É por isso que o passo mora aqui e não numa
+   regra da CLI.
+
+5. **Procure desvios**
 
    - comportamento construído que nenhuma spec descreve -> as specs precisam de atualização;
    - requisitos sem implementação -> a change não está pronta;
    - requisitos REMOVED cujo comportamento ainda existe -> a remoção está incompleta.
 
-5. **Grave o veredito**
+6. **Grave o veredito**
 
    Escreva \`verification.md\` no diretório da change, no formato do template
    (\`specs instructions verify --change "<change>" --json\` traz o modelo):
@@ -72,6 +91,7 @@ Um relatório curto:
 - resultado da validação, com cada erro e warning;
 - conclusão das tarefas, e qualquer tarefa marcada sem nada por trás;
 - por capacidade: requisitos verificados, e como;
+- critérios macro do incremento sem tarefa que os exerça, quando há plano;
 - cenários não verificados e desvios, cada um com o que resolveria;
 - um veredito: pronta para arquivar, ou a lista do que corrigir antes;
 - onde o \`verification.md\` foi gravado;

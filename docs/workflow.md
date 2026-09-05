@@ -176,8 +176,13 @@ Confere a change contra o que ela prometeu, e reporta.
 Ele reporta em vez de corrigir, a menos que o usuário peça outra coisa.
 
 E deixa rastro: `verification.md` no diretório da change, com a data, os comandos rodados e
-o resultado exato de cada um, o mapa requisito → prova, o código que nenhuma spec descreve,
-e os achados em aberto. Era o único passo do ciclo que não mudava arquivo nenhum — e também
+o resultado exato de cada um, o mapa requisito → prova, o mapa critério macro → tarefa
+quando há plano, o código que nenhuma spec descreve, e os achados em aberto.
+
+O eixo critério → tarefa existe porque um critério que o plano declarou e nenhuma tarefa
+exerce fecha em silêncio: "`docker compose up --build` funciona" era critério macro de uma
+change de entrega, nenhuma tarefa o verificava, e a change fechou com todos os boxes
+marcados. Era o único passo do ciclo que não mudava arquivo nenhum — e também
 o que teria encontrado sozinho o requisito sem teste, o comportamento sem requisito e a
 tarefa cuja evidência é um teste pulado. Um passo assim ser o mais fácil de pular, e não
 provar ter acontecido quando roda, era a lacuna.

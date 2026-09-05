@@ -22,6 +22,16 @@ data: <!-- YYYY-MM-DDTHH:MMZ -->
 |---|---|---|
 |  |  |  |
 
+## Critério macro → tarefa
+
+<!-- Só quando a change nasce de um incremento do plano. Um critério por linha,
+     com a tarefa que o exerce. Critério sem tarefa é achado. Apague a seção
+     quando não houver plano. -->
+
+| Critério macro | Tarefa | Veredito |
+|---|---|---|
+|  |  |  |
+
 ## Código sem requirement
 
 <!-- Comportamento que existe e nenhuma spec descreve. Apague a seção se não
