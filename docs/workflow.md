@@ -127,6 +127,11 @@ acontecem conforme o trabalho entra, não em lote no final.
 
 As delta specs são os critérios de aceite: cada cenário é um teste que vale ter.
 
+A condição de sucesso de uma tarefa nunca é um teste ser pulado. Se a change entrega um
+teste, a verificação é a execução dele; se ele depende de um serviço externo, a tarefa diz
+como esse serviço é provido. Uma verificação que confirma um skip é uma tarefa que se
+autoaprova.
+
 ### Quando a change nasce de um plano
 
 `specs new change` devolve o bloco `plan` quando um incremento planeja exatamente aquele
