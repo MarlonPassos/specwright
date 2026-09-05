@@ -208,6 +208,25 @@ async function resolveGitCommonDir(cwd: string): Promise<string> {
 }
 
 /**
+ * True unless `projectRoot` is itself a git repository whose main working
+ * tree is somewhere else - i.e. `projectRoot` is a linked worktree. Never
+ * throws: a caller that wants to fail loudly on the negative case is
+ * `assertMainWorktree`, not this. Used where "am I isolated?" needs to
+ * change a DECISION (skip a step, disable a capability) rather than abort.
+ */
+export async function isMainWorktree(projectRoot: string): Promise<boolean> {
+  const worktrees = await listGitWorktrees(projectRoot);
+  const main = worktrees.find((entry) => entry.isMain);
+  if (!main) return true;
+
+  const [resolvedMain, resolvedCwd] = await Promise.all([
+    fs.realpath(main.path).catch(() => path.resolve(main.path)),
+    fs.realpath(projectRoot).catch(() => path.resolve(projectRoot)),
+  ]);
+  return resolvedMain === resolvedCwd;
+}
+
+/**
  * Refuses to proceed unless the caller is standing in the git repository's
  * main working tree. This is the guard, not just a prompt instruction, that
  * keeps a subagent running inside its own isolated worktree from mutating
@@ -215,15 +234,7 @@ async function resolveGitCommonDir(cwd: string): Promise<string> {
  * first.
  */
 export async function assertMainWorktree(projectRoot: string): Promise<void> {
-  const worktrees = await listGitWorktrees(projectRoot);
-  const main = worktrees.find((entry) => entry.isMain);
-  if (!main) return;
-
-  const [resolvedMain, resolvedCwd] = await Promise.all([
-    fs.realpath(main.path).catch(() => path.resolve(main.path)),
-    fs.realpath(projectRoot).catch(() => path.resolve(projectRoot)),
-  ]);
-  if (resolvedMain !== resolvedCwd) {
+  if (!(await isMainWorktree(projectRoot))) {
     throw new SpecError('Este comando só roda a partir da árvore principal, não de um worktree isolado', {
       code: 'must_run_from_main_worktree',
     });

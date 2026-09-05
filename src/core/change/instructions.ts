@@ -4,6 +4,7 @@ import { readTemplate } from '../schema/loader.js';
 import { isPattern } from '../schema/outputs.js';
 import { rulesFor } from '../config.js';
 import { detectHarness } from '../harness/current.js';
+import { isMainWorktree } from './worktree.js';
 import { computeStatus, type StatusContext } from './status.js';
 
 /** Instruction surfaces that are phases of the workflow, not artifacts. */
@@ -90,10 +91,25 @@ const ARCHIVE_INSTRUCTION = [
  * predates this feature (no `parallel:` field at all) would silently start
  * fanning out to worktrees the first time it happens to run under a harness
  * that supports it.
+ *
+ * A third condition that overrides both: this only ever reports `supported`
+ * from the repository's MAIN worktree. `createWorktree`/`createChangeWorktree`
+ * both refuse to run from anywhere else (`assertMainWorktree`) - so a
+ * change-level worktree dispatched by `next.ts`'s own batch would read
+ * `supported: true` inside itself and then fail the moment it tried to nest a
+ * per-task nest of the same mechanism. Isolation cannot recurse into itself.
  */
-function resolveParallelDispatch(context: StatusContext): { supported: boolean; primitive?: string } {
+async function resolveParallelDispatch(
+  context: StatusContext
+): Promise<{ supported: boolean; primitive?: string }> {
   const harness = detectHarness({ configured: context.config.harnesses });
-  const supported = context.parallel && harness.supportsParallelDispatch === true;
+  // No git repository at all (never true for a real workspace, only for a
+  // handful of unit tests that build one without initializing git) means
+  // there is no worktree to be isolated FROM - nothing here to refuse.
+  const isolated = context.parallel
+    ? !(await isMainWorktree(context.workspace.projectRoot).catch(() => true))
+    : false;
+  const supported = context.parallel && harness.supportsParallelDispatch === true && !isolated;
   return {
     supported,
     ...(harness.parallelDispatchPrimitive ? { primitive: harness.parallelDispatchPrimitive } : {}),
@@ -124,7 +140,7 @@ export async function buildInstructions(
       blockedBy: status.applyBlockedBy,
       ...(apply?.tracks ? { tracks: apply.tracks } : {}),
       ...(status.tasks ? { tasks: status.tasks } : {}),
-      ...(phase === 'implement' ? { parallelDispatch: resolveParallelDispatch(context) } : {}),
+      ...(phase === 'implement' ? { parallelDispatch: await resolveParallelDispatch(context) } : {}),
     };
   }
 

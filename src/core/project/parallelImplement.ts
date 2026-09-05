@@ -1,5 +1,6 @@
 import { readDeltaSpecs } from '../change/model.js';
-import { changeDir, changeExists, type Workspace } from '../workspace.js';
+import { resolveChangeContext, computeStatus } from '../change/status.js';
+import { changeDir, type Workspace } from '../workspace.js';
 import { PRIORITY_RANK } from './state.js';
 import type { PlanStatus } from './status.js';
 import type { Priority } from './model.js';
@@ -39,6 +40,15 @@ export interface ParallelImplementBatch {
  *
  * A change with no capability at all (created with `--skip-specs`) never
  * conflicts with anything by this measure and is always includable.
+ *
+ * `execution === 'proposed'` (the project-level view) only means "the
+ * directory exists and no task has started" - it says nothing about which
+ * artifacts are actually IN that directory (`executionOf` in state.ts falls
+ * back to `proposed` for a change linked before proposal.md was ever
+ * written). The one check that actually proves `/spec-implement` has
+ * something to read is the change's own native status - the exact
+ * `applyBlockedBy` gate `specs instructions implement` itself refuses to
+ * proceed past - so every candidate is re-checked against it here too.
  */
 export async function computeParallelImplementBatch(
   workspace: Workspace,
@@ -61,10 +71,19 @@ export async function computeParallelImplementBatch(
       continue;
     }
 
-    if (!(await changeExists(workspace, view.link.name))) {
+    let nativeStatus;
+    try {
+      const context = await resolveChangeContext(workspace, view.link.name);
+      nativeStatus = await computeStatus(context);
+    } catch {
       excluded.push({ id: view.id, reason: 'change_dir_missing' });
       continue;
     }
+    if (!nativeStatus.ready) {
+      excluded.push({ id: view.id, reason: `implement_blocked:${nativeStatus.applyBlockedBy.join(',')}` });
+      continue;
+    }
+
     const deltas = await readDeltaSpecs(changeDir(workspace, view.link.name));
     const capabilities = [...new Set(deltas.map((delta) => delta.capability))];
 

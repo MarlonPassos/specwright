@@ -3,7 +3,9 @@ import { computeParallelImplementBatch } from '../../src/core/project/parallelIm
 import { computeProjectStatus } from '../../src/core/project/status.js';
 import { activePath } from '../../src/core/project/link.js';
 import { makePlanWorkspace, seedPlan, manifest, change, withBrief } from '../helpers/plan.js';
-import { seedChange } from '../helpers/workspace.js';
+import { seedChange, writeFile } from '../helpers/workspace.js';
+import { writeChangeMetadata } from '../../src/core/change/metadata.js';
+import path from 'node:path';
 import type { Workspace } from '../../src/core/workspace.js';
 import type { ChangeLink, ProjectChange } from '../../src/core/project/model.js';
 
@@ -69,6 +71,14 @@ describe('computeParallelImplementBatch', () => {
       { id: 'CH-001', slug: 'alpha' },
       { delta: null as unknown as string }
     );
+    // `seedChange`'s `.change.yaml` never declares `skip_specs` on its own;
+    // without it, omitting the delta file is just a change missing an
+    // artifact it still needs (correctly `implement_blocked`), not a real
+    // skip-specs change - assert the actual opt-out explicitly.
+    await writeChangeMetadata(path.join(workspace.changesPath, 'alpha'), {
+      schema: 'spec-driven',
+      skip_specs: true,
+    });
     const withCap = await readyProposedChange(
       workspace,
       'demo',
@@ -107,6 +117,31 @@ describe('computeParallelImplementBatch', () => {
 
     expect(result.batch).toEqual([]);
     expect(result.excluded).toEqual([{ id: 'CH-001', reason: 'not_linked' }]);
+  });
+
+  it('excludes a change linked before it was actually proposed (dir exists, no artifacts)', async () => {
+    // `execution: 'proposed'` at the project level only means "the directory
+    // exists and no task has started" - it says nothing about whether
+    // proposal.md/design.md/tasks.md/deltas actually exist. A change linked
+    // right after `specs new change` (before /spec-propose ever ran) reads
+    // as `proposed` too, and must not be handed to `/spec-implement`.
+    const workspace = await makePlanWorkspace();
+    await writeFile(
+      path.join(workspace.changesPath, 'alpha', '.change.yaml'),
+      'schema: spec-driven\n'
+    );
+    const bare = await withBrief(workspace, 'demo', change({ id: 'CH-001', slug: 'alpha' }));
+    await seedPlan(workspace, manifest({ id: 'demo', changes: [{ ...bare, link: linkTo('alpha') }] }));
+
+    const status = await computeProjectStatus(workspace, 'demo');
+    expect(status.changes[0].execution).toBe('proposed'); // confirms the gap this closes
+    const result = await computeParallelImplementBatch(workspace, status);
+
+    expect(result.batch).toEqual([]);
+    expect(result.excluded).toHaveLength(1);
+    expect(result.excluded[0].id).toBe('CH-001');
+    expect(result.excluded[0].reason).toMatch(/^implement_blocked:/);
+    expect(result.excluded[0].reason).toContain('proposal');
   });
 
   it('excludes a change that already has implementation started (execution beyond "proposed")', async () => {

@@ -687,10 +687,12 @@ function formatNext(
   if (implementBatch.batch.length > 1) {
     lines.push(
       '',
-      `Lote pronto para implement paralelo (já propostas, sem capability em comum): ${implementBatch.batch
-        .map((entry) => entry.id)
-        .join(', ')}`,
-      '  specs worktree create --change <id> (uma por change do lote, sem --task)'
+      'Lote pronto para implement paralelo (já propostas, sem capability em comum):',
+      // `link` é o slug real da change (o que `--change` espera); `id` (CH-NNN)
+      // é só o rótulo do incremento no plano — os dois podem divergir.
+      ...implementBatch.batch.map(
+        (entry) => `  ${entry.id} → specs worktree create --change ${entry.link} --whole-change`
+      )
     );
   }
   if (recommendation.excluded.length > 0) {
