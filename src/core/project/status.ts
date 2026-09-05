@@ -27,6 +27,7 @@ import {
   type Readiness,
 } from './state.js';
 import type { PlanManifest, MaterializationState, PlanStatusValue as DeclaredStatus } from './model.js';
+import { projectedRevision } from './render.js';
 import type { RoadmapRow } from './render.js';
 
 export interface PlannedChangeView {
@@ -287,6 +288,8 @@ export async function computeProjectStatus(
   const archived = count((view) => view.execution === 'archived');
   const total = views.length;
 
+  const projected = projectedRevision(await readFileIfExists(paths.planDoc));
+
   const diagnostics = collectDiagnostics({
     workspace,
     manifest,
@@ -312,6 +315,19 @@ export async function computeProjectStatus(
       // Escopo/Critérios macro), so the actual fix is supplying that content,
       // via a bundle or by hand, not re-running the command that found it.
       fix: `preencha Escopo e Critérios macro de ${id2} com um bundle replacePlannedChange (specs project apply --dry-run --json), ou edite planned-changes/ à mão`,
+    });
+  }
+
+  if (projected !== undefined && projected !== manifest.revision) {
+    diagnostics.push({
+      level: 'WARNING',
+      code: 'stale_projection',
+      path: 'plan.md',
+      message: `plan.md está projetado da revisão ${projected}, mas o manifesto está na ${manifest.revision}`,
+      // The safety net behind `reprojectRoadmap`: every mutating path already
+      // re-emits the block, so this fires for a projection someone edited by
+      // hand, a write that failed, or a path added later without wiring.
+      fix: 'specs project sync',
     });
   }
 

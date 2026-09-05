@@ -9,6 +9,7 @@ import {
 } from '../../src/core/project/link.js';
 import { loadPlan } from '../../src/core/project/repository.js';
 import { computeProjectStatus } from '../../src/core/project/status.js';
+import { projectedRevision } from '../../src/core/project/render.js';
 import {
   makePlanWorkspace,
   seedPlan,
@@ -459,5 +460,85 @@ describe('diagnósticos de archive órfão e execução ambígua', () => {
     const found = status.diagnostics.find((d) => d.code === 'ambiguous_execution');
     expect(found).toBeDefined();
     expect(found!.message).toContain('invisível');
+  });
+});
+
+describe('a projeção de plan.md acompanha toda mutação de revisão', () => {
+  /** The revision the roadmap block says it was projected from. */
+  async function stamped(workspace: Awaited<ReturnType<typeof makePlanWorkspace>>): Promise<number> {
+    const doc = await fs.readFile(
+      path.join(workspace.projectRoot, 'planning/demo/plan.md'),
+      'utf8'
+    );
+    return projectedRevision(doc)!;
+  }
+
+  async function seeded() {
+    const workspace = await makePlanWorkspace();
+    await seedChange(workspace, 'authentication');
+    await seedPlan(
+      workspace,
+      manifest({ id: 'demo', revision: 2, changes: [change({ id: 'CH-002', slug: 'auth' })] })
+    );
+    return workspace;
+  }
+
+  it('link reprojeta', async () => {
+    const workspace = await seeded();
+    const result = await linkChange(workspace, 'demo', 'CH-002', 'authentication');
+    expect(await stamped(workspace)).toBe(result.revision);
+  });
+
+  it('unlink reprojeta', async () => {
+    const workspace = await seeded();
+    await linkChange(workspace, 'demo', 'CH-002', 'authentication');
+    const result = await unlinkChange(workspace, 'demo', 'CH-002');
+    expect(await stamped(workspace)).toBe(result.revision);
+  });
+
+  it('set-state reprojeta', async () => {
+    const workspace = await seeded();
+    const result = await setPlanningState(workspace, 'demo', 'CH-002', 'on_hold', 'esperando');
+    expect(await stamped(workspace)).toBe(result.revision);
+  });
+
+  it('adopt reprojeta', async () => {
+    const workspace = await seeded();
+    await seedChange(workspace, 'outra');
+    const result = await adoptChange(workspace, 'demo', 'outra');
+    expect(await stamped(workspace)).toBe(result.revision);
+  });
+
+  it('status acusa stale_projection quando a projeção fica para trás', async () => {
+    const workspace = await seeded();
+    await linkChange(workspace, 'demo', 'CH-002', 'authentication');
+
+    // Simulate the drift the helper exists to prevent: a projection left
+    // behind by a path nobody wired, or edited by hand.
+    const docPath = path.join(workspace.projectRoot, 'planning/demo/plan.md');
+    const doc = await fs.readFile(docPath, 'utf8');
+    await fs.writeFile(docPath, doc.replace(/revision \d+/, 'revision 1'));
+
+    const status = await computeProjectStatus(workspace, 'demo');
+    const finding = status.diagnostics.find((d) => d.code === 'stale_projection')!;
+    expect(finding.level).toBe('WARNING');
+    expect(finding.message).toContain('revisão 1');
+    expect(finding.fix).toBe('specs project sync');
+  });
+
+  it('não falha o comando quando plan.md não existe', async () => {
+    const workspace = await makePlanWorkspace();
+    await seedChange(workspace, 'authentication');
+    await seedPlan(
+      workspace,
+      manifest({ id: 'demo', revision: 2, changes: [change({ id: 'CH-002', slug: 'auth' })] }),
+      { documents: false }
+    );
+
+    // The projection is downstream of the record: its absence must never turn
+    // a successful link into a failed command.
+    await expect(linkChange(workspace, 'demo', 'CH-002', 'authentication')).resolves.toMatchObject({
+      linked: true,
+    });
   });
 });

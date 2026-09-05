@@ -6,6 +6,7 @@ import type { ProjectChange } from './model.js';
 import { safeResolve } from './paths.js';
 import { activePath } from './link.js';
 import { localDateStamp } from '../../util/date.js';
+import { reprojectRoadmap } from './roadmap.js';
 
 export interface SyncResult {
   synced: boolean;
@@ -164,6 +165,7 @@ export async function syncPlan(
 
   if (mutated && !check) {
     const next = await savePlan(paths, { ...manifest, changes: nextChanges });
+    await reprojectRoadmap(workspace, planId);
     return {
       synced: true,
       checked: false,

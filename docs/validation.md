@@ -149,6 +149,12 @@ O `specs project sync` e o `status` reportam, como diagnóstico de leitura:
 | WARNING | `record_hash_missing` | o brief foi gravado antes da prova de identidade do incremento; rode `specs project generate` |
 | WARNING | `invalid_archive_path` | o `archive_path` persistido não é um diretório de archive válido e foi ignorado |
 | WARNING | `ambiguous_archive_identity` | o nome do archive pode ser um slug terminado em número ou uma colisão; use `adopt --slug` |
+| WARNING | `stale_projection` | `plan.md` está projetado de uma revisão anterior à do manifesto |
+
+`stale_projection` é a rede de segurança da reprojeção: `link`, `unlink`,
+`adopt`, `set-state` e `sync` já reemitem o bloco depois de gravar, então este
+diagnóstico só aparece quando alguém editou a projeção à mão, a escrita falhou,
+ou um caminho novo entrou sem ser instrumentado.
 
 Uma change que fica **fora do plano** indefinidamente é válida: não há warning que
 a trate como erro.
