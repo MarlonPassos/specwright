@@ -171,10 +171,28 @@ export function sourceRefsOf(text: string): SourceRef[] {
   return parseSourceRefs(parsePlannedChange(text).sections);
 }
 
-/** True when the section exists and has non-whitespace content. */
+/**
+ * True when the section exists and carries something other than a comment.
+ *
+ * Markdown comments are the template's own guidance to whoever fills the
+ * section in — the §7.5 skeleton uses them to say what shape a scope bullet or
+ * a source pointer takes. Counting them as content would make the deliberately
+ * invalid skeleton read as complete, which is exactly backwards: the skeleton
+ * has to fail validation so the increment stays blocked until someone supplies
+ * real prose (R-01, FR-22).
+ *
+ * It also closes the reverse hole, which existed before any guidance did: a
+ * brief whose `# Escopo` held nothing but `<!-- TODO -->` passed as filled.
+ */
 export function sectionHasText(sections: MarkdownSection[], title: string): boolean {
   const section = findSection(sections, title);
-  return section !== undefined && section.content.trim().length > 0;
+  if (section === undefined) return false;
+  return stripComments(section.content).trim().length > 0;
+}
+
+/** Removes `<!-- … -->` blocks, including unterminated ones. */
+function stripComments(text: string): string {
+  return text.replace(/<!--[\s\S]*?(?:-->|$)/g, '');
 }
 
 export interface RenderPlannedChangeInput {
@@ -191,6 +209,28 @@ export interface RenderPlannedChangeInput {
  * skeleton of §7.5: `Objetivo` names the increment, everything else is empty,
  * and the result fails validation on purpose so the gap is visible.
  */
+/**
+ * The one-line hint an empty section carries in the §7.5 skeleton.
+ *
+ * Only for sections whose SHAPE is not obvious from the heading, and only where
+ * getting the shape wrong has a known cost: a scope bullet with no pointer back
+ * to the source is a bullet nobody can check, and that is how "dados do cliente"
+ * disappeared from one. The comment is a Markdown comment, so it does not count
+ * as content — the section stays empty for validation, on purpose.
+ */
+function guidanceFor(heading: (typeof PLANNED_CHANGE_SECTIONS)[number]): string {
+  switch (heading) {
+    case 'Escopo':
+      return '<!-- Um bullet por entrega, cada um com a origem: - entrega  [fonte: §N / linhas] -->';
+    case 'Critérios macro':
+      return '<!-- Um critério por linha, cada um conferível: - critério → como se verifica -->';
+    case 'Referências da fonte':
+      return '<!-- Um ponteiro por linha: - caminho/do/documento.md:linha-inicial-linha-final -->';
+    default:
+      return '';
+  }
+}
+
 export function renderPlannedChange(input: RenderPlannedChangeInput): string {
   const provided = input.sections ?? {};
   const objetivo =
@@ -212,7 +252,8 @@ export function renderPlannedChange(input: RenderPlannedChangeInput): string {
 
   for (const heading of PLANNED_CHANGE_SECTIONS) {
     lines.push(`# ${heading}`, '');
-    const content = heading === 'Objetivo' ? objetivo : provided[heading]?.trim() ?? '';
+    const content =
+      heading === 'Objetivo' ? objetivo : (provided[heading]?.trim() ?? guidanceFor(heading));
     if (content) {
       lines.push(content, '');
     }

@@ -31,6 +31,11 @@ ${PROJECT_BOUNDARY}
 3. Leia as fontes em partes. Resuma cada parte com suas palavras — nunca copie
    trechos para o plano.
 4. Proponha domínios, incrementos, dependências (por ID), milestones e prioridade.
+   Cada bullet do Escopo de um incremento carrega a referência de onde ele vem
+   — \`[fonte: §N / linhas]\` — e a seção \`Referências da fonte\` reúne os mesmos
+   ponteiros. Com \`source_documents\` declarado, essa seção é **obrigatória**: um
+   brief que não aponta para lugar nenhum não tem como ser conferido contra
+   nada, e é assim que um item de escopo some sem ninguém notar.
 5. Mostre o resumo, as suposições que fez e as dúvidas críticas que mudam escopo.
 6. \`specs project bundle-schema --json\` — o contrato do bundle. Leia antes de
    montar o primeiro; não descubra o formato errando contra \`apply\`.

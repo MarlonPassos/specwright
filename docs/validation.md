@@ -118,6 +118,11 @@ marcada quando alguém vai conferir. A justificativa é o único rastro da decis
 | ERROR | Cabeçalho de delta (`## ADDED/MODIFIED/REMOVED/RENAMED Requirements`) |
 | WARNING | Seção recomendada (`Motivação`, `Riscos`, `Fora do escopo`, …) ausente ou vazia |
 
+Uma seção que carrega apenas um comentário Markdown conta como **vazia**: o
+comentário é a orientação do template para quem vai preenchê-la, não conteúdo.
+É o que mantém o esqueleto do §7.5 inválido apesar da orientação que ele traz —
+e o que impede um `# Escopo` com `<!-- TODO -->` de passar como preenchido.
+
 `Referências da fonte` é a única seção cuja obrigatoriedade depende do plano.
 Com `source_documents` declarado, um brief que não aponta para lugar nenhum não
 tem rastreabilidade — ninguém consegue conferir o escopo contra nada — e isso é

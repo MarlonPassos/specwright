@@ -132,6 +132,34 @@ describe('renderPlannedChange — frontmatter serializado, nunca concatenado', (
   });
 });
 
+describe('sectionHasText — comentário não é conteúdo', () => {
+  const withScope = (scope: string): string => VALID.replace('- início de sessão', scope);
+
+  it('lê uma seção que só tem comentário como vazia', () => {
+    const parsed = parsePlannedChange(withScope('<!-- TODO: preencher -->'));
+    expect(sectionHasText(parsed.sections, 'Escopo')).toBe(false);
+  });
+
+  it('lê conteúdo real ao lado de um comentário como preenchida', () => {
+    const parsed = parsePlannedChange(withScope('<!-- guia -->\n- entrega  [fonte: §1 / 1-9]'));
+    expect(sectionHasText(parsed.sections, 'Escopo')).toBe(true);
+  });
+
+  it('o esqueleto do §7.5 continua inválido apesar da orientação que ele carrega', () => {
+    const skeleton = renderPlannedChange({
+      id: 'CH-001',
+      slug: 'x',
+      title: 'X',
+      planRevision: 0,
+    });
+    const parsed = parsePlannedChange(skeleton);
+    expect(skeleton).toContain('[fonte: §N / linhas]');
+    expect(sectionHasText(parsed.sections, 'Escopo')).toBe(false);
+    expect(sectionHasText(parsed.sections, 'Critérios macro')).toBe(false);
+    expect(sectionHasText(parsed.sections, 'Referências da fonte')).toBe(false);
+  });
+});
+
 describe('source refs', () => {
   const brief = (referencias: string): string =>
     VALID.replace('# Critérios macro', `# Referências da fonte\n\n${referencias}\n\n# Critérios macro`);
