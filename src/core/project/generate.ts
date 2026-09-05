@@ -12,6 +12,8 @@ import { renderPlannedChange, sourceRefsOf } from './planned-change.js';
 import { assertRoadmapMarkers, renderRoadmapBlock, spliceRoadmap } from './render.js';
 import { materializationState } from './state.js';
 import { computeProjectStatus, roadmapRows } from './status.js';
+import { validatePlan, validateProposedPlan } from './validate.js';
+import type { ValidationReport } from '../validate/report.js';
 
 export interface GenerateOptions {
   changeIds?: string[];
@@ -48,6 +50,17 @@ export interface GenerateResult {
   skipped: { id: string; reason: string }[];
   conflicts: GenerateConflict[];
   diagnostics: unknown[];
+  /**
+   * The plan validation for the state this run produces — the proposed state on
+   * a dry run, the state on disk otherwise.
+   *
+   * `generate` used to end without checking anything, and the check that would
+   * have caught it lived only in the workflow's step 6, in prose an agent can
+   * skip. Reported, never thrown: an increment materialised as the bare §7.5
+   * skeleton is INVALID on purpose, so failing here would deadlock the
+   * documented flow. The caller decides what to do with it.
+   */
+  validation: ValidationReport[];
 }
 
 export async function generatePlannedChanges(
@@ -179,6 +192,7 @@ export async function generatePlannedChanges(
       skipped,
       conflicts,
       diagnostics: [],
+      validation: [],
     };
   }
 
@@ -186,7 +200,24 @@ export async function generatePlannedChanges(
     (entry) => `${status_rel(workspace, paths.dir)}/${entry.relPath}`
   );
 
+  const nextManifest: PlanManifest = {
+    ...manifest,
+    revision: manifest.revision + 1,
+    updated_at: localDateStamp(options.now ?? new Date()),
+    changes: manifest.changes.map((change) => {
+      const ref = nextRefs.get(change.id);
+      if (!ref) return change;
+      return { ...change, planned_change: ref, source_refs: nextSourceRefs.get(change.id) ?? [] };
+    }),
+  };
+
   if (options.dryRun) {
+    // The preview validates the state it PROPOSES, with the briefs it would
+    // write standing in for files that are not on disk — the same trick
+    // `apply --dry-run` uses, so the two previews agree.
+    const briefs = new Map(
+      [...toWrite.values()].map((entry) => [entry.relPath, entry.content] as const)
+    );
     return {
       generated: false,
       dryRun: true,
@@ -197,6 +228,7 @@ export async function generatePlannedChanges(
       skipped,
       conflicts: [],
       diagnostics,
+      validation: await validateProposedPlan(workspace.projectRoot, id, nextManifest, briefs),
     };
   }
 
@@ -212,19 +244,9 @@ export async function generatePlannedChanges(
       skipped,
       conflicts: [],
       diagnostics,
+      validation: await validatePlan(workspace.projectRoot, id),
     };
   }
-
-  const nextManifest: PlanManifest = {
-    ...manifest,
-    revision: manifest.revision + 1,
-    updated_at: localDateStamp(options.now ?? new Date()),
-    changes: manifest.changes.map((change) => {
-      const ref = nextRefs.get(change.id);
-      if (!ref) return change;
-      return { ...change, planned_change: ref, source_refs: nextSourceRefs.get(change.id) ?? [] };
-    }),
-  };
 
   // Briefs and manifest commit together, under the plan lock, with the revision
   // re-checked inside it.
@@ -266,6 +288,9 @@ export async function generatePlannedChanges(
     skipped,
     conflicts: [],
     diagnostics,
+    // Read back from disk, after the lock released: the report describes the
+    // state that actually committed, not the one this run intended.
+    validation: await validatePlan(workspace.projectRoot, id),
   };
 }
 

@@ -298,6 +298,47 @@ describe('generatePlannedChanges', () => {
       expect(saved.changes[0].source_refs).toEqual([]);
     });
 
+    it('reports the plan validation of what it wrote, without failing on it', async () => {
+      const workspace = await makePlanWorkspace();
+      await seedPlan(workspace, manifest({ id: 'demo', changes: [change({ id: 'CH-001', slug: 'x' })] }));
+
+      // The bare skeleton is invalid on purpose (§7.5): generate must SAY so
+      // and still succeed, or the documented flow deadlocks.
+      const result = await generatePlannedChanges(workspace, 'demo', { changeIds: ['CH-001'] });
+      expect(result.generated).toBe(true);
+      const messages = result.validation.flatMap((report) =>
+        report.issues.filter((issue) => issue.level === 'ERROR').map((issue) => issue.path)
+      );
+      expect(messages).toContain('planned-changes/CH-001-x.md:Escopo');
+      expect(messages).toContain('planned-changes/CH-001-x.md:Critérios macro');
+    });
+
+    it('validates the state the dry run proposes, not the one on disk', async () => {
+      const workspace = await makePlanWorkspace();
+      await seedPlan(workspace, manifest({ id: 'demo', changes: [change({ id: 'CH-001', slug: 'x' })] }));
+      await fs.mkdir(path.join(workspace.projectRoot, 'planning/demo/planned-changes'), {
+        recursive: true,
+      });
+      await fs.writeFile(
+        path.join(workspace.projectRoot, 'planning/demo/planned-changes/CH-001-x.md'),
+        '---\nschema_version: 1\nid: CH-001\nslug: x\ntitle: X\nplan_revision: 0\n---\n\n' +
+          '# Objetivo\n\nJá escrito.\n\n# Escopo\n\n- a\n\n# Critérios macro\n\n- b\n'
+      );
+
+      const preview = await generatePlannedChanges(workspace, 'demo', {
+        changeIds: ['CH-001'],
+        dryRun: true,
+      });
+      expect(preview.dryRun).toBe(true);
+      // The brief the preview would write is complete, so no required section
+      // is missing — even though the manifest on disk has no ref for it yet.
+      expect(
+        preview.validation.flatMap((report) =>
+          report.issues.filter((issue) => issue.level === 'ERROR')
+        )
+      ).toEqual([]);
+    });
+
     it('stays empty when nothing new is written (idempotent second run)', async () => {
       const workspace = await makePlanWorkspace();
       await seedPlan(workspace, manifest({ id: 'demo', changes: [change({ id: 'CH-001', slug: 'x' })] }));

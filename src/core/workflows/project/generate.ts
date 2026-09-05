@@ -28,7 +28,10 @@ ${PROJECT_BOUNDARY}
 3. Mostre o que seria gravado, o que seria pulado e os conflitos.
 4. Espere o sim em uma mensagem separada.
 5. \`specs project generate\` sem \`--dry-run\`.
-6. \`specs project validate --strict --json\` e reporte.
+6. Reporte o bloco \`validation\` que o próprio \`generate\` devolve — ele já
+   valida o plano resultante, no dry-run e no run real. Rode
+   \`specs project validate --strict --json\` à parte só se quiser o veredito
+   sob \`--strict\`.
 
 Se vier \`planned_change_modified\`, mostre \`recordedContentHash\` e
 \`currentContentHash\`, explique o conflito e PARE. Não use \`--force\` sem o usuário pedir.

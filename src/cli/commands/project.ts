@@ -344,10 +344,27 @@ export function registerProjectCommands(program: Command): void {
           printJson(result);
           return;
         }
+        // The validation of the resulting plan is part of the output, not a
+        // separate command someone has to remember to run. An increment
+        // materialised as the bare skeleton is invalid ON PURPOSE, so this
+        // reports and never changes the exit code.
+        const findings = result.validation.flatMap((report) =>
+          report.issues.map((issue) => `  ${issue.level} ${issue.path}: ${issue.message}`)
+        );
         printLines([
           result.dryRun ? 'Prévia (nada foi escrito):' : 'Materialização concluída.',
           ...result.written.map((file) => `  + ${file}`),
           ...result.skipped.map((entry) => `  = ${entry.id} (${entry.reason})`),
+          ...(result.skeletons.length > 0
+            ? [
+                '',
+                `Esqueleto vazio (§7.5) em: ${result.skeletons.join(', ')} — Escopo e Critérios`,
+                'macro ficam vazios até alguém preenchê-los, e o incremento fica bloqueado.',
+              ]
+            : []),
+          ...(findings.length > 0
+            ? ['', `Validação do plano — ${findings.length} achado(s):`, ...findings]
+            : ['', 'Validação do plano: nenhum achado.']),
         ]);
       } catch (error) {
         fail(error, { json, payload: { generated: false } });

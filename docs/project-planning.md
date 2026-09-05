@@ -62,6 +62,14 @@ vazia, e vazia significa "este incremento não cita fonte nenhuma", nunca
 A serialização é determinística: `load → save → load` é byte-idêntico. As chaves
 saem em ordem fixa, `changes` na ordem de declaração e `milestones` por `order`.
 
+### `generate` valida o que gravou
+
+Toda materialização — dry-run ou real — devolve `validation`: o relatório do
+plano resultante, com as briefs propostas no lugar dos arquivos no dry-run. É
+reportado, nunca lançado: o esqueleto do §7.5 é inválido de propósito, e falhar
+ali travaria o fluxo documentado. Quem quiser o veredito sob `--strict` roda
+`specs project validate --strict` à parte.
+
 ## Planned Change
 
 `planning/<plan-id>/planned-changes/<ID>-<slug>.md`: um Markdown com frontmatter
