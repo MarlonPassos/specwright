@@ -190,6 +190,19 @@ describe('source refs', () => {
     ]);
   });
 
+  it('marca como divergente a referência que o brief assinala', () => {
+    expect(sourceRefsOf(brief('- docs/plano.md:1008-1035 · divergente'))).toEqual([
+      { path: 'docs/plano.md', lines: '1008-1035', supersedes: true },
+    ]);
+    expect(sourceRefsOf(brief('- docs/plano.md:12 (divergente)'))).toEqual([
+      { path: 'docs/plano.md', lines: '12', supersedes: true },
+    ]);
+  });
+
+  it('não marca a referência comum', () => {
+    expect(sourceRefsOf(brief('- docs/plano.md:1-9'))[0].supersedes).toBeUndefined();
+  });
+
   it('is empty when the section is absent, and never throws on one', () => {
     expect(sourceRefsOf(VALID)).toEqual([]);
     expect(sourceRefsOf(brief('- '))).toEqual([]);

@@ -59,6 +59,13 @@ a escreveu (`371-573`, `§10`), sem interpretar. A lista sai do YAML quando est�
 vazia, e vazia significa "este incremento não cita fonte nenhuma", nunca
 "não sei".
 
+Um ponteiro marcado com `· divergente` no brief vira `supersedes: true`: o
+incremento se afasta da fonte ali de propósito. É a metade estrutural da regra
+de divergência do design — o design escreve o que a fonte pedia, o que se
+decidiu, por quê e o que se perde; o manifesto registra ONDE, numa forma que um
+comando consegue ler. Sem isso, `/spec-project-verify` só pode pedir a um humano
+que repare; com isso, divergência não declarada é a diferença entre duas listas.
+
 A serialização é determinística: `load → save → load` é byte-idêntico. As chaves
 saem em ordem fixa, `changes` na ordem de declaração e `milestones` por `order`.
 

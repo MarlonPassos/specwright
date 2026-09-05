@@ -56,6 +56,18 @@ export const SourceRefSchema = z
   .object({
     path: z.string().min(1),
     lines: z.string().min(1).optional(),
+    /**
+     * The increment knowingly departs from what the source says here.
+     *
+     * Diverging from the source document is legitimate and often right; what
+     * is not is diverging without knowing it. This marker is the plan-level
+     * half of that: the design writes the reasoning (what the source asked,
+     * what was decided, why, and what is lost), and this says WHERE, in a form
+     * a command can read. Without it, `project-verify` can only ask a human to
+     * notice; with it, an undeclared divergence is the difference between two
+     * lists.
+     */
+    supersedes: z.literal(true).optional(),
   })
   .strict();
 export type SourceRef = z.infer<typeof SourceRefSchema>;
@@ -233,6 +245,7 @@ function renderChange(change: ProjectChange): Record<string, unknown> {
     document.source_refs = sourceRefs.map((ref) => ({
       path: ref.path,
       ...(ref.lines !== undefined ? { lines: ref.lines } : {}),
+      ...(ref.supersedes ? { supersedes: true } : {}),
     }));
   }
   return {

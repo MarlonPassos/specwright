@@ -124,6 +124,8 @@ export function parsePlannedChange(text: string): ParsedPlannedChange {
 }
 
 const SOURCE_REF_LINE = /^[-*]\s+(.+?)\s*$/;
+/** `· divergente`, `(divergente)` or `[divergente]` on a reference line. */
+const DIVERGENT_MARKER = /\s*(?:·\s*divergente|\(\s*divergente\s*\)|\[\s*divergente\s*\])/i;
 
 /**
  * Reads `# Referências da fonte` into structured pointers.
@@ -145,6 +147,9 @@ export function parseSourceRefs(sections: MarkdownSection[]): SourceRef[] {
     if (!match) continue;
     let text = match[1].replace(/`/g, '').replace(/\*\*/g, '').trim();
     if (text.length === 0) continue;
+    // `· divergente` marks a reference this increment knowingly departs from.
+    const supersedes = DIVERGENT_MARKER.test(text);
+    text = text.replace(DIVERGENT_MARKER, '').trim();
     // A trailing parenthetical or em-dash comment is commentary, not path.
     text = text.split(/\s+[—–]\s+/)[0].trim();
 
@@ -161,7 +166,11 @@ export function parseSourceRefs(sections: MarkdownSection[]): SourceRef[] {
     const key = `${path}::${lines ?? ''}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    refs.push(lines === undefined ? { path } : { path, lines });
+    refs.push({
+      path,
+      ...(lines !== undefined ? { lines } : {}),
+      ...(supersedes ? { supersedes: true as const } : {}),
+    });
   }
   return refs;
 }
@@ -225,7 +234,11 @@ function guidanceFor(heading: (typeof PLANNED_CHANGE_SECTIONS)[number]): string 
     case 'Critérios macro':
       return '<!-- Um critério por linha, cada um conferível: - critério → como se verifica -->';
     case 'Referências da fonte':
-      return '<!-- Um ponteiro por linha: - caminho/do/documento.md:linha-inicial-linha-final -->';
+      return [
+        '<!-- Um ponteiro por linha: - caminho/do/documento.md:linha-inicial-linha-final',
+        '     Acrescente `· divergente` ao ponteiro do qual este incremento se afasta de',
+        '     propósito; o design explica o quê, por quê e o que se perde. -->',
+      ].join('\n');
     default:
       return '';
   }

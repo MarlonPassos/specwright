@@ -50,6 +50,11 @@ pedido?".
    Se aquele trecho pedia comportamento que ninguém construiu é **recomendação** sua, e
    precisa ser lida como tal.
 
+   Uma referência com \`supersedes: true\` é uma divergência **declarada**: o incremento
+   sabe que se afasta da fonte ali. Confira que o design correspondente traz a subseção de
+   divergência com "o que se perde". Uma divergência que o código comete e nenhuma
+   referência declara é o achado do passo 4.
+
 3. **Requisito → prova**
 
    Leia o \`verification.md\` de cada change arquivada do escopo. Requisito sem prova
