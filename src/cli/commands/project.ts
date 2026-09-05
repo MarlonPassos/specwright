@@ -537,12 +537,19 @@ export function registerProjectCommands(program: Command): void {
     .option('--file <path>', 'Lê o bundle deste arquivo em vez do stdin')
     .option('--dry-run', 'Imprime diff e impacto sem escrever nada')
     .option('--allow-completed', 'Permite uma operação atingir um incremento concluído')
+    .option('--strict', 'Recusa uma re-decomposição que perde a cobertura de um documento-fonte')
     .option('--expect-revision <n>', 'Falha se a revisão no disco diferir')
     .option('--json', 'Saída em JSON')
     .action(async function (
       this: Command,
       planId: string | undefined,
-      options: { file?: string; dryRun?: boolean; allowCompleted?: boolean; expectRevision?: string }
+      options: {
+        file?: string;
+        dryRun?: boolean;
+        strict?: boolean;
+        allowCompleted?: boolean;
+        expectRevision?: string;
+      }
     ) {
       const json = wantsJson(this);
       try {
@@ -560,6 +567,7 @@ export function registerProjectCommands(program: Command): void {
         }
         const result = await applyPlanBundle(workspace, id, parsed, {
           dryRun: options.dryRun,
+          strict: options.strict,
           allowCompleted: options.allowCompleted,
           expectRevision:
             options.expectRevision !== undefined ? Number(options.expectRevision) : undefined,

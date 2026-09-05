@@ -136,6 +136,16 @@ export interface BundleResult {
   documents: DocumentWrite[];
   /** Increment ids whose record changed and now touch a completed increment. */
   completedTouched: string[];
+  /**
+   * Re-decompositions THIS bundle performs: the increment it retires and the
+   * increments that take its place.
+   *
+   * Reported so the caller can check that the source pointers the retired
+   * increment carried survive the split. A plan can hold older supersessions
+   * from previous bundles; those are settled history and are not re-litigated
+   * here.
+   */
+  supersessions: Array<{ from: string; to: string[] }>;
 }
 
 export interface ApplyContext {
@@ -195,6 +205,7 @@ export function applyBundle(
   const working: PlanManifest = structuredClone(manifest);
   const idMap: Record<string, string> = {};
   const pendingBriefs: PendingBrief[] = [];
+  const supersessions: BundleResult['supersessions'] = [];
   const briefRenames: Array<{ from: string; to: string }> = [];
   const documents: DocumentWrite[] = [];
   const completedTouched = new Set<string>();
@@ -360,6 +371,7 @@ export function applyBundle(
         }
         original.planning_state = 'cancelled';
         original.superseded_by = newIds;
+        supersessions.push({ from: original.id, to: [...newIds] });
         break;
       }
       case 'mergeChanges': {
@@ -381,6 +393,7 @@ export function applyBundle(
           merged.depends_on.forEach((d) => absorbed.add(d));
           merged.planning_state = 'cancelled';
           merged.superseded_by = [survivor.id];
+          supersessions.push({ from: merged.id, to: [survivor.id] });
         }
         survivor.depends_on = [...absorbed].filter(
           (d) => d !== survivor.id && !mergedIds.includes(d)
@@ -464,6 +477,7 @@ export function applyBundle(
     briefRenames,
     documents,
     completedTouched: [...completedTouched],
+    supersessions,
   };
 }
 
@@ -661,4 +675,66 @@ export function renderBriefFromSpec(
   if (spec?.referencias) sections['Referências da fonte'] = spec.referencias.map((line) => `- ${line}`).join('\n');
   if (spec?.readiness) sections['Readiness e handoff'] = spec.readiness;
   return renderPlannedChange({ id, slug, title, planRevision, sections });
+}
+
+export interface CoverageLoss {
+  /** The increment being retired. */
+  from: string;
+  /** The increments taking its place. */
+  to: string[];
+  /** Source documents it cited that none of them cite. */
+  lostPaths: string[];
+  /** The full pointers behind `lostPaths`, for the message. */
+  lostRefs: Array<{ path: string; lines?: string }>;
+}
+
+/**
+ * Which source pointers a re-decomposition drops on the floor.
+ *
+ * A split or a merge allocates fresh records and writes fresh briefs. Nothing
+ * used to compare the increment being retired with the ones taking its place,
+ * so the whole `Referências da fonte` section could vanish and `apply` would
+ * accept it without a word — including under `--dry-run`, which is where the
+ * decision is actually made. That is how 22 of 22 briefs lost their pointers in
+ * one re-decomposition, and the six code gaps that followed had that as their
+ * shared root.
+ *
+ * The comparison is by source PATH, not by exact pointer. A successor that
+ * narrows `371-573` to `371-400` is doing its job, and flagging it would train
+ * everyone to ignore the finding. A source document that NO successor mentions
+ * at all is unambiguous: whatever the retired increment answered for there,
+ * nobody answers for now.
+ */
+export function supersessionCoverage(
+  manifest: PlanManifest,
+  supersessions: BundleResult['supersessions']
+): CoverageLoss[] {
+  const byId = new Map(manifest.changes.map((change) => [change.id, change]));
+  const losses: CoverageLoss[] = [];
+
+  for (const { from, to } of supersessions) {
+    const retired = byId.get(from);
+    const refs = retired?.source_refs ?? [];
+    if (refs.length === 0) continue;
+
+    const covered = new Set(
+      to.flatMap((id) => (byId.get(id)?.source_refs ?? []).map((ref) => ref.path))
+    );
+    const lostRefs = refs.filter((ref) => !covered.has(ref.path));
+    if (lostRefs.length === 0) continue;
+
+    losses.push({
+      from,
+      to: [...to],
+      lostPaths: [...new Set(lostRefs.map((ref) => ref.path))],
+      lostRefs,
+    });
+  }
+
+  return losses;
+}
+
+/** `docs/x.md:1-2` — the shape a brief writes, for a message a human can act on. */
+export function formatSourceRef(ref: { path: string; lines?: string }): string {
+  return ref.lines === undefined ? ref.path : `${ref.path}:${ref.lines}`;
 }

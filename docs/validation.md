@@ -120,6 +120,21 @@ documento do mesmo jeito, senão `apply --dry-run` e o `validate` seguinte
 discordam sobre os mesmos bytes.
 | WARNING | Conteúdo editado à mão (`modified`) ou fonte alterada (`outdated`) num incremento `planned` |
 
+## Re-decomposição
+
+| Nível | Código | Quando |
+| --- | --- | --- |
+| WARNING (ERROR sob `--strict`) | `supersession_coverage_lost` | um `splitChange`/`mergeChanges` aposenta um incremento que citava um documento-fonte que **nenhum** sucessor cita |
+
+A comparação é por PATH, não por ponteiro exato: um sucessor que estreita
+`371-573` para `371-400` está fazendo o trabalho dele. Um documento que nenhum
+sucessor menciona é inequívoco — o que o incremento aposentado respondia ali,
+ninguém responde mais.
+
+Aparece no `apply --dry-run`, que é onde a decisão é tomada. Sem `--strict` é
+aviso: largar um escopo pode ser deliberado. Com `--strict`, `apply` recusa e
+não escreve nada.
+
 ## Vínculo (Project Planning)
 
 O `specs project sync` e o `status` reportam, como diagnóstico de leitura:

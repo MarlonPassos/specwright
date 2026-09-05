@@ -302,6 +302,10 @@ catálogo publicado não diverge da união zod que o parser usa de verdade.
   dígitos, `_` ou `-` — espelhar o slug (`$bug-fixes`) é a convenção mais simples.
 - Nenhuma operação atinge um incremento `archived` sem `--allow-completed` (e aí
   o relatório traz um `WARNING`).
+Uma re-decomposição que aposenta um incremento cujas `source_refs` citam um
+documento que nenhum sucessor cita emite `supersession_coverage_lost` — aviso
+por padrão, recusa sob `specs project apply --strict`.
+
 - **Split** marca o original `cancelled` com `superseded_by: [novos IDs]` e exige
   `rewire` cobrindo todos os dependentes. O ID original nunca é reutilizado.
 - **Merge** escolhe um `survivor ∈ ids`, marca os demais `cancelled`, e é

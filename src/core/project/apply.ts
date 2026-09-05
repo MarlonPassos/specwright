@@ -12,14 +12,18 @@ import { resolveWithinRoot, safeResolve } from './paths.js';
 import { validatePlan, validateProposedPlan, validatePlannedChangeContent } from './validate.js';
 import {
   applyBundle,
+  formatSourceRef,
   parseBundle,
   renderBriefFromSpec,
+  supersessionCoverage,
   type Bundle,
 } from './bundle.js';
 import { sourceRefsOf } from './planned-change.js';
 
 export interface ApplyOptions {
   dryRun?: boolean;
+  /** Refuse to write when a re-decomposition drops a source document (A16). */
+  strict?: boolean;
   allowCompleted?: boolean;
   /** CLI-level guard; must match the revision on disk (FR-39). */
   expectRevision?: number;
@@ -142,6 +146,12 @@ export async function applyPlanBundle(
   ];
   const removed = result.briefRenames.map((rename) => `${planRel}/${rename.from}`);
 
+  // A split or a merge that drops a source document the retired increment
+  // answered for. Reported by default — a scope can be legitimately dropped —
+  // and refused under --strict, because the silent case is how a whole plan
+  // lost its traceability in one bundle.
+  const coverageLosses = supersessionCoverage(result.manifest, result.supersessions);
+
   const diagnostics: ApplyResult['diagnostics'] = result.completedTouched.map((id) => ({
     level: 'WARNING',
     code: 'completed_change_protected',
@@ -152,6 +162,32 @@ export async function applyPlanBundle(
           ? `${id} está concluído e seria alterado com --allow-completed`
           : `${id} está concluído e foi alterado com --allow-completed`,
   }));
+
+  for (const loss of coverageLosses) {
+    diagnostics.push({
+      level: options.strict === true ? 'ERROR' : 'WARNING',
+      code: 'supersession_coverage_lost',
+      message:
+        `${loss.from} → ${loss.to.join(', ')}: nenhum sucessor cita ` +
+        `${loss.lostRefs.map(formatSourceRef).join(', ')}`,
+      fix: `Acrescente a referência ao Escopo/Referências da fonte de um dos sucessores, ou declare a perda como deliberada.`,
+    });
+  }
+  if (coverageLosses.length > 0 && options.strict === true) {
+    throw new SpecError(
+      `A re-decomposição perde a cobertura de ${coverageLosses.length} incremento(s); nada foi escrito:\n` +
+        coverageLosses
+          .map(
+            (loss) =>
+              `  - ${loss.from} → ${loss.to.join(', ')}: ${loss.lostRefs.map(formatSourceRef).join(', ')}`
+          )
+          .join('\n'),
+      {
+        code: 'supersession_coverage_lost',
+        fix: 'Cite a fonte em um dos sucessores, ou rode sem --strict para registrar a perda como deliberada.',
+      }
+    );
+  }
 
   // A slug rename moves the brief: carry the existing bytes to the new path and
   // rewrite the `slug:` in its frontmatter, so every reference moves in the same
