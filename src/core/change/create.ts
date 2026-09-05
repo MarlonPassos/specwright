@@ -28,6 +28,8 @@ export interface CreateChangeOptions {
   schema?: string;
   goal?: string;
   skipSpecs?: boolean;
+  /** Written justification, required by validation whenever `skipSpecs` is set. */
+  skipSpecsReason?: string;
   parallel?: boolean;
 }
 
@@ -67,6 +69,9 @@ export async function createChange(
     created: localDateStamp(),
     ...(options.goal ? { goal: options.goal } : {}),
     ...(options.skipSpecs ? { skip_specs: true } : {}),
+    ...(options.skipSpecs && options.skipSpecsReason
+      ? { skip_specs_reason: options.skipSpecsReason }
+      : {}),
     ...(parallel ? { parallel: true } : {}),
   });
 

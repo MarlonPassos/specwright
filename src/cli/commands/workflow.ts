@@ -76,16 +76,18 @@ export function registerWorkflowCommands(program: Command): void {
     .option('--schema <name>', 'Schema de workflow a usar')
     .option('--goal <text>', 'Objetivo registrado nos metadados da change')
     .option('--skip-specs', 'Declara que a change não altera nenhum comportamento observável')
+    .option('--skip-specs-reason <text>', 'Por que nenhum comportamento observável muda (exigido com --skip-specs)')
     .option('--parallel', 'Habilita dispatch paralelo isolado por worktree para esta change')
     .option('--no-parallel', 'Desliga mesmo se spec/config.yaml declarar defaultParallel: true')
     .option('--json', 'Saída em JSON')
-    .action(async (name: string, options: { schema?: string; goal?: string; skipSpecs?: boolean; parallel?: boolean; json?: boolean }) => {
+    .action(async (name: string, options: { schema?: string; goal?: string; skipSpecs?: boolean; skipSpecsReason?: string; parallel?: boolean; json?: boolean }) => {
       try {
         const workspace = await requireWorkspace();
         const created = await createChange(workspace, name, {
           schema: options.schema,
           goal: options.goal,
           skipSpecs: options.skipSpecs,
+          skipSpecsReason: options.skipSpecsReason,
           parallel: options.parallel,
         });
 

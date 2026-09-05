@@ -96,6 +96,17 @@ regras que não dependem do grafo (ciclo e estado derivado chegam depois).
 `orphan_planned_change`; `plan.md`/`architecture.md` ausente com incrementos;
 plano em `draft` com briefs já materializados.
 
+## `skip_specs`
+
+| Nível | Regra |
+| --- | --- |
+| ERROR | `skip_specs: true` sem `skip_specs_reason` |
+| ERROR | `skip_specs: true` com arquivos de delta em `specs/` |
+
+O marcador desliga a única regra que amarra a change a um requisito. Sem
+requisito, a definição de pronto vira a própria lista de tarefas — que já está
+marcada quando alguém vai conferir. A justificativa é o único rastro da decisão.
+
 ## Planned Changes
 
 | Nível | Regra |

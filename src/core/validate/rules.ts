@@ -39,6 +39,10 @@ export const MESSAGES = {
     'observável, defina "skip_specs: true" no .change.yaml dela.',
   SKIP_SPECS_CONFLICT:
     'skip_specs está definido mas existem arquivos de delta em specs/. Remova o marcador ou apague os deltas',
+  SKIP_SPECS_NO_REASON:
+    'skip_specs está definido sem "skip_specs_reason". O marcador desliga a única regra que ' +
+    'amarra a change a um requisito, e sem requisito a definição de pronto dela vira a própria ' +
+    'lista de tarefas. Escreva em uma frase por que nenhum comportamento observável muda.',
   SKIP_SPECS_MALFORMED:
     'skip_specs parece definido mas o .change.yaml não é um metadado de change válido, então o marcador é ignorado',
   TOO_MANY_DELTAS: `Mais de ${MAX_DELTAS_PER_CHANGE} deltas - considere dividir esta change`,

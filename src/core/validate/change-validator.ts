@@ -48,6 +48,10 @@ export async function validateChange(
     issues.push({ level: 'ERROR', path: '.change.yaml', message: MESSAGES.SKIP_SPECS_CONFLICT });
   }
 
+  if (metadata.skipSpecs && !metadata.skipSpecsReason?.trim()) {
+    issues.push({ level: 'ERROR', path: '.change.yaml', message: MESSAGES.SKIP_SPECS_NO_REASON });
+  }
+
   if (!metadata.skipSpecs && deltaCount === 0) {
     issues.push({ level: 'ERROR', path: 'specs/', message: MESSAGES.NO_DELTAS });
   }

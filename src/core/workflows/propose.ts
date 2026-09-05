@@ -45,7 +45,9 @@ ${CLI_NOTE}
    Acrescente \`--schema "<schema>"\` só quando o usuário pediu um schema de workflow
    específico; \`specs schemas --json\` lista os disponíveis. Acrescente \`--skip-specs\` só
    quando a change comprovadamente não altera nenhum comportamento observável (refatoração,
-   tooling, docs) - nunca para escapar da validação.
+   tooling, docs) - nunca para escapar da validação. Ele exige
+   \`--skip-specs-reason "<uma frase>"\`: sem requisito, a definição de pronto da change vira
+   a lista de tarefas dela, e a justificativa é o único rastro dessa decisão.
 
    Se a saída trouxer a chave \`plan\`, o projeto tem um plano e um incremento dele planeja
    exatamente este slug. Rode o \`plan.fix\` que veio junto:

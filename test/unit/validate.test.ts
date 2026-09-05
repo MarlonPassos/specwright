@@ -52,12 +52,26 @@ describe('change validation', () => {
     expect(messages(report, 'ERROR').some((message) => message.startsWith('Nenhum delta de spec'))).toBe(true);
   });
 
-  it('accepts a zero-delta change that declares skip_specs', async () => {
+  it('accepts a zero-delta change that declares skip_specs with a reason', async () => {
+    const workspace = await makeWorkspace();
+    const dir = await seedChange(workspace, 'c', { delta: null as unknown as string });
+    await writeFile(
+      path.join(dir, '.change.yaml'),
+      'schema: spec-driven\nskip_specs: true\nskip_specs_reason: só move arquivos\n'
+    );
+    const report = await validateChange(workspace, 'c');
+    expect(report.valid).toBe(true);
+  });
+
+  it('rejects skip_specs without a written reason', async () => {
     const workspace = await makeWorkspace();
     const dir = await seedChange(workspace, 'c', { delta: null as unknown as string });
     await writeFile(path.join(dir, '.change.yaml'), 'schema: spec-driven\nskip_specs: true\n');
     const report = await validateChange(workspace, 'c');
-    expect(report.valid).toBe(true);
+    expect(
+      messages(report, 'ERROR').some((message) => message.includes('skip_specs_reason'))
+    ).toBe(true);
+    expect(report.valid).toBe(false);
   });
 
   it('rejects skip_specs alongside delta files', async () => {

@@ -121,7 +121,10 @@ describe('change lifecycle', () => {
   it('skips the merge for a change that declares no spec deltas', async () => {
     const workspace = await makeWorkspace();
     const dir = await seedChange(workspace, 'c', { delta: null as unknown as string });
-    await writeFile(path.join(dir, '.change.yaml'), 'schema: spec-driven\nskip_specs: true\n');
+    await writeFile(
+      path.join(dir, '.change.yaml'),
+      'schema: spec-driven\nskip_specs: true\nskip_specs_reason: só tooling\n'
+    );
     await writeFile(path.join(dir, 'tasks.md'), '## 1. Work\n\n- [x] 1.1 done and verified\n');
 
     const result = await archiveChange(workspace, 'c');

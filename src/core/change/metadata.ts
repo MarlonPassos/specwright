@@ -14,6 +14,14 @@ export const ChangeMetadataSchema = z.object({
    */
   skip_specs: z.boolean().optional(),
   /**
+   * Why this change alters no observable behaviour. Required whenever
+   * `skip_specs` is true: the marker turns off the ONLY gate that ties a change
+   * to a requirement, and a change that skips specs has no definition of done
+   * beyond its own task list — which is already ticked by the time anyone
+   * looks. The reason is the only trace left of that decision.
+   */
+  skip_specs_reason: z.string().min(1).optional(),
+  /**
    * Opts this change into worktree-isolated parallel dispatch. Absent or
    * false keeps the change on the sequential, one-task-at-a-time path no
    * matter what the running harness supports - this is the single gate that
@@ -32,6 +40,8 @@ export interface ChangeMetadataState {
   malformed: boolean;
   /** True when `skip_specs: true` is present in a file that parses. */
   skipSpecs: boolean;
+  /** The written justification for `skip_specs`, when there is one. */
+  skipSpecsReason?: string;
   /** True when `parallel: true` is present in a file that parses. */
   parallel: boolean;
 }
@@ -62,6 +72,9 @@ export async function readChangeMetadata(changeDir: string): Promise<ChangeMetad
     metadata: result.data,
     malformed: false,
     skipSpecs: result.data.skip_specs === true,
+    ...(result.data.skip_specs_reason !== undefined
+      ? { skipSpecsReason: result.data.skip_specs_reason }
+      : {}),
     parallel: result.data.parallel === true,
   };
 }
@@ -74,6 +87,9 @@ export async function writeChangeMetadata(
   if (metadata.created) document.created = metadata.created;
   if (metadata.goal) document.goal = metadata.goal;
   if (metadata.skip_specs !== undefined) document.skip_specs = metadata.skip_specs;
+  if (metadata.skip_specs_reason !== undefined) {
+    document.skip_specs_reason = metadata.skip_specs_reason;
+  }
   if (metadata.parallel !== undefined) document.parallel = metadata.parallel;
   await writeFileEnsured(metadataPath(changeDir), stringifyYaml(document));
 }

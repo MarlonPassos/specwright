@@ -32,9 +32,15 @@ artifacts:
 
       Uma change precisa declarar pelo menos uma capacidade ou abrir mão das specs
       explicitamente: a validação rejeita uma change com zero deltas, a não ser que o
-      `.change.yaml` dela defina `skip_specs: true`. Use esse marcador só quando nenhum
-      comportamento observável muda (refatoração, tooling, docs). Nunca invente um requisito
-      para satisfazer a validação.
+      `.change.yaml` dela defina `skip_specs: true` E um `skip_specs_reason`. Use esse
+      marcador só quando nenhum comportamento observável muda (refatoração, tooling, docs).
+      Nunca invente um requisito para satisfazer a validação.
+
+      A justificativa é obrigatória porque o marcador desliga a única regra que amarra a
+      change a um requisito. Sem requisito, a definição de pronto da change vira a própria
+      lista de tarefas dela - que já está toda marcada quando alguém vai conferir. Uma
+      change de "testes de contrato" e uma de "prontidão de entrega" passaram por aí e
+      terminaram sem nenhum requisito na spec viva.
 
       Seja breve. Como a change é construída pertence ao design.md.
 
