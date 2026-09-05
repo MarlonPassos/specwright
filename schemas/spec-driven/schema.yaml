@@ -158,6 +158,21 @@ artifacts:
       pulou. Se a resposta mudaria as specs, a abordagem ou a divisão em tarefas, resolva
       agora - pergunte em vez de chutar.
 
+      **Divergir do documento-fonte.** Quando uma decisão contraria o que a fonte pede, ela
+      ganha uma subseção própria em Decisões, com quatro coisas: o que a fonte pedia, com a
+      referência de linha; o que se decidiu; por quê; e **o que se perde**.
+
+      A última é a que não costuma ser escrita e é a que importa. Divergir é legítimo e
+      frequentemente certo - o problema é divergir sem saber que se está divergindo. Uma
+      change redefiniu o envelope de erro e ganhou correlação por requisição, que a fonte
+      não previa; perdeu junto o código de erro estável que a fonte especificava com exemplo
+      concreto, e o design apresentou o envelope novo como se não houvesse contrato
+      anterior. Ninguém decidiu abrir mão daquilo: ninguém percebeu que estava abrindo.
+
+      As referências da fonte que a proposta registra em `## Origem` são o contexto para
+      isto. Com elas à mão, a divergência fica difícil de cometer por acidente; sem elas,
+      é o caminho natural.
+
   - id: tasks
     generates: tasks.md
     description: Checklist de implementação ordenado

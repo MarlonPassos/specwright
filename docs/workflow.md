@@ -138,6 +138,16 @@ A proposta registra isso em `## Origem`. É o único lugar onde a origem da chan
 dentro da própria change: sem ele, o plano diz uma coisa, a change faz outra, e nada acusa
 a diferença até alguém auditar o código.
 
+### Divergir da fonte é um ato consciente
+
+Quando uma decisão do design contraria o documento-fonte, ela ganha uma subseção própria
+em Decisões com quatro linhas: o que a fonte pedia (com a referência), o que se decidiu,
+por quê, e **o que se perde**.
+
+A última existe porque divergir é legítimo e divergir sem perceber não é. O `## Origem` da
+proposta é o que torna a diferença visível: sem as referências à fonte em mãos, contrariá-la
+por acidente é o caminho natural.
+
 ## /spec-verify
 
 Confere a change contra o que ela prometeu, e reporta.
