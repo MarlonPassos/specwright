@@ -39,4 +39,14 @@
 
 ## Perguntas em Aberto
 
-<!-- Incógnitas que podem ser respondidas depois com segurança. Apague esta seção quando não houver nenhuma. -->
+<!-- Duas categorias, e a segunda é a que costuma faltar. Apague esta seção
+     quando não houver nenhuma das duas.
+
+- [ ] Q-1 · adiável — <!-- incógnita que pode esperar; não muda spec, abordagem nem tasks -->
+- [ ] FU-1 · follow-up — <!-- legítimo não fazer aqui, e obrigatório fazer depois -->
+      fonte: <!-- caminho:linhas, quando vem do documento-fonte -->
+      destino: <!-- o que precisa existir: uma change nova, um requisito, uma decisão -->
+
+Um `FU-` não é uma dúvida: é trabalho que esta change está declarando que fica
+para outra. Ele sai daqui como Planned Change, como item de backlog registrado,
+ou descartado com justificativa - nunca em silêncio. -->

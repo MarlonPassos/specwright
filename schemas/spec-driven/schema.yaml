@@ -152,11 +152,29 @@ artifacts:
       - **Decisões**: cada escolha central com a justificativa e as alternativas consideradas.
       - **Riscos / Compensações**: o que pode dar errado, cada um com sua mitigação.
       - **Plano de Migração**: passos de rollout e de rollback, quando for o caso.
-      - **Perguntas em Aberto**: incógnitas que podem ser respondidas depois com segurança. Omita a seção quando não houver nenhuma.
+      - **Perguntas em Aberto**: duas categorias, tipadas. Omita a seção quando não houver nenhuma.
+        - `Q-N · adiável` - incógnita genuína que pode esperar. Não muda spec, abordagem nem tasks.
+        - `FU-N · follow-up` - trabalho que é legítimo não fazer aqui e obrigatório fazer depois.
+          Carrega `fonte:` (quando vem do documento-fonte) e `destino:` (o que precisa existir).
 
       Uma questão em aberto é uma incógnita genuinamente adiável, não uma decisão que você
       pulou. Se a resposta mudaria as specs, a abordagem ou a divisão em tarefas, resolva
       agora - pergunte em vez de chutar.
+
+      **A terceira saída de uma pergunta em aberto.** Um caso real, e o mais caro que este
+      fluxo já perdeu: um design registrou corretamente que campos de cliente constavam do
+      documento-fonte, não existiam no modelo, e que criá-los violaria a regra de "nenhuma
+      migration" daquela change. A decisão estava impecável. Foi escrita como pergunta em
+      aberto, a change foi arquivada, e o endpoint público de atualização ficou sem nenhum
+      campo atualizável.
+
+      A instrução oferecia duas saídas - adiável dentro desta change, ou resolva agora - e o
+      caso não era nenhuma das duas. Era "legítimo não fazer aqui, obrigatório fazer depois".
+      Sem essa terceira categoria, virou adiável e evaporou.
+
+      Um `FU-` não é uma dúvida: é trabalho que esta change declara que fica para outra. Ele
+      precisa sair do design como Planned Change, como item de backlog registrado, ou
+      descartado com justificativa - nunca em silêncio.
 
       **Divergir do documento-fonte.** Quando uma decisão contraria o que a fonte pede, ela
       ganha uma subseção própria em Decisões, com quatro coisas: o que a fonte pedia, com a
@@ -183,8 +201,12 @@ artifacts:
     instruction: |
       Quebre o trabalho num checklist ordenado.
 
-      Antes de escrevê-lo, leia as Open Questions do design.md. Resolva com o usuário
-      qualquer uma que mudaria o que será construído.
+      Antes de escrevê-lo, leia as Perguntas em Aberto do design.md. Resolva com o usuário
+      qualquer `Q-` que mudaria o que será construído.
+
+      Um `FU-` é diferente: ele não bloqueia esta change, mas também não pode sumir com ela.
+      Leve cada um ao usuário e pergunte qual destino ele quer - Planned Change nova, item
+      de backlog, ou descarte com justificativa - antes de fechar as tarefas.
 
       Siga o template exatamente. A fase de implementação lê a sintaxe de checkbox para
       acompanhar o progresso, então uma linha que não seja `- [ ] X.Y ...` não é acompanhada.
