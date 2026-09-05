@@ -1,5 +1,38 @@
 # Referência da CLI
 
+## specs project loop
+
+`specs project loop [plan-id] [--json]` consulta o estado para o comando de agente
+`spec-loop`. É somente leitura: não executa um modelo, não inicia um serviço e
+não habilita autonomia. Para executar, invoque `$spec-loop <plan-id>` no Codex
+ou `/spec-loop <plan-id>` nos demais harnesses.
+
+O JSON traz `loopSchemaVersion: 1`, `plan` (`id`, `revision`), `state`,
+`completed`, `cancelled`, `remaining`, `candidates`, `recommended`, `blockers`
+e `diagnostics`. `state` é `ready` quando há ações disponíveis, `completed`
+quando todo incremento não cancelado está arquivado, ou `blocked` quando não há
+ação disponível. Plano vazio não é conclusão. Um estado `blocked` é um resultado
+de consulta (exit 0); falhas de leitura/validação usam o envelope `error` (exit 1).
+
+Cada candidato traz id, slug, nome da change, título, caminho do brief,
+dependências, desbloqueios transitivos e `action`:
+
+| Ação | Estado observado |
+| --- | --- |
+| `link` | Identidade exata já existe e precisa ser vinculada |
+| `propose` | Incremento pronto, ainda sem change |
+| `continue` | Change vinculada com artefatos faltantes |
+| `implement` | Artefatos prontos, tarefas pendentes |
+| `verify` | Pronta para conferir comportamento; ainda não comprovadamente concluída |
+
+`recommended` é um ID opcional; o agente pode escolher outro candidato.
+Blockers identificam incremento (ou `null` para o plano), `reasonCodes`,
+`blockedBy` e `manualBlockers`. Worktrees registrados e archives ambíguos
+bloqueiam novo dispatch; progresso parcial não é reiniciado. As consultas usuais
+`status` e `next` mantêm seus contratos.
+
+## Convenções gerais
+
 Todo comando encontra o workspace subindo a partir do diretório de trabalho, então pode
 ser rodado de qualquer lugar dentro do projeto.
 

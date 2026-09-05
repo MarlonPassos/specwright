@@ -82,7 +82,7 @@ adaptador e registrá-lo — os corpos dos comandos, a CLI e o workflow ficam in
 
 ## Catálogo de comandos
 
-O catálogo gerado tem quatorze comandos, em duas listas:
+O catálogo gerado tem quinze comandos:
 
 **Ciclo de change** — `spec-explore`, `spec-propose`, `spec-continue`,
 `spec-revise`, `spec-implement`, `spec-verify`, `spec-archive`.
@@ -91,5 +91,12 @@ O catálogo gerado tem quatorze comandos, em duas listas:
 `spec-project-generate`, `spec-project-status`, `spec-project-next`,
 `spec-project-propose-batch`, `spec-project-refine`.
 
-`specs init`/`update --harnesses all` escrevem 56 arquivos (14 × 4). Os comandos
+**Execução autônoma explícita** — `spec-loop`. No Codex, `$spec-loop <plan-id>`;
+nos demais, `/spec-loop <plan-id>`. Esse comando tem sua própria autorização e
+continuidade; não faz parte dos comandos de planejamento nem altera as pausas do
+ciclo tradicional. No Claude, somente ele amplia `allowed-tools` para
+`Bash, Read, Write, Edit, Glob, Grep, Task`, permitindo implementar, testar e delegar
+sob as permissões da sessão. O corpo exige pedido explícito em todos os harnesses.
+
+`specs init`/`update --harnesses all` escrevem 60 arquivos (15 × 4). Os comandos
 de plano são opt-in: sem `planning/<plan-id>/plan.yaml` eles não têm efeito.

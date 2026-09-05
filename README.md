@@ -242,6 +242,20 @@ plano libera ao mesmo tempo) e `/spec-project-refine` (granularidade, split,
 merge). A CLI determinística por trás deles é o grupo `specs project`. Veja
 [docs/project-planning.md](docs/project-planning.md).
 
+### Executar o plano até o fim
+
+Depois de gerar o plano e seus briefs, rode `specs update` para instalar o novo
+comando e invoque **`$spec-loop <plan-id>` no Codex**, ou **`/spec-loop <plan-id>`**
+nos outros harnesses. Esse pedido explícito autoriza o agente a escolher a ordem,
+avaliar paralelismo, percorrer propose → implement → verify e arquivar cada change
+verificada para liberar as dependências seguintes. Falhas dentro do escopo são
+corrigidas no próprio loop; decisões que exigem o usuário pausam a execução.
+
+O loop retoma artefatos e tarefas existentes. Ele roda na sessão do agente, sem
+serviço em background nem ativação implícita por Planning Change ou configuração.
+`specs project loop <plan-id> --json` apenas consulta os candidatos, as fases
+pendentes e os bloqueios. Veja [o modo autônomo](docs/workflow.md#spec-loop).
+
 ## Créditos
 
 O Specwright é construído sobre o [OpenSpec](https://github.com/Fission-AI/OpenSpec) — o

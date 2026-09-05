@@ -10,6 +10,7 @@ export * from './state.js';
 export * from './render.js';
 export * from './status.js';
 export * from './next.js';
+export * from './loop.js';
 export * from './generate.js';
 export * from './link.js';
 export * from './sync.js';

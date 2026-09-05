@@ -6,6 +6,7 @@ import { implementCommand } from './implement.js';
 import { verifyCommand } from './verify.js';
 import { archiveCommand } from './archive.js';
 import { projectCommands } from './project/index.js';
+import { loopCommand } from './loop.js';
 import type { WorkflowCommand } from './types.js';
 
 export * from './types.js';
@@ -39,12 +40,12 @@ export function workflowCommandIds(): string[] {
 }
 
 /**
- * The complete generated catalogue: the seven change-cycle commands plus the six
- * plan commands. `workflowCommands()` still returns only the cycle, so callers
+ * The complete catalogue: change-cycle commands, plan commands and the explicit
+ * autonomous loop. `workflowCommands()` still returns only the cycle, so callers
  * that reason about the delivery loop are untouched.
  */
 export function allCommands(): WorkflowCommand[] {
-  return [...workflowCommands(), ...projectCommands()];
+  return [...workflowCommands(), ...projectCommands(), loopCommand()];
 }
 
 export function allCommandIds(): string[] {

@@ -1,5 +1,43 @@
 # O workflow
 
+## spec-loop
+
+Para executar um plano inteiro, invoque `$spec-loop <plan-id>` no Codex ou
+`/spec-loop <plan-id>` nos demais harnesses, após atualizar os comandos com
+`specs update`. Esse é um modo explícito de execução autônoma na sessão do agente.
+Gerar um plano ou habilitar paralelismo não o ativa. Sem plan-id, um único plano
+é selecionado; com vários, o agente solicita a escolha antes de escrever.
+
+O agente consulta `specs project loop <plan-id> --json` e o estado completo do
+grafo após cada fase. Escolhe entre todas as changes elegíveis, pode propor e
+implementar incrementos independentes em paralelo quando houver subagentes e
+isolamento por worktree, e usa execução sequencial nos demais casos. A decisão
+considera também os arquivos e contratos envolvidos, não só as arestas do grafo.
+Integrações e arquivamentos são feitos pelo coordenador, em sequência, com nova
+verificação na árvore principal.
+
+Cada change percorre **propose → implement → verify**, incluindo os artefatos
+intermediários de `continue`. Falhas corrigíveis voltam à implementação sem nova
+aprovação. Após verificar, o agente arquiva a change: é o archive que registra
+a conclusão e libera os dependentes no grafo existente. Tarefas marcadas e
+`execution: verifying` nunca substituem a verificação do comportamento.
+
+O loop termina quando todos os incrementos não cancelados estiverem arquivados.
+Se há trabalho independente disponível, um bloqueio local não encerra o loop.
+Sem avanço possível, ele pausa com a causa, as tentativas e a decisão necessária:
+escopo ou aceite ambíguo, blocker manual, recurso externo indisponível, conflito
+de intenção ou falha sem correção justificada. Não há repetição indefinida do
+mesmo erro sem progresso. Planos pausados/arquivados e estados `idea`/`on_hold`
+são respeitados; não são alterados para forçar conclusão.
+
+Artefatos, tarefas, vínculos e worktrees preservam o progresso. Uma nova invocação
+explícita retoma a partir do disco e verifica novamente quando necessário.
+Não há processo em background: limites da sessão devem ser reportados como
+interrupção, nunca como conclusão. A autorização não abrange deploy, publicação,
+descarte de trabalho ou mudanças nos critérios do plano.
+
+## Ciclo tradicional
+
 O ciclo de entrega tem cinco comandos, em ordem. Cada um tem um único trabalho e para
 quando esse trabalho termina, então uma revisão pode acontecer entre quaisquer duas etapas.
 O modo `/spec-explore` é opcional e pode ser usado antes de abrir uma change ou entre
