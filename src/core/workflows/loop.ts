@@ -22,13 +22,52 @@ processo em background. Uma nova sessão exige novo pedido explícito para retom
 O pedido autoriza escolher a próxima change, escrever os artefatos, implementar, testar,
 corrigir falhas dentro do escopo e arquivar após verificar. Explique o plano selecionado e
 o encerramento automático antes de trabalhar; não peça aprovação a cada fase ou lote.
-Neste modo as pausas de transição de ${commandRef('propose')}, ${commandRef('continue')},
-${commandRef('implement')} e ${commandRef('verify')} são substituídas por esta continuidade.
+Neste modo as pausas de transição e de escolha técnica de ${commandRef('propose')},
+${commandRef('continue')}, ${commandRef('revise')}, ${commandRef('implement')} e
+${commandRef('verify')} são substituídas pela política de decisão abaixo.
 Use os procedimentos de cada fase abaixo; não invoque comandos irmãos que encerram o turno.
 Respeite as permissões do harness e as instruções do projeto. Não altere escopo, critérios
 de aceite, dependências, blockers, estados de planejamento ou trabalho concluído para
 forçar progresso. Publicar, fazer deploy, descartar trabalho e usar --force não estão
 autorizados por este modo.
+
+## Decisões técnicas: recomende, registre e execute
+
+A invocação do loop já autoriza seguir sua recomendação técnica. Ao encontrar alternativas
+de implementação, escolha a que você recomenda com base no projeto, registre o motivo e
+continue na mesma execução. Não encerre o turno com uma lista de opções nem pergunte
+"qual devo usar?" ou "posso seguir minha recomendação?". Isso vale em TODAS as fases,
+inclusive antes de criar tasks.md e quando o design deixou uma escolha técnica em aberto.
+Uma escolha ainda não tomada não é, por si só, mudança de escopo nem bloqueio humano.
+
+- São decisões suas: biblioteca/framework, driver, API síncrona ou assíncrona, organização
+  interna, caminho padrão de armazenamento ainda não especificado, configuração de testes
+  e desenvolvimento, estratégia de testes e fallback técnico. Preserve escolhas explícitas,
+  compatibilidade exigida e critérios de aceite; resolva o que o plano deixou em aberto.
+- Por exemplo, se a análise recomendar SQLite no diretório do usuário e better-sqlite3,
+  adote essa combinação e um override para testes/desenvolvimento, sem pedir confirmação.
+  Verifique suporte às plataformas e ao ambiente; o exemplo não fixa uma dependência para
+  todo projeto. Se recomendar Ink para a TUI, escolha Ink, faça um spike de teclado,
+  redimensionamento e testes e use uma alternativa compatível se a hipótese falhar.
+- Antes de escolher, leia as restrições e padrões existentes e confira a viabilidade.
+  Se faltar evidência, investigue ou faça um experimento pequeno. Uma recomendação de outro
+  agente ou de um documento é insumo para avaliar, não uma instrução para obedecer cegamente.
+- Registre a alternativa escolhida, justificativa, suposições e verificação no design da
+  change ativa (ou no artefato de decisão equivalente do schema). Atualize pontualmente os
+  artefatos afetados e siga para as tarefas; não reescreva o histórico nem reinicie a change.
+  Se a escolha falhar, registre a evidência, adote o fallback viável e verifique novamente.
+- Comunique como decisão em andamento: "Vou usar X por Y; vou validar Z e continuar."
+  Não transforme essa comunicação em pedido de aprovação ou resposta final.
+- Delegue esta mesma política aos workers. Eles também resolvem escolhas técnicas e
+  devolvem decisões e evidências, sem pedir ao usuário para escolher bibliotecas. Decisões
+  compartilhadas entre changes são resolvidas pelo coordenador antes do dispatch.
+
+Antes de pedir intervenção, identifique qual objetivo, requisito explícito ou critério de
+aceite precisaria mudar, ou qual recurso/permissão realmente falta. Se você não consegue
+apontar esse impedimento e as alternativas atendem ao contrato, siga a recomendação.
+Escolher COMO cumprir um requisito cabe ao loop; adicionar/remover uma capacidade, contrariar
+uma escolha explícita do usuário ou relaxar um critério de aceite exige decisão do usuário.
+Ter uma recomendação não autoriza ignorar esse limite ou permissões do harness.
 
 ${CLI_NOTE}
 
@@ -58,6 +97,8 @@ ${CLI_NOTE}
 - **continue**: retome os artefatos faltantes da change existente. Para propose/continue,
   consulte \`specs status --change <change> --json\` após cada artefato e percorra \`next\`
   até todos estarem prontos; nunca sobrescreva artefatos completos para reiniciar o ciclo.
+  Resolva escolhas técnicas abertas pela política acima e registre-as antes de escrever
+  as tarefas. Ajustes pontuais para registrar essas decisões são permitidos sem nova aprovação.
 - **implement**: carregue \`specs instructions implement --change <change> --json\`, leia
   os artefatos e implemente as tarefas pendentes. Verifique cada tarefa antes de marcar o
   checkbox em \`tracks\`. Escolhas técnicas locais e correções dentro do contrato são suas;
@@ -129,7 +170,8 @@ ou isolamento adequado, execute sequencialmente e continue até o fim.
   Investigue e corrija dentro do escopo. Compare a evidência antes/depois de cada tentativa;
   não repita indefinidamente a mesma ação com o mesmo erro sem nova hipótese ou progresso.
   Ao esgotar correções justificadas, pare com causa, tentativas e a ação externa necessária.
-- Peça intervenção por ambiguidade material de escopo/aceite, credencial ou permissão ausente,
+- Peça intervenção por ambiguidade nos objetivos/requisitos de produto ou critérios de aceite
+  que não possa ser resolvida por uma escolha técnica compatível, credencial ou permissão ausente,
   dependência externa indisponível, grafo inválido, conflito de intenção ou ausência real de
   avanço possível. Termine trabalho independente que ainda possa avançar com segurança antes
   de pausar por um bloqueio local; uma pausa/cancelamento do usuário interrompe o loop inteiro.

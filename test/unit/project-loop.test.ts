@@ -192,4 +192,23 @@ describe('explicit loop workflow', () => {
     }
     expect(files.find((entry) => entry.harness === 'claude')!.content).toContain('allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Task');
   });
+
+  it('ships technical decision authority to every harness without changing the traditional approval boundaries', () => {
+    const files = renderHarnesses(allHarnesses()).filter((entry) => entry.command === 'loop');
+    for (const file of files) {
+      expect(file.content).toContain('A invocação do loop já autoriza seguir sua recomendação técnica');
+      expect(file.content).toContain('inclusive antes de criar tasks.md');
+      expect(file.content).toContain('quando o design deixou uma escolha técnica em aberto');
+      expect(file.content).toContain('SQLite no diretório do usuário e better-sqlite3');
+      expect(file.content).toContain('Se recomendar Ink para a TUI, escolha Ink');
+      expect(file.content).toContain('Delegue esta mesma política aos workers');
+      expect(file.content).toContain('Atualize pontualmente os');
+      expect(file.content).toContain('adote o fallback viável e verifique novamente');
+      expect(file.content).toContain('relaxar um critério de aceite exige decisão do usuário');
+      expect(file.content).toContain('Ter uma recomendação não autoriza ignorar esse limite');
+    }
+    expect(anyCommand('propose')!.body).toContain('pergunte antes de criar a change');
+    expect(anyCommand('implement')!.body).toContain('Pare e pergunte');
+    expect(anyCommand('revise')!.body).toContain('Escreva só depois que o usuário confirmar');
+  });
 });
