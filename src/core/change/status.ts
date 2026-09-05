@@ -84,6 +84,13 @@ export interface TaskSummary {
   completed: number;
   /** Tarefas abertas, em ordem de arquivo, limitadas a `OPEN_TASKS_SHOWN`. */
   open: { number: string; text: string; group?: string }[];
+  /**
+   * Tarefas concluídas sem `cmd:` registrado. Não é um erro — o bloco de
+   * evidência é opcional e toda tarefa escrita antes dele existir cai aqui.
+   * Serve para dizer quantas conclusões não trazem um comando que alguém possa
+   * rodar de novo, que é a diferença entre "confie em mim" e "confira".
+   */
+  completedWithoutEvidence: number;
 }
 
 /** Quantas tarefas abertas o resumo carrega. O resto se lê no próprio tasks.md. */
@@ -216,6 +223,9 @@ function summarizeTasks(tasks: TaskProgress): TaskSummary {
   return {
     total: tasks.total,
     completed: tasks.completed,
+    completedWithoutEvidence: tasks.tasks.filter(
+      (task) => task.done && task.evidence?.cmd === undefined
+    ).length,
     open: tasks.tasks
       .filter((task) => !task.done)
       .slice(0, OPEN_TASKS_SHOWN)

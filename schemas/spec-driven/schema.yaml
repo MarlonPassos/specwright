@@ -273,6 +273,25 @@ artifacts:
       Uma tarefa sem essas tags continua funcionando exatamente como antes - as tags são
       só uma dica de agendamento, nunca obrigatórias.
 
+      **Bloco de evidência.** Ao marcar uma tarefa, registre em linhas indentadas logo
+      abaixo o que foi de fato executado:
+
+      ```
+      - [x] 3.3 Teste de concorrência 100x10
+            cmd: TEST_DATABASE_URL=... pytest -m integration -k scale
+            resultado: 2 passed in 8.4s
+            em: 2026-09-05T14:22Z
+      ```
+
+      Opcional e retrocompatível, no mesmo espírito das tags acima. E deliberadamente
+      modesto: isto não é prova, porque quem marca o box escreve estas linhas também. É
+      reprodutibilidade - o `cmd` pode ser rodado de novo, por uma pessoa ou pela
+      verificação, e comparado com o `resultado`. Transforma "confie em mim" em "confira
+      você mesmo", que é uma afirmação menor e honesta.
+
+      Copie o resultado como ele saiu. Um `resultado` que diz `skipped`, `no tests ran` ou
+      `0 selected` para o alvo declarado é um achado a levantar, não uma linha a maquiar.
+
       **Por que a regra sobre teste pulado existe.** Num projeto real, três tarefas foram
       escritas assim e as três foram marcadas como concluídas:
 
@@ -336,6 +355,11 @@ apply:
     Leia os artefatos da change, percorra as tarefas não marcadas em ordem e marque cada
     box conforme a verificação dela passa. Pare e pergunte quando bater num impedimento ou
     numa decisão que não foi tomada.
+
+    Ao marcar, registre a evidência em linhas indentadas sob a tarefa - `cmd:` com o comando
+    que você rodou, `resultado:` com a saída dele como ela saiu, `em:` com o momento. Copie o
+    resultado, não o resuma. Um resultado que diz `skipped`, `no tests ran` ou `0 selected`
+    para o alvo declarado é um achado a levantar com o usuário, não uma linha a maquiar.
 
     Numa change com `parallel: true`, rodada num harness que suporta dispatch paralelo, as
     tarefas prontas e sem conflito declarado entre si podem ser trabalhadas em lote, cada

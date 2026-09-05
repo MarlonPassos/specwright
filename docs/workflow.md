@@ -127,6 +127,16 @@ acontecem conforme o trabalho entra, não em lote no final.
 
 As delta specs são os critérios de aceite: cada cenário é um teste que vale ter.
 
+Ao marcar um box, a tarefa pode registrar o que foi executado em linhas indentadas logo
+abaixo — `cmd:`, `resultado:`, `em:`. Opcional e retrocompatível, no mesmo espírito das tags
+`files:`/`depends:`.
+
+E deliberadamente modesto: **não é prova**. Quem marca o box escreve essas linhas também, e
+o Specwright não executa nada do projeto. O que o bloco compra é reprodutibilidade — o
+`cmd` pode ser rodado de novo, por uma pessoa ou pela verificação, e comparado com o
+`resultado`. É "confira você mesmo" no lugar de "confie em mim". `specs status --change`
+devolve `completedWithoutEvidence`: quantas conclusões não trazem comando nenhum.
+
 A condição de sucesso de uma tarefa nunca é um teste ser pulado. Se a change entrega um
 teste, a verificação é a execução dele; se ele depende de um serviço externo, a tarefa diz
 como esse serviço é provido. Uma verificação que confirma um skip é uma tarefa que se

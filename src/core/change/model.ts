@@ -68,6 +68,27 @@ export interface Task {
   files: string[];
   /** Task numbers this task declares it depends on, from a `` `depends: 1.1` `` tag. Empty when not declared. */
   dependsOn: string[];
+  /**
+   * What was actually run for this task, from indented `cmd:` / `resultado:` /
+   * `em:` lines beneath it. Absent when the task declares none.
+   *
+   * This is NOT proof. Whoever ticks the box writes these lines too, and
+   * Specwright never executes anything belonging to the project — there is no
+   * runner, and `spec/config.yaml` registers no commands. What it buys is
+   * REPRODUCIBILITY: `cmd` can be run again by a person, a reviewer or
+   * `/spec-verify` and compared against `resultado`. It turns "trust me" into
+   * "check for yourself", which is a smaller claim and an honest one.
+   */
+  evidence?: TaskEvidence;
+}
+
+export interface TaskEvidence {
+  /** The command as written. */
+  cmd?: string;
+  /** Its outcome, verbatim. */
+  resultado?: string;
+  /** When it was run. */
+  em?: string;
 }
 
 export interface TaskProgress {
@@ -79,6 +100,13 @@ export interface TaskProgress {
 const TASK_LINE = /^\s*[-*]\s+\[( |x|X)\]\s*(?:([0-9]+(?:\.[0-9]+)*)\s+)?(.*)$/d;
 const GROUP_HEADER = /^##\s+(.*\S)\s*$/;
 const TASK_TAG = /`(files|depends):\s*([^`]*)`/g;
+/**
+ * An indented `chave: valor` line under a task. Indentation is required: an
+ * unindented line at column zero belongs to the document, not to the box above
+ * it, and treating it otherwise would swallow prose that happens to contain a
+ * colon.
+ */
+const EVIDENCE_LINE = /^\s+(cmd|resultado|em):\s*(.+?)\s*$/;
 
 /**
  * Pulls `` `files: a.ts` `` / `` `depends: 1.1` `` tags out of a task's raw
@@ -115,6 +143,13 @@ export function parseTasks(content: string): TaskProgress {
       group = header[1].trim();
       return;
     }
+    const evidence = EVIDENCE_LINE.exec(line);
+    if (evidence && tasks.length > 0) {
+      const owner = tasks[tasks.length - 1];
+      owner.evidence = { ...owner.evidence, [evidence[1]]: evidence[2] };
+      return;
+    }
+
     const match = TASK_LINE.exec(line);
     if (!match) return;
     const { text, files, dependsOn } = extractTaskTags(match[3]);

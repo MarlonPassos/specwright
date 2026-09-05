@@ -63,3 +63,38 @@ describe('markTaskDone', () => {
     await expect(markTaskDone(dir, '1.1')).rejects.toThrow(/não existe/);
   });
 });
+
+describe('bloco de evidência', () => {
+  it('anexa cmd, resultado e em à tarefa acima', () => {
+    const parsed = parseTasks(
+      '## 1. Testes\n\n' +
+        '- [x] 1.1 Teste de concorrência\n' +
+        '      cmd: TEST_DATABASE_URL=x pytest -k scale\n' +
+        '      resultado: 2 passed in 8.4s\n' +
+        '      em: 2026-09-05T14:22Z\n'
+    );
+
+    expect(parsed.total).toBe(1);
+    expect(parsed.tasks[0].evidence).toEqual({
+      cmd: 'TEST_DATABASE_URL=x pytest -k scale',
+      resultado: '2 passed in 8.4s',
+      em: '2026-09-05T14:22Z',
+    });
+  });
+
+  it('uma tarefa sem o bloco continua exatamente como antes', () => {
+    const parsed = parseTasks('- [x] 1.1 feito\n- [ ] 1.2 pendente\n');
+    expect(parsed.tasks.map((task) => task.evidence)).toEqual([undefined, undefined]);
+    expect({ total: parsed.total, completed: parsed.completed }).toEqual({ total: 2, completed: 1 });
+  });
+
+  it('exige indentação: uma linha na coluna zero é prosa do documento', () => {
+    const parsed = parseTasks('- [x] 1.1 feito\ncmd: isto não pertence à tarefa\n');
+    expect(parsed.tasks[0].evidence).toBeUndefined();
+  });
+
+  it('ignora um bloco que não tem tarefa antes dele', () => {
+    expect(() => parseTasks('      cmd: solto\n')).not.toThrow();
+    expect(parseTasks('      cmd: solto\n').total).toBe(0);
+  });
+});
