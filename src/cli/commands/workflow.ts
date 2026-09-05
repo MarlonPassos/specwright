@@ -76,16 +76,18 @@ export function registerWorkflowCommands(program: Command): void {
     .option('--schema <name>', 'Schema de workflow a usar')
     .option('--goal <text>', 'Objetivo registrado nos metadados da change')
     .option('--skip-specs', 'Declara que a change não altera nenhum comportamento observável')
+    .option('--skip-specs-reason <text>', 'Por que nenhum comportamento observável muda (exigido com --skip-specs)')
     .option('--parallel', 'Habilita dispatch paralelo isolado por worktree para esta change')
     .option('--no-parallel', 'Desliga mesmo se spec/config.yaml declarar defaultParallel: true')
     .option('--json', 'Saída em JSON')
-    .action(async (name: string, options: { schema?: string; goal?: string; skipSpecs?: boolean; parallel?: boolean; json?: boolean }) => {
+    .action(async (name: string, options: { schema?: string; goal?: string; skipSpecs?: boolean; skipSpecsReason?: string; parallel?: boolean; json?: boolean }) => {
       try {
         const workspace = await requireWorkspace();
         const created = await createChange(workspace, name, {
           schema: options.schema,
           goal: options.goal,
           skipSpecs: options.skipSpecs,
+          skipSpecsReason: options.skipSpecsReason,
           parallel: options.parallel,
         });
 
@@ -287,8 +289,9 @@ export function registerWorkflowCommands(program: Command): void {
     .option('--skip-specs', 'Não aplica os deltas de spec')
     .option('--no-validate', 'Arquiva sem validar antes')
     .option('--force', 'Arquiva mesmo com tarefas não marcadas')
+    .option('--require-verify', 'Recusa arquivar sem um verification.md sem achados em aberto')
     .option('--json', 'Saída em JSON')
-    .action(async (change: string | undefined, options: { skipSpecs?: boolean; validate?: boolean; force?: boolean; json?: boolean }) => {
+    .action(async (change: string | undefined, options: { skipSpecs?: boolean; validate?: boolean; force?: boolean; requireVerify?: boolean; json?: boolean }) => {
       try {
         const workspace = await requireWorkspace();
         const changeId = await resolveChangeId(workspace, change);
@@ -296,6 +299,7 @@ export function registerWorkflowCommands(program: Command): void {
           skipSpecs: options.skipSpecs,
           validate: options.validate,
           force: options.force,
+          requireVerify: options.requireVerify,
         });
 
         if (options.json) {
@@ -315,12 +319,43 @@ export function registerWorkflowCommands(program: Command): void {
           ...(result.plan
             ? [`  Plano "${result.plan.plan}": ${result.plan.change} vinculado e concluído.`]
             : []),
+          ...(result.planSynced
+            ? [`  Vínculo reparado no plano: ${result.planSynced.join(', ')}.`]
+            : []),
           ...(result.planAmbiguity
             ? [
                 '  Mais de um incremento planejava este slug; nada foi gravado no plano.',
                 ...result.planAmbiguity.candidates.map(
                   (candidate) => `    ${candidate.plan}: ${candidate.change} — ${candidate.fix}`
                 ),
+              ]
+            : []),
+          ...(result.verification.present
+            ? result.verification.clean
+              ? [`  Verificada em ${result.verification.date ?? 'data não registrada'}.`]
+              : [
+                  result.verification.openFindings.length > 0
+                    ? `  AVISO: o veredito da verificação tem ${result.verification.openFindings.length} achado(s) em aberto:`
+                    : '  AVISO: o veredito da verificação não respondeu "Achados em aberto".',
+                  ...result.verification.openFindings.map((finding) => `    - ${finding}`),
+                ]
+            : [
+                '  AVISO: esta change não tem verification.md — nada prova que ela foi',
+                '  verificada contra o que prometeu.',
+              ]),
+          ...(result.pendingFollowUps.length > 0
+            ? [
+                `  AVISO: ${result.pendingFollowUps.length} follow-up(s) sem destino saem`,
+                '  arquivados junto com esta change:',
+                ...result.pendingFollowUps.map((entry) => `    - ${entry.id}: ${entry.text}`),
+              ]
+            : []),
+          ...(result.unversioned
+            ? [
+                '',
+                '  AVISO: o git nunca rastreou nenhum arquivo desta change. O trabalho existe',
+                '  só nesta árvore: um clone deste repositório não o traria. Commite antes de',
+                '  considerar a entrega feita.',
               ]
             : []),
         ]);

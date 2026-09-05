@@ -44,6 +44,13 @@ ${PROJECT_BOUNDARY}
      na mesma transação.
    - **decisão global**: registre a decisão em \`architecture.md\` via
      \`op: "writeDocument"\` e ajuste os incrementos afetados.
+
+   Num **split** ou **merge**, as \`Referências da fonte\` do incremento aposentado
+   precisam reaparecer nos sucessores. \`apply --dry-run\` traz
+   \`supersession_coverage_lost\` para cada documento que nenhum sucessor cita;
+   \`apply --strict\` recusa. Estreitar um intervalo é o trabalho sendo feito;
+   largar um documento inteiro é a perda que este diagnóstico existe para pegar —
+   e foi assim que uma re-decomposição apagou 22 de 22 rastreabilidades de uma vez.
 4. Se o impacto atinge um incremento \`archived\`, **não** o altere: recomende uma
    change corretiva nova. Só use \`--allow-completed\` se o usuário pedir
    explicitamente, ciente do \`WARNING\`.

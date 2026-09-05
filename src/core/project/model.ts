@@ -45,6 +45,33 @@ export const SourceDocumentSchema = z
   .strict();
 export type SourceDocument = z.infer<typeof SourceDocumentSchema>;
 
+/**
+ * A pointer from an increment into the source documents the plan was built
+ * from. Derived from the brief's `Referências da fonte` section every time the
+ * brief is materialised, and persisted so consumers — `show`, the coverage
+ * report, the re-decomposition check — read one authority instead of re-parsing
+ * Markdown each time.
+ */
+export const SourceRefSchema = z
+  .object({
+    path: z.string().min(1),
+    lines: z.string().min(1).optional(),
+    /**
+     * The increment knowingly departs from what the source says here.
+     *
+     * Diverging from the source document is legitimate and often right; what
+     * is not is diverging without knowing it. This marker is the plan-level
+     * half of that: the design writes the reasoning (what the source asked,
+     * what was decided, why, and what is lost), and this says WHERE, in a form
+     * a command can read. Without it, `project-verify` can only ask a human to
+     * notice; with it, an undeclared divergence is the difference between two
+     * lists.
+     */
+    supersedes: z.literal(true).optional(),
+  })
+  .strict();
+export type SourceRef = z.infer<typeof SourceRefSchema>;
+
 export const PlannedChangeRefSchema = z
   .object({
     path: z.string().min(1),
@@ -99,6 +126,12 @@ export const ProjectChangeSchema = z
      */
     reason: z.string().min(1).optional(),
     planned_change: PlannedChangeRefSchema.nullable(),
+    /**
+     * Source pointers this increment claims, derived from its brief. Defaults
+     * to empty so every plan written before this field still loads, and an
+     * empty list reads as "this increment claims nothing", never as "unknown".
+     */
+    source_refs: z.array(SourceRefSchema).default([]),
     link: ChangeLinkSchema.nullable(),
   })
   .strict();
@@ -204,6 +237,17 @@ function renderChange(change: ProjectChange): Record<string, unknown> {
     milestone: change.milestone,
   };
   if (change.reason !== undefined) document.reason = change.reason;
+  // Omitted when empty: an increment with no source pointers is the normal
+  // case for a plan with no source documents, and an always-present `[]` would
+  // add a line to every record in every plan for nothing.
+  const sourceRefs = change.source_refs ?? [];
+  if (sourceRefs.length > 0) {
+    document.source_refs = sourceRefs.map((ref) => ({
+      path: ref.path,
+      ...(ref.lines !== undefined ? { lines: ref.lines } : {}),
+      ...(ref.supersedes ? { supersedes: true } : {}),
+    }));
+  }
   return {
     ...document,
     planned_change: change.planned_change

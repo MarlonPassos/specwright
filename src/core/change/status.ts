@@ -7,6 +7,8 @@ import { loadConfig, type WorkspaceConfig } from '../config.js';
 import { changeDir, listChanges, type Workspace } from '../workspace.js';
 import { readChangeMetadata } from './metadata.js';
 import { readTaskProgress, type TaskProgress } from './model.js';
+import { readVerification, type VerificationVerdict } from './verification.js';
+import { pendingFollowUps, readFollowUps, type FollowUp } from './followups.js';
 
 /**
  * The change to act on: the one the caller named, or the sole active one when
@@ -55,6 +57,18 @@ export interface ChangeStatus {
   ready: boolean;
   next: string[];
   tasks?: TaskSummary;
+  /**
+   * The verdict `/spec-verify` left behind, when it left one. Absent means the
+   * change was never verified — which is a fact worth reporting, not the same
+   * as verified-and-clean.
+   */
+  verification: VerificationVerdict;
+  /**
+   * Follow-ups the design declared and nobody has dispatched. A follow-up is
+   * work this change says belongs to another one; unreported, it is archived
+   * along with the change and never happens.
+   */
+  pendingFollowUps: FollowUp[];
 }
 
 /**
@@ -70,6 +84,13 @@ export interface TaskSummary {
   completed: number;
   /** Tarefas abertas, em ordem de arquivo, limitadas a `OPEN_TASKS_SHOWN`. */
   open: { number: string; text: string; group?: string }[];
+  /**
+   * Tarefas concluídas sem `cmd:` registrado. Não é um erro — o bloco de
+   * evidência é opcional e toda tarefa escrita antes dele existir cai aqui.
+   * Serve para dizer quantas conclusões não trazem um comando que alguém possa
+   * rodar de novo, que é a diferença entre "confie em mim" e "confira".
+   */
+  completedWithoutEvidence: number;
 }
 
 /** Quantas tarefas abertas o resumo carrega. O resto se lê no próprio tasks.md. */
@@ -178,6 +199,8 @@ export async function computeStatus(context: StatusContext): Promise<ChangeStatu
   });
 
   const tasks: TaskProgress | undefined = await readTaskProgress(dir);
+  const verification = await readVerification(dir);
+  const followUps = pendingFollowUps(await readFollowUps(dir));
 
   return {
     change: context.changeId,
@@ -191,6 +214,8 @@ export async function computeStatus(context: StatusContext): Promise<ChangeStatu
     ready: applyBlockedBy.length === 0,
     next: artifacts.filter((entry) => entry.state === 'ready').map((entry) => entry.id),
     ...(tasks ? { tasks: summarizeTasks(tasks) } : {}),
+    verification,
+    pendingFollowUps: followUps,
   };
 }
 
@@ -198,6 +223,9 @@ function summarizeTasks(tasks: TaskProgress): TaskSummary {
   return {
     total: tasks.total,
     completed: tasks.completed,
+    completedWithoutEvidence: tasks.tasks.filter(
+      (task) => task.done && task.evidence?.cmd === undefined
+    ).length,
     open: tasks.tasks
       .filter((task) => !task.done)
       .slice(0, OPEN_TASKS_SHOWN)

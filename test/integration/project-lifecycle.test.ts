@@ -9,6 +9,7 @@ import { computeProjectStatus } from '../../src/core/project/status.js';
 import { recommendNext } from '../../src/core/project/next.js';
 import { linkChange } from '../../src/core/project/link.js';
 import { syncPlan } from '../../src/core/project/sync.js';
+import { loadPlan } from '../../src/core/project/repository.js';
 import { BUNDLE_VERSION } from '../../src/core/project/bundle.js';
 import { archiveChange } from '../../src/core/archive/archive.js';
 import { withStaging } from '../../src/util/fs.js';
@@ -95,6 +96,10 @@ describe('project lifecycle', () => {
             objetivo: 'Permitir que alguém se identifique.',
             escopo: ['início de sessão'],
             criteriosMacro: ['uma sessão pode ser encerrada'],
+            // The plan declares a source document, so a brief that points at
+            // nothing is an ERROR: nobody could check the scope against
+            // anything.
+            referencias: ['docs/vision.md:1-3'],
           },
         },
         {
@@ -107,6 +112,7 @@ describe('project lifecycle', () => {
             objetivo: 'Listar produtos.',
             escopo: ['grade'],
             criteriosMacro: ['filtra por categoria'],
+            referencias: ['docs/vision.md:3'],
           },
         },
         {
@@ -121,6 +127,13 @@ describe('project lifecycle', () => {
     // 3. validate — a plan built from a complete bundle is clean
     const reports = await validatePlan(root, 'shop', {});
     expect(reports.every((report) => report.valid)).toBe(true);
+
+    // …and the pointers each brief declared reached the manifest.
+    const withRefs = (await loadPlan(root, 'shop')).manifest;
+    expect(withRefs.changes.map((entry) => entry.source_refs)).toEqual([
+      [{ path: 'docs/vision.md', lines: '1-3' }],
+      [{ path: 'docs/vision.md', lines: '3' }],
+    ]);
 
     // 4. generate is idempotent over what apply already materialised
     const regenerated = await generatePlannedChanges(workspace, 'shop', {});
@@ -167,5 +180,64 @@ describe('project lifecycle', () => {
     status = await computeProjectStatus(workspace, 'shop');
     expect(status.progress).toMatchObject({ total: 2, archived: 1, percent: 50 });
     expect(status.milestones[0]).toMatchObject({ id: 'M1', archived: 1, total: 2 });
+  });
+});
+
+describe('archive fecha o vínculo que já existia', () => {
+  it('promove active_path para archive_path de um incremento vinculado na criação', async () => {
+    const workspace = await makeWorkspace();
+    const root = workspace.projectRoot;
+    await writeFile(path.join(root, 'docs/vision.md'), '# Visão\n\nAuth.\n');
+    await createPlan(root, 'shop', { name: 'Loja', sources: ['docs/vision.md'] });
+    await applyPlanBundle(workspace, 'shop', {
+      bundleVersion: BUNDLE_VERSION,
+      expectRevision: 0,
+      plan: { status: 'active' },
+      operations: [
+        {
+          op: 'addChange',
+          ref: '$a',
+          slug: 'auth',
+          title: 'Autenticação',
+          plannedChange: {
+            objetivo: 'o',
+            escopo: ['x'],
+            criteriosMacro: ['y'],
+            referencias: ['docs/vision.md:1-3'],
+          },
+        },
+      ],
+    });
+
+    // Linked while the work is still ACTIVE — the normal order, and the case
+    // `linkArchivedToPlan`'s `!entry.link` filter excludes.
+    await seedChange(workspace, 'auth');
+    await linkChange(workspace, 'shop', 'CH-001', 'auth');
+    const linked = (await loadPlan(root, 'shop')).manifest.changes[0].link!;
+    expect(linked.active_path).toBe('spec/changes/auth');
+    expect(linked.archive_path).toBeNull();
+
+    const result = await archiveChange(workspace, 'auth', {
+      now: new Date(2026, 0, 1),
+      validate: false,
+      force: true,
+    });
+    expect(result.planSynced).toEqual(['shop']);
+
+    const after = (await loadPlan(root, 'shop')).manifest.changes[0].link!;
+    expect(after.archive_path).toBe('spec/changes/archive/2026-01-01-auth');
+    expect(after.active_path).toBeNull();
+  });
+
+  it('não falha o arquivamento quando não há plano nenhum', async () => {
+    const workspace = await makeWorkspace();
+    await seedChange(workspace, 'solta');
+    const result = await archiveChange(workspace, 'solta', {
+      now: new Date(2026, 0, 1),
+      validate: false,
+      force: true,
+    });
+    expect(result.archivedAs).toBe('2026-01-01-solta');
+    expect(result.planSynced).toBeUndefined();
   });
 });

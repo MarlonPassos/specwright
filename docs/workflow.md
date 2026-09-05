@@ -127,6 +127,42 @@ acontecem conforme o trabalho entra, não em lote no final.
 
 As delta specs são os critérios de aceite: cada cenário é um teste que vale ter.
 
+Ao marcar um box, a tarefa pode registrar o que foi executado em linhas indentadas logo
+abaixo — `cmd:`, `resultado:`, `em:`. Opcional e retrocompatível, no mesmo espírito das tags
+`files:`/`depends:`.
+
+E deliberadamente modesto: **não é prova**. Quem marca o box escreve essas linhas também, e
+o Specwright não executa nada do projeto. O que o bloco compra é reprodutibilidade — o
+`cmd` pode ser rodado de novo, por uma pessoa ou pela verificação, e comparado com o
+`resultado`. É "confira você mesmo" no lugar de "confie em mim". `specs status --change`
+devolve `completedWithoutEvidence`: quantas conclusões não trazem comando nenhum.
+
+A condição de sucesso de uma tarefa nunca é um teste ser pulado. Se a change entrega um
+teste, a verificação é a execução dele; se ele depende de um serviço externo, a tarefa diz
+como esse serviço é provido. Uma verificação que confirma um skip é uma tarefa que se
+autoaprova.
+
+### Quando a change nasce de um plano
+
+`specs new change` devolve o bloco `plan` quando um incremento planeja exatamente aquele
+slug. O `/spec-propose` então **lê o Planned Change desse incremento** antes de escrever a
+proposta — `specs project show <CH-NNN> --json` traz Escopo, Critérios macro e Referências
+da fonte, e `sourceRefs` traz os ponteiros já estruturados.
+
+A proposta registra isso em `## Origem`. É o único lugar onde a origem da change fica
+dentro da própria change: sem ele, o plano diz uma coisa, a change faz outra, e nada acusa
+a diferença até alguém auditar o código.
+
+### Divergir da fonte é um ato consciente
+
+Quando uma decisão do design contraria o documento-fonte, ela ganha uma subseção própria
+em Decisões com quatro linhas: o que a fonte pedia (com a referência), o que se decidiu,
+por quê, e **o que se perde**.
+
+A última existe porque divergir é legítimo e divergir sem perceber não é. O `## Origem` da
+proposta é o que torna a diferença visível: sem as referências à fonte em mãos, contrariá-la
+por acidente é o caminho natural.
+
 ## /spec-verify
 
 Confere a change contra o que ela prometeu, e reporta.
@@ -138,6 +174,31 @@ Confere a change contra o que ela prometeu, e reporta.
   ninguém construiu.
 
 Ele reporta em vez de corrigir, a menos que o usuário peça outra coisa.
+
+E deixa rastro: `verification.md` no diretório da change, com a data, os comandos rodados e
+o resultado exato de cada um, o mapa requisito → prova, o mapa critério macro → tarefa
+quando há plano, o código que nenhuma spec descreve, e os achados em aberto.
+
+O eixo critério → tarefa existe porque um critério que o plano declarou e nenhuma tarefa
+exerce fecha em silêncio: "`docker compose up --build` funciona" era critério macro de uma
+change de entrega, nenhuma tarefa o verificava, e a change fechou com todos os boxes
+marcados. Era o único passo do ciclo que não mudava arquivo nenhum — e também
+o que teria encontrado sozinho o requisito sem teste, o comportamento sem requisito e a
+tarefa cuja evidência é um teste pulado. Um passo assim ser o mais fácil de pular, e não
+provar ter acontecido quando roda, era a lacuna.
+
+A seção **Achados em aberto** ausente não conta como limpa: conta como pergunta não
+respondida. Só um `nenhum` explícito fecha.
+
+`specs instructions verify --change <change> --json` traz a instrução e o template.
+
+O `specs archive` devolve `verification` sempre — ausente, com achados, ou limpo — e
+**avisa** nos dois primeiros casos sem impedir nada. Dois motivos para não ser bloqueio por
+padrão: arquivar nunca falha por estado a jusante do trabalho, e um veredito descreve
+trabalho já terminado; e o `/spec-loop` roda propose → implement → verify → archive sem
+ninguém no meio, então um portão cuja única saída é decisão humana ou trava o loop, ou é
+decidido pelo próprio agente — e aí não protege nada enquanto parece proteger. Quem quer a
+regra dura passa `--require-verify`.
 
 ## /spec-archive
 
@@ -157,6 +218,15 @@ ser aplicado interrompe o arquivamento com o workspace intacto. Depois:
 
 O diretório da change então vai para `spec/changes/archive/<data>-<nome-da-change>/`.
 
+Num repositório git, o arquivamento também confere se o git algum dia rastreou algum
+arquivo daquela change. Se nunca rastreou, a saída traz `unversioned: true`: o trabalho
+existe só naquela árvore, e um clone não o traria. É aviso, nunca bloqueio — arquivar não
+falha por estado a jusante do trabalho, e o git é a jusante.
+
+A pergunta é deliberadamente essa, e não "está tudo commitado?": o arquivamento é um
+`mv`, então o destino fica sempre não rastreado logo depois, para toda change. Isso é
+normal e não diz nada. "Nunca chegou ao git" diz.
+
 ## O que cada etapa deixa para trás
 
 | Etapa | Artefatos depois dela |
@@ -165,7 +235,7 @@ O diretório da change então vai para `spec/changes/archive/<data>-<nome-da-cha
 | continue | `specs/**/spec.md`, `design.md` (quando se justifica), `tasks.md` |
 | revise | os mesmos artefatos, revisados; nenhum arquivo novo |
 | implement | boxes marcados no `tasks.md`, e o código |
-| verify | um relatório; nenhum arquivo muda |
+| verify | `verification.md` — o veredito, com os comandos rodados e os achados em aberto |
 | archive | `spec/specs/` atualizado, a change em `spec/changes/archive/` |
 
 ## Onde o plano encosta no ciclo (opcional)

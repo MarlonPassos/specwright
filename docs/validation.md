@@ -96,6 +96,17 @@ regras que não dependem do grafo (ciclo e estado derivado chegam depois).
 `orphan_planned_change`; `plan.md`/`architecture.md` ausente com incrementos;
 plano em `draft` com briefs já materializados.
 
+## `skip_specs`
+
+| Nível | Regra |
+| --- | --- |
+| ERROR | `skip_specs: true` sem `skip_specs_reason` |
+| ERROR | `skip_specs: true` com arquivos de delta em `specs/` |
+
+O marcador desliga a única regra que amarra a change a um requisito. Sem
+requisito, a definição de pronto vira a própria lista de tarefas — que já está
+marcada quando alguém vai conferir. A justificativa é o único rastro da decisão.
+
 ## Planned Changes
 
 | Nível | Regra |
@@ -103,9 +114,50 @@ plano em `draft` com briefs já materializados.
 | ERROR | Frontmatter ausente, inválido, ou com `id`/`slug` divergentes do manifesto |
 | ERROR | Nome do arquivo diferente de `<id>-<slug>.md` |
 | ERROR | Seção `Objetivo`, `Escopo` ou `Critérios macro` ausente ou vazia |
+| ERROR | Seção `Referências da fonte` ausente ou vazia **quando o plano declara `source_documents`** |
 | ERROR | Cabeçalho de delta (`## ADDED/MODIFIED/REMOVED/RENAMED Requirements`) |
 | WARNING | Seção recomendada (`Motivação`, `Riscos`, `Fora do escopo`, …) ausente ou vazia |
+
+Uma seção que carrega apenas um comentário Markdown conta como **vazia**: o
+comentário é a orientação do template para quem vai preenchê-la, não conteúdo.
+É o que mantém o esqueleto do §7.5 inválido apesar da orientação que ele traz —
+e o que impede um `# Escopo` com `<!-- TODO -->` de passar como preenchido.
+
+`Referências da fonte` é a única seção cuja obrigatoriedade depende do plano.
+Com `source_documents` declarado, um brief que não aponta para lugar nenhum não
+tem rastreabilidade — ninguém consegue conferir o escopo contra nada — e isso é
+ERROR. Sem documento-fonte não há para onde apontar, e a seção volta a ser
+apenas recomendada, exatamente como era.
+
+Os warnings de seção recomendada são coletados **sempre**, no disco e em
+memória. `--strict` decide o veredito (um warning deixa de ser tolerado), nunca
+quais achados existem: as duas validações de brief precisam enxergar o mesmo
+documento do mesmo jeito, senão `apply --dry-run` e o `validate` seguinte
+discordam sobre os mesmos bytes.
 | WARNING | Conteúdo editado à mão (`modified`) ou fonte alterada (`outdated`) num incremento `planned` |
+
+## Re-decomposição
+
+| Nível | Código | Quando |
+| --- | --- | --- |
+| WARNING (ERROR sob `--strict`) | `supersession_coverage_lost` | um `splitChange`/`mergeChanges` aposenta um incremento que citava um documento-fonte que **nenhum** sucessor cita |
+
+A cobertura é decidida em dois níveis, porque um só não basta.
+
+Por **path**: um documento que nenhum sucessor menciona é inequívoco. É a
+resposta inteira quando o ponteiro não traz faixa numérica.
+
+Por **faixa**, quando os dois lados trazem linhas numéricas: as faixas dos
+sucessores naquele documento são unidas, e o que sobra é perda. Só path era
+fraco demais no caso comum de um plano com UM documento-fonte — todo split o
+cita em algum lugar, então nada nunca disparava por mais que o documento
+deixasse de ser respondido. Só faixa seria estrito demais: é a UNIÃO que
+importa, então um split que parte `371-573` em `371-400` e `401-573` fica em
+silêncio, como deve.
+
+Aparece no `apply --dry-run`, que é onde a decisão é tomada. Sem `--strict` é
+aviso: largar um escopo pode ser deliberado. Com `--strict`, `apply` recusa e
+não escreve nada.
 
 ## Vínculo (Project Planning)
 
@@ -121,6 +173,18 @@ O `specs project sync` e o `status` reportam, como diagnóstico de leitura:
 | WARNING | `record_hash_missing` | o brief foi gravado antes da prova de identidade do incremento; rode `specs project generate` |
 | WARNING | `invalid_archive_path` | o `archive_path` persistido não é um diretório de archive válido e foi ignorado |
 | WARNING | `ambiguous_archive_identity` | o nome do archive pode ser um slug terminado em número ou uma colisão; use `adopt --slug` |
+| WARNING | `stale_projection` | `plan.md` está projetado de uma revisão anterior à do manifesto |
+| WARNING | `pending_followup` | o design de uma change ativa declara um `FU-` sem destino |
+
+`pending_followup` só vale enquanto a change está ativa: depois de arquivada, o
+design é registro, não lista de pendências. A janela entre declarar um
+follow-up e arquivar é exatamente onde ele ainda pode ser despachado barato — e
+era onde nada dizia que ele existia.
+
+`stale_projection` é a rede de segurança da reprojeção: `link`, `unlink`,
+`adopt`, `set-state` e `sync` já reemitem o bloco depois de gravar, então este
+diagnóstico só aparece quando alguém editou a projeção à mão, a escrita falhou,
+ou um caminho novo entrou sem ser instrumentado.
 
 Uma change que fica **fora do plano** indefinidamente é válida: não há warning que
 a trate como erro.

@@ -50,16 +50,70 @@ Cada **Project Change** carrega `id` (`^CH-\d{3,}$`, imutável e nunca
 reutilizado), `slug` (kebab-case), `title`, `planning_state`
 (`idea | planned | on_hold | cancelled` — o **único** estado persistido),
 `priority`, `depends_on` (somente IDs), `manual_blockers`, `superseded_by`,
-`milestone`, `planned_change` e `link`.
+`milestone`, `planned_change`, `source_refs` e `link`.
+
+`source_refs` é derivado: a cada materialização do brief — por `generate` ou por
+um bundle no `apply` — a seção `# Referências da fonte` é lida para
+`{path, lines?}[]` e gravada no registro. `lines` guarda a citação como o brief
+a escreveu (`371-573`, `§10`), sem interpretar. A lista sai do YAML quando está
+vazia, e vazia significa "este incremento não cita fonte nenhuma", nunca
+"não sei".
+
+Um ponteiro marcado com `· divergente` no brief vira `supersedes: true`: o
+incremento se afasta da fonte ali de propósito. É a metade estrutural da regra
+de divergência do design — o design escreve o que a fonte pedia, o que se
+decidiu, por quê e o que se perde; o manifesto registra ONDE, numa forma que um
+comando consegue ler. Sem isso, `/spec-project-verify` só pode pedir a um humano
+que repare; com isso, divergência não declarada é a diferença entre duas listas.
 
 A serialização é determinística: `load → save → load` é byte-idêntico. As chaves
 saem em ordem fixa, `changes` na ordem de declaração e `milestones` por `order`.
+
+### Invariantes em `architecture.md`
+
+A seção `## Invariantes` guarda as regras estruturais que precisam continuar valendo
+depois de toda change, e **cada uma nomeia a capability que vai carregá-la** como
+requisito.
+
+A exigência não é decorativa. Num projeto real, a pureza do domínio virou requisito de
+spec e ganhou uma varredura que proíbe imports de framework — zero violações. A regra de
+dependência da camada de aplicação ficou só no documento de arquitetura, e terminou com
+onze imports de infraestrutura em cinco de cinco módulos de caso de uso. O teste espelhou
+fielmente o que foi especificado; a lacuna era da spec, não da disciplina de quem
+implementou.
+
+A promoção não é conferida por comando nenhum: casar uma frase de arquitetura com um
+requisito é juízo semântico, fora da fronteira da CLI. `/spec-project-review` pede que o
+agente olhe para isso, e `/spec-project-verify` também.
+
+### `/spec-project-verify` — conferir o que foi entregue
+
+`/spec-verify` confere UMA change contra os deltas dela. `/spec-project-review`
+critica o PLANO, antes de materializar. Nenhum dos dois enxerga o que some
+**entre** uma change e outra: requisito da fonte que nunca virou requirement,
+capacidade especificada e nunca exposta, spec de uma change contradizendo a de
+outra, valor que existe no código sem requisito nenhum.
+
+`/spec-project-verify` ocupa esse lugar, ao fechar um milestone. A saída vem em
+duas metades rotuladas: **cálculo** (diagnósticos, cobertura de `source_refs`,
+vereditos de verificação presentes e ausentes) e **recomendação** (os desvios
+semânticos, que são leitura do agente e precisam vir marcadas como tal).
+
+### `generate` valida o que gravou
+
+Toda materialização — dry-run ou real — devolve `validation`: o relatório do
+plano resultante, com as briefs propostas no lugar dos arquivos no dry-run. É
+reportado, nunca lançado: o esqueleto do §7.5 é inválido de propósito, e falhar
+ali travaria o fluxo documentado. Quem quiser o veredito sob `--strict` roda
+`specs project validate --strict` à parte.
 
 ## Planned Change
 
 `planning/<plan-id>/planned-changes/<ID>-<slug>.md`: um Markdown com frontmatter
 (`schema_version`, `id`, `slug`, `title`, `plan_revision`) e as seções
-**Objetivo**, **Escopo** e **Critérios macro** obrigatórias (as demais são
+**Objetivo**, **Escopo** e **Critérios macro** obrigatórias — mais
+**Referências da fonte**, obrigatória quando o plano declara `source_documents`
+(as demais são
 recomendadas). Um Planned Change é planejamento macro — nunca contém cabeçalho de
 delta (`## ADDED/MODIFIED/REMOVED/RENAMED Requirements`) e as regras de requisito
 `SHALL`/`MUST` não se aplicam a ele.
@@ -285,6 +339,15 @@ catálogo publicado não diverge da união zod que o parser usa de verdade.
   dígitos, `_` ou `-` — espelhar o slug (`$bug-fixes`) é a convenção mais simples.
 - Nenhuma operação atinge um incremento `archived` sem `--allow-completed` (e aí
   o relatório traz um `WARNING`).
+O `specs archive` roda `sync` no plano que carrega o vínculo daquela change,
+depois de mover o diretório: `archive_path` passa a apontar para o archive e
+`active_path` é limpo. Best effort — arquivar nunca falha por causa do estado
+de um plano. O que ele reparou vem em `planSynced`.
+
+Uma re-decomposição que aposenta um incremento cujas `source_refs` citam um
+documento que nenhum sucessor cita emite `supersession_coverage_lost` — aviso
+por padrão, recusa sob `specs project apply --strict`.
+
 - **Split** marca o original `cancelled` com `superseded_by: [novos IDs]` e exige
   `rewire` cobrindo todos os dependentes. O ID original nunca é reutilizado.
 - **Merge** escolhe um `survivor ∈ ids`, marca os demais `cancelled`, e é

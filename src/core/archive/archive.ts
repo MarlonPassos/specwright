@@ -8,9 +8,13 @@ import { readDeltaSpecs, readTaskProgress } from '../change/model.js';
 import { specPath } from '../specs.js';
 import { validateChange } from '../validate/change-validator.js';
 import { ARCHIVE_DIR, CHANGES_DIR, WORKSPACE_DIR, changeDir, type Workspace } from '../workspace.js';
-import { adviseLink, soleCandidate } from '../project/advice.js';
+import { adviseLink, plansLinking, soleCandidate } from '../project/advice.js';
 import { linkChange } from '../project/link.js';
+import { syncPlan } from '../project/sync.js';
 import { mergeCapability } from './merge.js';
+import { reportUnversionedWork } from './versioning.js';
+import { readVerification, type VerificationVerdict } from '../change/verification.js';
+import { pendingFollowUps, readFollowUps, type FollowUp } from '../change/followups.js';
 
 export interface ArchiveOptions {
   /** Skip the spec merge entirely. For changes that carry no spec deltas. */
@@ -19,6 +23,11 @@ export interface ArchiveOptions {
   validate?: boolean;
   /** Proceed even with unchecked tasks. */
   force?: boolean;
+  /**
+   * Refuse to archive without a `verification.md` whose open findings are
+   * empty. Off by default — see `assertVerified`.
+   */
+  requireVerify?: boolean;
   now?: Date;
 }
 
@@ -55,6 +64,18 @@ export interface ArchiveResult {
    * NOTHING was written. The archive itself is unaffected (I-4).
    */
   planAmbiguity?: ArchivePlanAmbiguity;
+  /** Plans whose link block `sync` repaired on the way out. */
+  planSynced?: string[];
+  /**
+   * Set when the workspace is a git repository and git never tracked a single
+   * file of this change: the work exists only in this working tree. A warning —
+   * the archive itself succeeded.
+   */
+  unversioned?: true;
+  /** The verdict `/spec-verify` left, or its absence. Always reported. */
+  verification: VerificationVerdict;
+  /** Follow-ups the design declared and nobody dispatched. Reported, never a gate. */
+  pendingFollowUps: FollowUp[];
 }
 
 export async function archiveChange(
@@ -92,6 +113,10 @@ export async function archiveChange(
       { code: 'tasks_incomplete', fix: `specs archive ${changeId} --force` }
     );
   }
+
+  const verification = await assertVerified(dir, options.requireVerify === true);
+  // Read BEFORE the move: after it, `dir` no longer exists.
+  const followUps = pendingFollowUps(await readFollowUps(dir));
 
   const metadata = await readChangeMetadata(dir);
   const specsSkipped = options.skipSpecs === true || metadata.skipSpecs;
@@ -179,8 +204,12 @@ export async function archiveChange(
   }
 
   const closure = await linkArchivedToPlan(workspace, changeId, archivedAs);
+  const synced = await syncArchivedLink(workspace, changeId);
+  const versioning = await reportUnversionedWork(workspace.projectRoot, dir);
 
   return {
+    verification,
+    pendingFollowUps: followUps,
     change: changeId,
     archivedAs,
     archivePath: destination,
@@ -190,7 +219,45 @@ export async function archiveChange(
     specsSkipped,
     ...(closure.plan ? { plan: closure.plan } : {}),
     ...(closure.ambiguity ? { planAmbiguity: closure.ambiguity } : {}),
+    ...(synced.length > 0 ? { planSynced: synced } : {}),
+    ...(versioning.neverVersioned ? { unversioned: true as const } : {}),
   };
+}
+
+/**
+ * Moves an ALREADY LINKED increment's paths from active to archive.
+ *
+ * `linkArchivedToPlan` handles only the increment with no link yet — its filter
+ * is `!entry.link` — because it exists to close a link the plan foresaw. The
+ * common case is the opposite: the change was linked when it was created, and
+ * on archiving its `active_path` starts pointing at a directory that no longer
+ * exists while `archive_path` stays null. Loosening that filter would not work
+ * either: `linkChange` refuses an increment whose derived execution is already
+ * `archived` (`completed_change_protected`), which is exactly this one.
+ *
+ * The repair already existed, in `sync`: it fills `archive_path` from resolved
+ * evidence and clears a stale `active_path`. Nothing ever called it — every
+ * link diagnostic printed `fix: specs project sync` and waited for a human.
+ * Now the archive runs it itself.
+ *
+ * Best effort, same contract as the link closure above: archiving never fails,
+ * and never behaves differently, because of the state of a plan (I-4).
+ */
+async function syncArchivedLink(workspace: Workspace, changeId: string): Promise<string[]> {
+  const repaired: string[] = [];
+  try {
+    for (const planId of await plansLinking(workspace.projectRoot, changeId)) {
+      try {
+        const result = await syncPlan(workspace, planId);
+        if (result.synced) repaired.push(planId);
+      } catch {
+        continue;
+      }
+    }
+  } catch {
+    return repaired;
+  }
+  return repaired;
 }
 
 /**
@@ -313,4 +380,48 @@ async function pruneEmptyDirs(start: string, boundary: string): Promise<void> {
     await fs.rmdir(current).catch(() => undefined);
     current = path.dirname(current);
   }
+}
+
+/**
+ * The verification verdict, and the gate over it — which is off by default.
+ *
+ * Requiring a verdict to archive is tempting: `/spec-verify` is the step that
+ * finds what everything else misses, and twenty-four changes were archived
+ * without one in the project that motivated this. Two reasons it is not the
+ * default anyway.
+ *
+ * The first is the invariant this file already states about the plan (I-4):
+ * archiving must never fail because of state downstream of the work. A verdict
+ * is downstream — it describes work that is already finished.
+ *
+ * The second is that `/spec-loop` and `specs project loop` run propose →
+ * implement → verify → archive with nobody in the middle. A gate whose only
+ * exit is a human decision either deadlocks that loop, or gets decided by the
+ * agent itself — and then it protects nothing while looking like it does.
+ *
+ * So: always reported, never enforced, unless the project asks for enforcement
+ * with `--require-verify`. A project that wants the harder rule can have it;
+ * one that does not still sees the finding.
+ */
+async function assertVerified(dir: string, required: boolean): Promise<VerificationVerdict> {
+  const verification = await readVerification(dir);
+  if (!required) return verification;
+
+  if (!verification.present) {
+    throw new SpecError(
+      'Esta change não tem verification.md e --require-verify foi pedido.',
+      { code: 'verification_missing', fix: 'Rode a verificação e grave o veredito antes de arquivar.' }
+    );
+  }
+  if (!verification.clean) {
+    const detail =
+      verification.openFindings.length > 0
+        ? `:\n${verification.openFindings.map((finding) => `  - ${finding}`).join('\n')}`
+        : ' (a seção "Achados em aberto" não respondeu nada)';
+    throw new SpecError(`O veredito da verificação tem achados em aberto${detail}`, {
+      code: 'verification_open_findings',
+      fix: 'Resolva os achados, ou registre "nenhum" com a justificativa de cada um.',
+    });
+  }
+  return verification;
 }

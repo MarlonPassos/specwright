@@ -6,6 +6,8 @@ import { computeProjectStatus } from '../../src/core/project/status.js';
 import { loadPlan } from '../../src/core/project/repository.js';
 import { BUNDLE_VERSION } from '../../src/core/project/bundle.js';
 import { makePlanWorkspace, seedPlan, manifest, change } from '../helpers/plan.js';
+import { writeFile } from '../helpers/workspace.js';
+import { sha256 } from '../../src/core/project/hashes.js';
 
 const addTwo = {
   bundleVersion: BUNDLE_VERSION,
@@ -132,6 +134,192 @@ describe('applyPlanBundle', () => {
     const status = await computeProjectStatus(workspace, 'p');
     expect(status.changes.find((c) => c.id === 'CH-001')!.planningState).toBe('cancelled');
     expect(status.changes.find((c) => c.id === 'CH-002')!.dependsOn).toEqual(['CH-004']);
+  });
+});
+
+describe('re-decomposição não pode perder a fonte em silêncio', () => {
+  /** A plan with one increment whose brief cites two source documents. */
+  async function planWithCitedIncrement() {
+    const workspace = await makePlanWorkspace();
+    await writeFile(path.join(workspace.projectRoot, 'docs/a.md'), '# A\n');
+    await writeFile(path.join(workspace.projectRoot, 'docs/b.md'), '# B\n');
+    await seedPlan(
+      workspace,
+      manifest({
+        id: 'p',
+        status: 'active',
+        source_documents: [
+          { path: 'docs/a.md', sha256: sha256('# A\n') },
+          { path: 'docs/b.md', sha256: sha256('# B\n') },
+        ],
+        changes: [],
+      })
+    );
+    await applyPlanBundle(workspace, 'p', {
+      bundleVersion: BUNDLE_VERSION,
+      expectRevision: 0,
+      operations: [
+        {
+          op: 'addChange',
+          ref: '$a',
+          slug: 'origem',
+          title: 'Origem',
+          plannedChange: {
+            objetivo: 'o',
+            escopo: ['x'],
+            criteriosMacro: ['y'],
+            referencias: ['docs/a.md:1-9', 'docs/b.md:1-4'],
+          },
+        },
+      ],
+    });
+    return workspace;
+  }
+
+  const splitLosing = {
+    bundleVersion: BUNDLE_VERSION,
+    expectRevision: 1,
+    operations: [
+      {
+        op: 'splitChange',
+        id: 'CH-001',
+        into: [
+          {
+            ref: '$x',
+            slug: 'parte-a',
+            title: 'Parte A',
+            // Between them the two successors cite a.md and drop b.md
+            // entirely — the exact shape of the loss.
+            plannedChange: {
+              objetivo: 'o',
+              escopo: ['x'],
+              criteriosMacro: ['y'],
+              referencias: ['docs/a.md:1-4'],
+            },
+          },
+          {
+            ref: '$y',
+            slug: 'parte-b',
+            title: 'Parte B',
+            plannedChange: {
+              objetivo: 'o',
+              escopo: ['x'],
+              criteriosMacro: ['y'],
+              referencias: ['docs/a.md:5-9'],
+            },
+          },
+        ],
+        rewire: {},
+      },
+    ],
+  };
+
+  it('avisa, sem bloquear, quando nenhum sucessor cita um documento-fonte do original', async () => {
+    const workspace = await planWithCitedIncrement();
+    const result = await applyPlanBundle(workspace, 'p', splitLosing);
+
+    expect(result.applied).toBe(true);
+    const finding = result.diagnostics.find((d) => d.code === 'supersession_coverage_lost')!;
+    expect(finding.level).toBe('WARNING');
+    expect(finding.message).toContain('docs/b.md:1-4');
+    expect(finding.message).not.toContain('docs/a.md');
+  });
+
+  it('recusa e não escreve nada sob --strict', async () => {
+    const workspace = await planWithCitedIncrement();
+    await expect(applyPlanBundle(workspace, 'p', splitLosing, { strict: true })).rejects.toMatchObject(
+      { code: 'supersession_coverage_lost' }
+    );
+    const after = (await loadPlan(workspace.projectRoot, 'p')).manifest;
+    expect(after.revision).toBe(1);
+    expect(after.changes.map((c) => c.id)).toEqual(['CH-001']);
+  });
+
+  it('acusa a faixa que sobrou quando um sucessor fica só com um pedaço', async () => {
+    const workspace = await planWithCitedIncrement();
+    const result = await applyPlanBundle(workspace, 'p', {
+      ...splitLosing,
+      operations: [
+        {
+          ...splitLosing.operations[0],
+          into: [
+            {
+              ref: '$x',
+              slug: 'parte-a',
+              title: 'Parte A',
+              // Keeps 1-4 of a 1-9 range: 5-9 passa a não ter dono, mesmo com
+              // o documento ainda citado. Comparar só por path não pegaria.
+              plannedChange: {
+                objetivo: 'o',
+                escopo: ['x'],
+                criteriosMacro: ['y'],
+                referencias: ['docs/a.md:1-4'],
+              },
+            },
+            {
+              ref: '$y',
+              slug: 'parte-b',
+              title: 'Parte B',
+              plannedChange: {
+                objetivo: 'o',
+                escopo: ['x'],
+                criteriosMacro: ['y'],
+                referencias: ['docs/b.md:1-4'],
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const finding = result.diagnostics.find((d) => d.code === 'supersession_coverage_lost')!;
+    expect(finding.message).toContain('docs/a.md:1-9');
+  });
+
+  it('cala quando os sucessores particionam a faixa inteira entre si', async () => {
+    const workspace = await planWithCitedIncrement();
+    const result = await applyPlanBundle(workspace, 'p', {
+      ...splitLosing,
+      operations: [
+        {
+          ...splitLosing.operations[0],
+          into: [
+            {
+              ref: '$x',
+              slug: 'parte-a',
+              title: 'Parte A',
+              plannedChange: {
+                objetivo: 'o',
+                escopo: ['x'],
+                criteriosMacro: ['y'],
+                // 1-4 e 5-9 juntos cobrem o 1-9 original: é a divisão sendo
+                // feita, não perda. É a UNIÃO que importa.
+                referencias: ['docs/a.md:1-4'],
+              },
+            },
+            {
+              ref: '$y',
+              slug: 'parte-b',
+              title: 'Parte B',
+              plannedChange: {
+                objetivo: 'o',
+                escopo: ['x'],
+                criteriosMacro: ['y'],
+                referencias: ['docs/a.md:5-9', 'docs/b.md:1-4'],
+              },
+            },
+          ],
+        },
+      ],
+    });
+    expect(result.diagnostics.some((d) => d.code === 'supersession_coverage_lost')).toBe(false);
+  });
+
+  it('o dry-run enxerga a perda antes de qualquer escrita', async () => {
+    const workspace = await planWithCitedIncrement();
+    const preview = await applyPlanBundle(workspace, 'p', splitLosing, { dryRun: true });
+    expect(preview.dryRun).toBe(true);
+    expect(preview.diagnostics.some((d) => d.code === 'supersession_coverage_lost')).toBe(true);
   });
 });
 

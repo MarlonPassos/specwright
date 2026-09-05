@@ -25,7 +25,19 @@ ${RESOLVE_CHANGE}
    valer, pare e diga o que está pendente. Tarefas não marcadas significam que o trabalho não
    acabou - não arquive por cima delas.
 
-   Se a change ainda não foi verificada, rode \`${commandRef('verify')}\` antes.
+   Se a change ainda não foi verificada, rode \`${commandRef('verify')}\` antes. O
+   \`specs archive\` devolve \`verification\` sempre: ausente, com achados em aberto, ou
+   limpo com a data. Ele **avisa** nos dois primeiros casos e arquiva mesmo assim - arquivar
+   não falha por estado a jusante do trabalho, e um veredito descreve trabalho que já
+   terminou. Um projeto que quer a regra mais dura passa \`--require-verify\`, e aí o
+   comando recusa.
+
+   Reporte o que vier em \`verification\` ao usuário, em qualquer um dos três casos.
+
+   O mesmo vale para \`pendingFollowUps\`: cada \`FU-\` que o design declarou e ninguém
+   despachou sai arquivado junto com a change. Leve a lista ao usuário e pergunte o destino
+   de cada um antes de arquivar - incremento novo no plano, item de backlog, ou descarte com
+   justificativa. Marcar a caixa do \`FU-\` no design é o que registra que ele teve destino.
 
 2. **Leia o que o arquivamento vai mudar**
 
@@ -57,9 +69,11 @@ ${RESOLVE_CHANGE}
 
 5. **Feche o plano, se houver um**
 
-   O arquivamento já vincula sozinho o incremento que planejava exatamente aquele slug e
-   ainda não tinha vínculo. Quando isso acontece, a saída do \`specs archive\` traz um bloco
-   \`plan\` com o incremento vinculado - reporte-o ao usuário.
+   O arquivamento faz duas coisas no plano, sozinho. Vincula o incremento que planejava
+   exatamente aquele slug e ainda não tinha vínculo - aí a saída traz o bloco \`plan\`. E
+   roda o reparo de vínculo (\`sync\`) no plano que já tinha o vínculo, movendo
+   \`active_path\` para \`archive_path\` - aí a saída traz \`planSynced\` com o id do plano.
+   Reporte os dois ao usuário.
 
    Se existe \`planning/\` na raiz e o bloco \`plan\` **não** veio, há três razões possíveis:
    nenhum incremento planejava aquele slug; o plano está ausente, ilegível ou recusou a
@@ -88,7 +102,10 @@ ${RESOLVE_CHANGE}
 - onde a change foi arquivada;
 - capacidades criadas, atualizadas e aposentadas;
 - o incremento do plano que passou a contar como concluído, quando há plano;
-- qualquer coisa que reste para fazer à mão, como um propósito placeholder a substituir.
+- qualquer coisa que reste para fazer à mão, como um propósito placeholder a substituir;
+- \`unversioned: true\`, quando vier: o git nunca rastreou nenhum arquivo desta change, e o
+  trabalho existe só nesta árvore. Diga isso ao usuário. Não commite por conta própria -
+  quando e como commitar é decisão dele.
 
 **Guardrails**
 - O arquivamento reescreve as specs do workspace. Nunca o rode numa change não implementada.

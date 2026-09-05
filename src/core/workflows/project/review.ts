@@ -27,7 +27,9 @@ ${PROJECT_BOUNDARY}
    - milestone inviável;
    - Planned Change sem critérios macro;
    - vínculo quebrado, ou change ativa com proposta e sem vínculo;
-   - duplicação entre \`plan.md\`, \`architecture.md\` e os Planned Changes.
+   - duplicação entre \`plan.md\`, \`architecture.md\` e os Planned Changes;
+   - invariante em \`architecture.md\` que não nomeia a capability que vai carregá-la, ou
+     cuja capability nenhum incremento entrega.
 3. \`specs project status --json\`. Para cada diagnóstico \`unclaimed_archive\`
    existe trabalho concluído que o plano não está contando. Rode
    \`specs project sync --link --check\`: ele lista os incrementos que seriam

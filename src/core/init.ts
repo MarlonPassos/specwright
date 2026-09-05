@@ -3,7 +3,14 @@ import { promises as fs } from 'node:fs';
 import { SpecError } from '../util/errors.js';
 import { ensureDir, pathExists, writeFileEnsured } from '../util/fs.js';
 import { DEFAULT_SCHEMA, loadConfig, renderConfig, type WorkspaceConfig } from './config.js';
-import { allHarnesses, resolveHarnesses, writeHarnessFiles, type GeneratedFile } from './harness/index.js';
+import {
+  allHarnesses,
+  pruneHarnessFiles,
+  resolveHarnesses,
+  writeHarnessFiles,
+  type GeneratedFile,
+} from './harness/index.js';
+import { detectHarness } from './harness/current.js';
 import { allCommands } from './workflows/index.js';
 import { ARCHIVE_DIR, PROJECT_FILE, workspaceAt, type Workspace } from './workspace.js';
 
@@ -60,13 +67,19 @@ export async function initWorkspace(
   await ensureDir(workspace.changesPath);
   await ensureDir(path.join(workspace.changesPath, ARCHIVE_DIR));
 
-  const adapters = resolveHarnesses(options.harnesses ?? 'all');
+  // Default to the harness we are actually running under, not to all four.
+  // `all` materialised sixty command files in a project that used one harness,
+  // and nothing ever removed the other three. Asking for all of them is still
+  // one flag away; getting them without asking is not a good default.
+  const adapters = resolveHarnesses(
+    options.harnesses ?? existingSelection(await currentConfig(workspace, existed)) ?? detectHarness().id
+  );
   const harnesses = adapters.map((adapter) => adapter.id);
 
   // An existing workspace keeps its schema and gains the newly selected
   // harnesses: re-running init to add a harness must not silently reset the
   // workflow schema the project already uses.
-  const existing: WorkspaceConfig | undefined = existed ? await loadConfig(workspace) : undefined;
+  const existing: WorkspaceConfig | undefined = await currentConfig(workspace, existed);
   const config: WorkspaceConfig = {
     ...(existing ?? {}),
     schema: options.schema ?? existing?.schema ?? DEFAULT_SCHEMA,
@@ -91,6 +104,20 @@ export async function initWorkspace(
     files,
     projectFileCreated,
   };
+}
+
+/** The config already on disk, or `undefined` for a fresh workspace. */
+async function currentConfig(
+  workspace: Workspace,
+  existed: boolean
+): Promise<WorkspaceConfig | undefined> {
+  return existed ? loadConfig(workspace) : undefined;
+}
+
+/** What an existing workspace already declared, so re-running init keeps it. */
+function existingSelection(config: WorkspaceConfig | undefined): string | undefined {
+  const declared = config?.harnesses;
+  return declared && declared.length > 0 ? declared.join(',') : undefined;
 }
 
 function mergeHarnesses(existing: string[] | undefined, selected: string[]): string[] {
@@ -118,7 +145,13 @@ async function assertUsableDirectory(target: string): Promise<void> {
 export async function updateWorkspace(
   workspace: Workspace,
   options: { harnesses?: string } = {}
-): Promise<{ harnesses: string[]; files: GeneratedFile[]; commands: string[] }> {
+): Promise<{
+  harnesses: string[];
+  files: GeneratedFile[];
+  /** Command files removed because their harness is no longer selected. */
+  removed: string[];
+  commands: string[];
+}> {
   const config = await loadConfig(workspace);
   const selection = options.harnesses ?? config.harnesses?.join(',');
 
@@ -132,16 +165,25 @@ export async function updateWorkspace(
   const adapters = resolveHarnesses(selection);
   const files = await writeHarnessFiles(workspace.projectRoot, adapters);
 
+  // An explicit `--harnesses` REPLACES the selection, and the files of the
+  // harnesses it drops go with it. Merging instead — which is what this used to
+  // do — made the list monotonic: every harness ever selected stayed forever,
+  // and there was no way to take one back.
+  const removed = options.harnesses
+    ? await pruneHarnessFiles(workspace.projectRoot, adapters)
+    : [];
+
   if (options.harnesses) {
     await writeFileEnsured(
       workspace.configPath,
-      renderConfig({ ...config, harnesses: mergeHarnesses(config.harnesses, adapters.map((a) => a.id)) })
+      renderConfig({ ...config, harnesses: adapters.map((a) => a.id) })
     );
   }
 
   return {
     harnesses: adapters.map((adapter) => adapter.id),
     files,
+    removed,
     commands: allCommands().map((command) => command.id),
   };
 }

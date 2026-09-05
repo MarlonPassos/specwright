@@ -62,18 +62,25 @@ Cria o workspace e escreve os arquivos de comando do harness.
 
 | Opção | Significado |
 | --- | --- |
-| `--harnesses <list>` | `all` (padrão), ou uma lista separada por vírgula de `claude`, `codex`, `opencode`, `kiro` |
+| `--harnesses <list>` | `all`, ou uma lista separada por vírgula de `claude`, `codex`, `opencode`, `kiro`. **Padrão: o harness em uso** |
 | `--schema <name>` | Schema de workflow para novas changes; padrão `spec-driven` |
 | `--json` | Saída em JSON |
 
-Rodar o `init` de novo é seguro: ele mantém o schema configurado, adiciona os harnesses
-recém-selecionados aos existentes, regera todos os arquivos de comando e nunca sobrescreve
-o `spec/project.md`.
+O padrão é o harness detectado, não os quatro. Materializar todos por omissão punha 60
+arquivos de prompt num projeto que usava um só — 18,75 % dos arquivos versionados — e nada
+nunca removia os outros três. Quem quer os quatro pede `--harnesses all`.
+
+Rodar o `init` de novo é seguro: ele mantém o schema e a seleção de harnesses que o
+workspace já declara, regera os arquivos de comando e nunca sobrescreve o `spec/project.md`.
 
 ### `specs update [path]`
 
-Regera os arquivos de comando dos harnesses que o workspace declara. Passe
-`--harnesses <list>` para adicionar harnesses; essa seleção é então persistida.
+Regera os arquivos de comando dos harnesses que o workspace declara.
+
+`--harnesses <list>` **substitui** a seleção e apaga os arquivos de comando dos harnesses
+que saírem — só os arquivos que o próprio gerador produz, num diretório que fica vazio.
+Antes a seleção era monotônica: todo harness já escolhido ficava para sempre, e não havia
+como devolver um.
 
 ### `specs harnesses`
 
@@ -149,12 +156,17 @@ ainda está devendo.
 
 ### `specs instructions [artifact]`
 
-Imprime as instruções de um artefato, ou das fases `implement` / `archive`. Sem um
-artefato, serve o próximo que estiver pronto.
+Imprime as instruções de um artefato, ou das fases `implement` / `verify` / `archive`.
+Sem um artefato, serve o próximo que estiver pronto.
 
 O JSON carrega `instruction`, `template`, `context`, `rules`, `outputPath`,
 `outputIsPattern`, `dependencies`, e — quando a change abriu mão — `skipped` e `warning`.
 `context` e `rules` são restrições para quem escreve, nunca conteúdo para o arquivo.
+
+A fase `verify` traz também o `template` do `verification.md` e o `verification` que já
+estiver no disco — presença, data e achados em aberto. `verify` é uma fase e não um
+artefato porque acontece **depois** da implementação, e o grafo de artefatos só modela o
+que vem antes dela.
 
 ### `specs archive [change]`
 
@@ -165,6 +177,7 @@ Aplica os deltas da change nas specs do workspace e a move para o arquivo.
 | `--skip-specs` | Não aplicar os deltas |
 | `--no-validate` | Arquivar sem validar antes |
 | `--force` | Arquivar apesar de tarefas não marcadas |
+| `--require-verify` | Recusar sem um `verification.md` cujos achados em aberto estejam zerados |
 
 Num projeto com [plano](project-planning.md), o arquivamento fecha o vínculo já
 previsto — o único incremento não cancelado e sem vínculo cujo `slug` é igual ao

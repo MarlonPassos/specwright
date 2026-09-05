@@ -225,7 +225,7 @@ describe('specs project — link / adopt / sync / set-state', () => {
       path.join(dir, 'spec/changes/small-fix/proposal.md'),
       '## Why\n\nCustomers keep hitting a small papercut that wastes support time every week.\n\n## What Changes\n\n- fix it\n\n## Impact\n\nnone\n'
     );
-    await writeFile(path.join(dir, 'spec/changes/small-fix/.change.yaml'), 'schema: spec-driven\nskip_specs: true\n');
+    await writeFile(path.join(dir, 'spec/changes/small-fix/.change.yaml'), 'schema: spec-driven\nskip_specs: true\nskip_specs_reason: nenhum comportamento observável muda\n');
     await writeFile(path.join(dir, 'spec/changes/small-fix/tasks.md'), '## 1\n- [x] 1.1 done\n');
 
     const archive = await runCli(['archive', 'small-fix', '--json'], dir);
@@ -336,7 +336,7 @@ describe('specs project — no regression', () => {
       );
       await writeFile(
         path.join(dir, `spec/changes/${slug}/.change.yaml`),
-        'schema: spec-driven\nskip_specs: true\n'
+        'schema: spec-driven\nskip_specs: true\nskip_specs_reason: nenhum comportamento observável muda\n'
       );
       await writeFile(path.join(dir, `spec/changes/${slug}/tasks.md`), '## 1\n- [x] 1.1 done\n');
     }
@@ -375,7 +375,7 @@ describe('specs project — no regression', () => {
       path.join(dir, 'spec/changes/same-work/proposal.md'),
       '## Why\n\nCustomers keep hitting a small papercut that wastes support time every week.\n\n## What Changes\n\n- fix it\n\n## Impact\n\nnone\n'
     );
-    await writeFile(path.join(dir, 'spec/changes/same-work/.change.yaml'), 'schema: spec-driven\nskip_specs: true\n');
+    await writeFile(path.join(dir, 'spec/changes/same-work/.change.yaml'), 'schema: spec-driven\nskip_specs: true\nskip_specs_reason: nenhum comportamento observável muda\n');
     await writeFile(path.join(dir, 'spec/changes/same-work/tasks.md'), '## 1\n- [x] 1.1 done\n');
 
     const archived = await runCli(['archive', 'same-work', '--json'], dir);

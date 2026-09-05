@@ -1,3 +1,9 @@
+## Origem
+
+<!-- Quando a change nasce de um incremento do plano: o id (CH-NNN) e as
+     referências da fonte que o Planned Change declara, uma por linha. Apague
+     esta seção quando não houver plano. -->
+
 ## Why
 
 <!-- O problema ou a oportunidade, e por que importa agora. Pelo menos 50 caracteres. -->

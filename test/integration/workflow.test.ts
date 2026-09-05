@@ -1,7 +1,8 @@
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { initWorkspace } from '../../src/core/init.js';
+import { initWorkspace, updateWorkspace } from '../../src/core/init.js';
+import { workspaceAt } from '../../src/core/workspace.js';
 import { createChange } from '../../src/core/change/create.js';
 import { computeStatus, resolveChangeContext } from '../../src/core/change/status.js';
 import { buildInstructions } from '../../src/core/change/instructions.js';
@@ -15,13 +16,15 @@ import { loadConfig } from '../../src/core/config.js';
 import { makeTempDir, makeWorkspace, seedChange, writeFile } from '../helpers/workspace.js';
 
 describe('init', () => {
-  it('creates the workspace and the harness files', async () => {
+  it('creates the workspace and, by default, only the detected harness', async () => {
     const dir = await makeTempDir();
     const result = await initWorkspace(dir);
 
     expect(result.created).toBe(true);
-    expect(result.harnesses).toEqual(['claude', 'codex', 'opencode', 'kiro']);
-    expect(result.files).toHaveLength(allCommands().length * 4);
+    // Not all four: materialising every harness by default put sixty command
+    // files in a project that used one, and nothing ever removed the rest.
+    expect(result.harnesses).toHaveLength(1);
+    expect(result.files).toHaveLength(allCommands().length);
 
     for (const file of result.files) {
       await expect(fs.stat(path.join(dir, file.path))).resolves.toBeTruthy();
@@ -29,6 +32,34 @@ describe('init', () => {
     await expect(fs.stat(path.join(dir, 'spec', 'config.yaml'))).resolves.toBeTruthy();
     await expect(fs.stat(path.join(dir, 'spec', 'project.md'))).resolves.toBeTruthy();
     await expect(fs.stat(path.join(dir, 'spec', 'changes', 'archive'))).resolves.toBeTruthy();
+  });
+
+  it('materialises every harness when asked, and takes them back when asked', async () => {
+    const dir = await makeTempDir();
+    const all = await initWorkspace(dir, { harnesses: 'all' });
+    expect(all.files).toHaveLength(allCommands().length * 4);
+
+    const workspace = workspaceAt(dir);
+    const narrowed = await updateWorkspace(workspace, { harnesses: 'claude' });
+
+    expect(narrowed.harnesses).toEqual(['claude']);
+    expect(narrowed.removed).toHaveLength(allCommands().length * 3);
+    // The selection REPLACES, it does not merge: without this the list was
+    // monotonic and a harness could never be taken back.
+    for (const file of narrowed.removed) {
+      await expect(fs.stat(path.join(dir, file))).rejects.toBeTruthy();
+    }
+    for (const file of narrowed.files) {
+      await expect(fs.stat(path.join(dir, file.path))).resolves.toBeTruthy();
+    }
+  });
+
+  it('re-running init keeps the selection the workspace already declared', async () => {
+    const dir = await makeTempDir();
+    await initWorkspace(dir, { harnesses: 'codex' });
+
+    const again = await initWorkspace(dir);
+    expect(again.harnesses).toEqual(['codex']);
   });
 
   it('keeps the configured schema and adds harnesses when re-run', async () => {
@@ -121,7 +152,10 @@ describe('change lifecycle', () => {
   it('skips the merge for a change that declares no spec deltas', async () => {
     const workspace = await makeWorkspace();
     const dir = await seedChange(workspace, 'c', { delta: null as unknown as string });
-    await writeFile(path.join(dir, '.change.yaml'), 'schema: spec-driven\nskip_specs: true\n');
+    await writeFile(
+      path.join(dir, '.change.yaml'),
+      'schema: spec-driven\nskip_specs: true\nskip_specs_reason: só tooling\n'
+    );
     await writeFile(path.join(dir, 'tasks.md'), '## 1. Work\n\n- [x] 1.1 done and verified\n');
 
     const result = await archiveChange(workspace, 'c');

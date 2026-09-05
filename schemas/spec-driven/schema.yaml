@@ -11,6 +11,14 @@ artifacts:
       Escreva o documento que responde POR QUE esta change existe e O QUE ela cobre.
 
       Seções obrigatórias:
+      - **Origem**: só quando a change nasce de um incremento de um Project Plan. O id do
+        incremento (`CH-NNN`) e as referências da fonte que o Planned Change dele declara,
+        copiadas como estão - são ponteiros, não prosa a reescrever. Apague a seção quando
+        não houver plano.
+
+        Esta seção não é decorativa: ela é o único lugar onde a origem da change fica
+        registrada dentro da própria change. Sem ela, um requisito do documento-fonte pode
+        sumir entre o plano e o código sem que nada acuse.
       - **Why**: uma ou duas frases nomeando o problema ou a oportunidade, e por que importa agora.
       - **What Changes**: uma lista de mudanças concretas. Nomeie comportamento novo, comportamento alterado e remoções. Prefixe um item com **BREAKING** quando ele quebra um contrato existente.
       - **Capabilities**: as specs que esta change vai tocar.
@@ -24,9 +32,15 @@ artifacts:
 
       Uma change precisa declarar pelo menos uma capacidade ou abrir mão das specs
       explicitamente: a validação rejeita uma change com zero deltas, a não ser que o
-      `.change.yaml` dela defina `skip_specs: true`. Use esse marcador só quando nenhum
-      comportamento observável muda (refatoração, tooling, docs). Nunca invente um requisito
-      para satisfazer a validação.
+      `.change.yaml` dela defina `skip_specs: true` E um `skip_specs_reason`. Use esse
+      marcador só quando nenhum comportamento observável muda (refatoração, tooling, docs).
+      Nunca invente um requisito para satisfazer a validação.
+
+      A justificativa é obrigatória porque o marcador desliga a única regra que amarra a
+      change a um requisito. Sem requisito, a definição de pronto da change vira a própria
+      lista de tarefas dela - que já está toda marcada quando alguém vai conferir. Uma
+      change de "testes de contrato" e uma de "prontidão de entrega" passaram por aí e
+      terminaram sem nenhum requisito na spec viva.
 
       Seja breve. Como a change é construída pertence ao design.md.
 
@@ -49,6 +63,27 @@ artifacts:
       Não pertence a uma spec: nomes internos, escolha de bibliotecas, implementação passo a
       passo. Regra prática - se a implementação pode mudar sem mudar nada observável, não é
       material de spec.
+
+      Três reforços, cada um vindo de uma falha concreta:
+
+      **Capacidade de domínio precisa de requisito de exposição, ou marca de interna.** Se
+      uma spec exige uma transição, um estado ou uma operação, alguma spec precisa dizer
+      como alguém chega até ela - ou a spec declara explicitamente que é interna. Numa
+      auditoria real, uma transição obrigatória de estado foi especificada com regras de
+      ator e de guichê, o método existia no domínio, e nenhum caso de uso o chamava e nenhum
+      endpoint o expunha. Estado especificado e inalcançável em produção.
+
+      **Um exemplo dentro de um requisito precisa ser alcançável sob a regra que ele
+      ilustra.** Uma spec ilustrou numeração com "A001 para normal, P001 para prioridade"
+      sob uma regra de contador único por fila - regra que torna esse par impossível numa
+      fila mista. O exemplo é lido como contrato; se ele não pode acontecer, ou o exemplo
+      está errado ou a regra está.
+
+      **Requisito não funcional relevante é requisito.** Custo de consulta, limite de
+      volume, tempo de resposta e comportamento sob concorrência entram como requirement
+      quando importam. Nenhuma spec daquele projeto disse nada sobre custo de consulta, e o
+      dashboard carrega a fila inteira em memória a cada requisição sem violar spec alguma -
+      o que significa que nada nunca vai acusar isso.
 
       Escreva um arquivo por capacidade listada na proposta, em
       `specs/<caminho-da-capacidade>/spec.md` dentro do diretório da change.
@@ -138,11 +173,44 @@ artifacts:
       - **Decisões**: cada escolha central com a justificativa e as alternativas consideradas.
       - **Riscos / Compensações**: o que pode dar errado, cada um com sua mitigação.
       - **Plano de Migração**: passos de rollout e de rollback, quando for o caso.
-      - **Perguntas em Aberto**: incógnitas que podem ser respondidas depois com segurança. Omita a seção quando não houver nenhuma.
+      - **Perguntas em Aberto**: duas categorias, tipadas. Omita a seção quando não houver nenhuma.
+        - `Q-N · adiável` - incógnita genuína que pode esperar. Não muda spec, abordagem nem tasks.
+        - `FU-N · follow-up` - trabalho que é legítimo não fazer aqui e obrigatório fazer depois.
+          Carrega `fonte:` (quando vem do documento-fonte) e `destino:` (o que precisa existir).
 
       Uma questão em aberto é uma incógnita genuinamente adiável, não uma decisão que você
       pulou. Se a resposta mudaria as specs, a abordagem ou a divisão em tarefas, resolva
       agora - pergunte em vez de chutar.
+
+      **A terceira saída de uma pergunta em aberto.** Um caso real, e o mais caro que este
+      fluxo já perdeu: um design registrou corretamente que campos de cliente constavam do
+      documento-fonte, não existiam no modelo, e que criá-los violaria a regra de "nenhuma
+      migration" daquela change. A decisão estava impecável. Foi escrita como pergunta em
+      aberto, a change foi arquivada, e o endpoint público de atualização ficou sem nenhum
+      campo atualizável.
+
+      A instrução oferecia duas saídas - adiável dentro desta change, ou resolva agora - e o
+      caso não era nenhuma das duas. Era "legítimo não fazer aqui, obrigatório fazer depois".
+      Sem essa terceira categoria, virou adiável e evaporou.
+
+      Um `FU-` não é uma dúvida: é trabalho que esta change declara que fica para outra. Ele
+      precisa sair do design como Planned Change, como item de backlog registrado, ou
+      descartado com justificativa - nunca em silêncio.
+
+      **Divergir do documento-fonte.** Quando uma decisão contraria o que a fonte pede, ela
+      ganha uma subseção própria em Decisões, com quatro coisas: o que a fonte pedia, com a
+      referência de linha; o que se decidiu; por quê; e **o que se perde**.
+
+      A última é a que não costuma ser escrita e é a que importa. Divergir é legítimo e
+      frequentemente certo - o problema é divergir sem saber que se está divergindo. Uma
+      change redefiniu o envelope de erro e ganhou correlação por requisição, que a fonte
+      não previa; perdeu junto o código de erro estável que a fonte especificava com exemplo
+      concreto, e o design apresentou o envelope novo como se não houvesse contrato
+      anterior. Ninguém decidiu abrir mão daquilo: ninguém percebeu que estava abrindo.
+
+      As referências da fonte que a proposta registra em `## Origem` são o contexto para
+      isto. Com elas à mão, a divergência fica difícil de cometer por acidente; sem elas,
+      é o caminho natural.
 
   - id: tasks
     generates: tasks.md
@@ -154,8 +222,12 @@ artifacts:
     instruction: |
       Quebre o trabalho num checklist ordenado.
 
-      Antes de escrevê-lo, leia as Open Questions do design.md. Resolva com o usuário
-      qualquer uma que mudaria o que será construído.
+      Antes de escrevê-lo, leia as Perguntas em Aberto do design.md. Resolva com o usuário
+      qualquer `Q-` que mudaria o que será construído.
+
+      Um `FU-` é diferente: ele não bloqueia esta change, mas também não pode sumir com ela.
+      Leve cada um ao usuário e pergunte qual destino ele quer - Planned Change nova, item
+      de backlog, ou descarte com justificativa - antes de fechar as tarefas.
 
       Siga o template exatamente. A fase de implementação lê a sintaxe de checkbox para
       acompanhar o progresso, então uma linha que não seja `- [ ] X.Y ...` não é acompanhada.
@@ -168,6 +240,13 @@ artifacts:
       - toda tarefa diz como é verificada - um teste, um comando, um resultado observável
         ou um artefato entregue - dentro do próprio texto do checkbox. Adicione uma tarefa
         de verificação separada só para comportamento que atravessa várias tarefas
+      - **a condição de sucesso nunca pode ser um teste ser pulado, ignorado ou condicional.**
+        Se a change entrega um teste, a verificação é a execução dele. Se ele depende de um
+        serviço externo, a tarefa declara como esse serviço é provido
+      - **nunca derive valores do que já está persistido.** Um enum, um conjunto de estados,
+        uma constraint - todos vêm da spec, jamais do schema do banco, de uma migration ou
+        de dados existentes. Uma tarefa que diz "criar o enum com os literais já
+        persistidos" inverteu a fonte de verdade
 
       Exemplo:
       ```
@@ -194,6 +273,79 @@ artifacts:
       Uma tarefa sem essas tags continua funcionando exatamente como antes - as tags são
       só uma dica de agendamento, nunca obrigatórias.
 
+      **Bloco de evidência.** Ao marcar uma tarefa, registre em linhas indentadas logo
+      abaixo o que foi de fato executado:
+
+      ```
+      - [x] 3.3 Teste de concorrência 100x10
+            cmd: TEST_DATABASE_URL=... pytest -m integration -k scale
+            resultado: 2 passed in 8.4s
+            em: 2026-09-05T14:22Z
+      ```
+
+      Opcional e retrocompatível, no mesmo espírito das tags acima. E deliberadamente
+      modesto: isto não é prova, porque quem marca o box escreve estas linhas também. É
+      reprodutibilidade - o `cmd` pode ser rodado de novo, por uma pessoa ou pela
+      verificação, e comparado com o `resultado`. Transforma "confie em mim" em "confira
+      você mesmo", que é uma afirmação menor e honesta.
+
+      Copie o resultado como ele saiu. Um `resultado` que diz `skipped`, `no tests ran` ou
+      `0 selected` para o alvo declarado é um achado a levantar, não uma linha a maquiar.
+
+      **Por que a regra sobre teste pulado existe.** Num projeto real, três tarefas foram
+      escritas assim e as três foram marcadas como concluídas:
+
+      - "executar a suíte completa, confirmando que os testes PostgreSQL continuam
+        condicionados a TEST_DATABASE_URL"
+      - "criar teste opt-in, confirmar que a suíte padrão o ignora sem URL"
+      - "executar a suíte completa com pytest -q" - comando que pula o teste E2E que aquela
+        mesma change entregou
+
+      A change entregou um teste de ponta a ponta e a verificação dela confirmou que ele é
+      ignorado. Nenhum artefato do projeto registra que a suíte PostgreSQL ou o E2E algum dia
+      tenham passado. O efeito prático foi grave: a garantia central do produto - não entregar
+      o mesmo item a dois atendentes - dependia de `SELECT ... FOR UPDATE SKIP LOCKED`, que o
+      SQLite da suíte padrão descarta em silêncio, e nunca foi exercida.
+
+      Uma verificação que confirma um skip é uma tarefa que se autoaprova.
+
+      **Por que a regra sobre derivar do schema existe.** No mesmo projeto, uma change
+      inventou o valor `transferred` numa check constraint sem nenhum requisito por trás. A
+      change seguinte recebeu a tarefa "criar o tipo de evento com os literais JÁ
+      PERSISTIDOS" - e assim o schema virou fonte de verdade acima da spec. As duas changes
+      seguintes adiaram, e nada nunca implementou o comportamento. Sobrou um valor de enum
+      no domínio e no banco que requisito nenhum justifica, e que ninguém consegue remover
+      com segurança porque não se sabe o que ele deveria significar.
+
+      **A change de entrega.** Quando a change é a que fecha um projeto ou um milestone e
+      produz documentação pública - README, guia de operação, referência de API - três
+      regras extras valem:
+
+      1. **As tarefas saem do que a fonte exige, não de prosa livre.** Se o documento-fonte
+         enumera o que a documentação precisa ter, gere uma tarefa por item enumerado. Num
+         projeto real a fonte listava dez itens para o README; a change de entrega escreveu
+         suas tarefas de cabeça e dois deles - arquitetura e migrations - simplesmente não
+         apareceram na lista.
+      2. **Checklist em documento shipado é preenchido ou removido.** Um "checklist de
+         aceite" com sete caixas desmarcadas foi entregue por uma tarefa marcada `[x]`.
+      3. **Voz presente e completa.** Documento público não fala na voz de uma change
+         intermediária. "A autorização chega na change de políticas" e "filas herdarão estas
+         políticas pelas próximas changes" foram shipados depois de as duas coisas já terem
+         acontecido, e "o typecheck cobre os módulos alterados desta change" vazou vocabulário
+         interno para o leitor externo. Escreva sobre o sistema como ele é agora.
+
+      Conteúdo mínimo de um README de entrega, para adaptar ao que o projeto é - cada item
+      que sobreviver à adaptação vira uma tarefa: objetivo do sistema; **arquitetura**
+      (camadas, regra de dependência, onde cada coisa mora); requisitos de ambiente;
+      inicialização em ambiente limpo; variáveis de configuração e quais são só de
+      desenvolvimento; **migrations** (como rodar, como criar, quando rodam sozinhas);
+      credenciais de desenvolvimento e como desligá-las; contrato da API; **como rodar os
+      testes, incluindo os que a suíte padrão pula e como habilitá-los**; matriz de
+      permissões; diagnóstico operacional.
+
+      O item dos testes merece destaque: uma suíte que termina verde pulando trinta e um
+      testes, documentada como "rode pytest", engana quem lê.
+
       Use as specs para o que construir e o design para como construir.
 
 apply:
@@ -203,6 +355,11 @@ apply:
     Leia os artefatos da change, percorra as tarefas não marcadas em ordem e marque cada
     box conforme a verificação dela passa. Pare e pergunte quando bater num impedimento ou
     numa decisão que não foi tomada.
+
+    Ao marcar, registre a evidência em linhas indentadas sob a tarefa - `cmd:` com o comando
+    que você rodou, `resultado:` com a saída dele como ela saiu, `em:` com o momento. Copie o
+    resultado, não o resuma. Um resultado que diz `skipped`, `no tests ran` ou `0 selected`
+    para o alvo declarado é um achado a levantar com o usuário, não uma linha a maquiar.
 
     Numa change com `parallel: true`, rodada num harness que suporta dispatch paralelo, as
     tarefas prontas e sem conflito declarado entre si podem ser trabalhadas em lote, cada

@@ -15,6 +15,7 @@ import { parsePlannedChange } from './planned-change.js';
 import { validatePlannedChangeContent } from './validate.js';
 import { safeResolve } from './paths.js';
 import { readEvidence } from './evidence.js';
+import { pendingFollowUps, readFollowUps } from '../change/followups.js';
 import { parseArchiveIdentity, sortArchiveDirs } from './archive-identity.js';
 import { sha256, sourceHash, type HashableSource } from './hashes.js';
 import { resolveWithinRoot } from './paths.js';
@@ -27,6 +28,7 @@ import {
   type Readiness,
 } from './state.js';
 import type { PlanManifest, MaterializationState, PlanStatusValue as DeclaredStatus } from './model.js';
+import { projectedRevision } from './render.js';
 import type { RoadmapRow } from './render.js';
 
 export interface PlannedChangeView {
@@ -179,7 +181,8 @@ export async function computeProjectStatus(
       const issues = validatePlannedChangeContent(
         briefContent,
         { id: change.id, slug: change.slug },
-        ref.path
+        ref.path,
+        { hasSourceDocuments: manifest.source_documents.length > 0 }
       ).filter((issue) => issue.level === 'ERROR');
       if (issues.length > 0) invalidBrief.set(change.id, issues.map((issue) => issue.message));
     }
@@ -286,6 +289,8 @@ export async function computeProjectStatus(
   const archived = count((view) => view.execution === 'archived');
   const total = views.length;
 
+  const projected = projectedRevision(await readFileIfExists(paths.planDoc));
+
   const diagnostics = collectDiagnostics({
     workspace,
     manifest,
@@ -311,6 +316,39 @@ export async function computeProjectStatus(
       // Escopo/Critérios macro), so the actual fix is supplying that content,
       // via a bundle or by hand, not re-running the command that found it.
       fix: `preencha Escopo e Critérios macro de ${id2} com um bundle replacePlannedChange (specs project apply --dry-run --json), ou edite planned-changes/ à mão`,
+    });
+  }
+
+  // Follow-ups declared in an ACTIVE change's design. Once the change is
+  // archived the design is a record, not a to-do list — but between declaring
+  // one and archiving is exactly the window where it can still be dispatched
+  // cheaply, and where nothing used to say it existed.
+  for (const view of views) {
+    if (!view.link || view.execution === 'archived') continue;
+    const changeDir = safeResolve(workspace.changesPath, view.link.name);
+    if (changeDir === undefined) continue;
+    const pending = pendingFollowUps(await readFollowUps(changeDir));
+    for (const followUp of pending) {
+      diagnostics.push({
+        level: 'WARNING',
+        code: 'pending_followup',
+        path: `changes.${view.id}.design`,
+        message: `${view.id} declara ${followUp.id} sem destino: ${followUp.text}`,
+        fix: `Crie o incremento que o cobre (specs project apply com addChange), ou marque ${followUp.id} como despachado com a justificativa`,
+      });
+    }
+  }
+
+  if (projected !== undefined && projected !== manifest.revision) {
+    diagnostics.push({
+      level: 'WARNING',
+      code: 'stale_projection',
+      path: 'plan.md',
+      message: `plan.md está projetado da revisão ${projected}, mas o manifesto está na ${manifest.revision}`,
+      // The safety net behind `reprojectRoadmap`: every mutating path already
+      // re-emits the block, so this fires for a projection someone edited by
+      // hand, a write that failed, or a path added later without wiring.
+      fix: 'specs project sync',
     });
   }
 
@@ -655,7 +693,8 @@ export async function showProjectChange(
   }
 
   let plannedChange: unknown = null;
-  const ref = status.manifest.changes.find((entry) => entry.id === changeId)?.planned_change;
+  const record = status.manifest.changes.find((entry) => entry.id === changeId);
+  const ref = record?.planned_change;
   if (ref) {
     const briefAbsolute = safeResolve(
       path.join(workspace.projectRoot, status.plan.path),
@@ -690,6 +729,9 @@ export async function showProjectChange(
   return {
     change: view,
     plannedChange,
+    // Already structured, so whoever writes the proposal does not have to
+    // re-parse the brief's Markdown to know what this increment answers for.
+    sourceRefs: record?.source_refs ?? [],
     dependencies: resolve(view.dependsOn),
     dependents: resolve(view.unlocks),
     ancestors: status.graph.ancestors(changeId),

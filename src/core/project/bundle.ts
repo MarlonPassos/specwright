@@ -136,6 +136,16 @@ export interface BundleResult {
   documents: DocumentWrite[];
   /** Increment ids whose record changed and now touch a completed increment. */
   completedTouched: string[];
+  /**
+   * Re-decompositions THIS bundle performs: the increment it retires and the
+   * increments that take its place.
+   *
+   * Reported so the caller can check that the source pointers the retired
+   * increment carried survive the split. A plan can hold older supersessions
+   * from previous bundles; those are settled history and are not re-litigated
+   * here.
+   */
+  supersessions: Array<{ from: string; to: string[] }>;
 }
 
 export interface ApplyContext {
@@ -195,6 +205,7 @@ export function applyBundle(
   const working: PlanManifest = structuredClone(manifest);
   const idMap: Record<string, string> = {};
   const pendingBriefs: PendingBrief[] = [];
+  const supersessions: BundleResult['supersessions'] = [];
   const briefRenames: Array<{ from: string; to: string }> = [];
   const documents: DocumentWrite[] = [];
   const completedTouched = new Set<string>();
@@ -275,6 +286,7 @@ export function applyBundle(
     superseded_by: [],
     milestone: null,
     planned_change: null,
+    source_refs: [],
     link: null,
   });
 
@@ -359,6 +371,7 @@ export function applyBundle(
         }
         original.planning_state = 'cancelled';
         original.superseded_by = newIds;
+        supersessions.push({ from: original.id, to: [...newIds] });
         break;
       }
       case 'mergeChanges': {
@@ -380,6 +393,7 @@ export function applyBundle(
           merged.depends_on.forEach((d) => absorbed.add(d));
           merged.planning_state = 'cancelled';
           merged.superseded_by = [survivor.id];
+          supersessions.push({ from: merged.id, to: [survivor.id] });
         }
         survivor.depends_on = [...absorbed].filter(
           (d) => d !== survivor.id && !mergedIds.includes(d)
@@ -463,6 +477,7 @@ export function applyBundle(
     briefRenames,
     documents,
     completedTouched: [...completedTouched],
+    supersessions,
   };
 }
 
@@ -660,4 +675,118 @@ export function renderBriefFromSpec(
   if (spec?.referencias) sections['Referências da fonte'] = spec.referencias.map((line) => `- ${line}`).join('\n');
   if (spec?.readiness) sections['Readiness e handoff'] = spec.readiness;
   return renderPlannedChange({ id, slug, title, planRevision, sections });
+}
+
+export interface CoverageLoss {
+  /** The increment being retired. */
+  from: string;
+  /** The increments taking its place. */
+  to: string[];
+  /** Source documents it cited that none of them cite. */
+  lostPaths: string[];
+  /** The full pointers behind `lostPaths`, for the message. */
+  lostRefs: Array<{ path: string; lines?: string }>;
+}
+
+/** `371-573` → `[371, 573]`; `371` → `[371, 371]`; anything else → undefined. */
+function parseRange(lines: string | undefined): [number, number] | undefined {
+  if (lines === undefined) return undefined;
+  const span = /^(\d+)\s*-\s*(\d+)$/.exec(lines.trim());
+  if (span) {
+    const from = Number(span[1]);
+    const to = Number(span[2]);
+    return from <= to ? [from, to] : [to, from];
+  }
+  const single = /^(\d+)$/.exec(lines.trim());
+  return single ? [Number(single[1]), Number(single[1])] : undefined;
+}
+
+/**
+ * The part of `range` that no interval in `covers` accounts for.
+ *
+ * Used to decide whether a split PARTITIONED a range or just kept a slice of
+ * it. Splitting `371-573` into `371-400` and `401-573` leaves nothing over and
+ * is the job being done correctly; keeping only `371-400` leaves `401-573` with
+ * nobody answering for it, and that is a loss whether or not the document is
+ * still cited somewhere.
+ */
+function uncovered(range: [number, number], covers: Array<[number, number]>): boolean {
+  let [from, to] = range;
+  for (const [start, end] of [...covers].sort((a, b) => a[0] - b[0])) {
+    if (end < from) continue;
+    if (start > from) return true;
+    from = Math.max(from, end + 1);
+    if (from > to) return false;
+  }
+  return from <= to;
+}
+
+/**
+ * Which source pointers a re-decomposition drops on the floor.
+ *
+ * A split or a merge allocates fresh records and writes fresh briefs. Nothing
+ * used to compare the increment being retired with the ones taking its place,
+ * so the whole `Referências da fonte` section could vanish and `apply` would
+ * accept it without a word — including under `--dry-run`, which is where the
+ * decision is actually made. That is how 22 of 22 briefs lost their pointers in
+ * one re-decomposition, and the six code gaps that followed had that as their
+ * shared root.
+ *
+ * Coverage is decided at two levels, because one alone is not enough.
+ *
+ * By PATH: a source document no successor mentions at all is unambiguous. This
+ * is the whole answer when the pointer carries no numeric range.
+ *
+ * By RANGE, when both sides carry numeric line spans: the successors' spans on
+ * that path are unioned, and what is left over is lost. Path alone was too weak
+ * to be useful in the common case of a plan with ONE source document — every
+ * split cites it somewhere, so nothing ever fired, no matter how much of the
+ * document stopped being answered for. Range alone would be too strict: it is
+ * the UNION that matters, so a split that partitions `371-573` into `371-400`
+ * and `401-573` is silent, as it should be.
+ */
+export function supersessionCoverage(
+  manifest: PlanManifest,
+  supersessions: BundleResult['supersessions']
+): CoverageLoss[] {
+  const byId = new Map(manifest.changes.map((change) => [change.id, change]));
+  const losses: CoverageLoss[] = [];
+
+  for (const { from, to } of supersessions) {
+    const retired = byId.get(from);
+    const refs = retired?.source_refs ?? [];
+    if (refs.length === 0) continue;
+
+    const successorRefs = to.flatMap((id) => byId.get(id)?.source_refs ?? []);
+    const coveredPaths = new Set(successorRefs.map((ref) => ref.path));
+
+    const lostRefs = refs.filter((ref) => {
+      if (!coveredPaths.has(ref.path)) return true;
+      const range = parseRange(ref.lines);
+      // No numeric range on either side: the path is cited, and that is all
+      // this can honestly conclude.
+      if (range === undefined) return false;
+      const covers = successorRefs
+        .filter((other) => other.path === ref.path)
+        .map((other) => parseRange(other.lines))
+        .filter((span): span is [number, number] => span !== undefined);
+      if (covers.length === 0) return false;
+      return uncovered(range, covers);
+    });
+    if (lostRefs.length === 0) continue;
+
+    losses.push({
+      from,
+      to: [...to],
+      lostPaths: [...new Set(lostRefs.map((ref) => ref.path))],
+      lostRefs,
+    });
+  }
+
+  return losses;
+}
+
+/** `docs/x.md:1-2` — the shape a brief writes, for a message a human can act on. */
+export function formatSourceRef(ref: { path: string; lines?: string }): string {
+  return ref.lines === undefined ? ref.path : `${ref.path}:${ref.lines}`;
 }

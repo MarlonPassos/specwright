@@ -44,6 +44,7 @@ export function change(overrides: Partial<ProjectChange> & { id: string; slug: s
     superseded_by: [],
     milestone: null,
     planned_change: null,
+    source_refs: [],
     link: null,
     ...overrides,
   };

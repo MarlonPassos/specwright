@@ -344,10 +344,27 @@ export function registerProjectCommands(program: Command): void {
           printJson(result);
           return;
         }
+        // The validation of the resulting plan is part of the output, not a
+        // separate command someone has to remember to run. An increment
+        // materialised as the bare skeleton is invalid ON PURPOSE, so this
+        // reports and never changes the exit code.
+        const findings = result.validation.flatMap((report) =>
+          report.issues.map((issue) => `  ${issue.level} ${issue.path}: ${issue.message}`)
+        );
         printLines([
           result.dryRun ? 'Prévia (nada foi escrito):' : 'Materialização concluída.',
           ...result.written.map((file) => `  + ${file}`),
           ...result.skipped.map((entry) => `  = ${entry.id} (${entry.reason})`),
+          ...(result.skeletons.length > 0
+            ? [
+                '',
+                `Esqueleto vazio (§7.5) em: ${result.skeletons.join(', ')} — Escopo e Critérios`,
+                'macro ficam vazios até alguém preenchê-los, e o incremento fica bloqueado.',
+              ]
+            : []),
+          ...(findings.length > 0
+            ? ['', `Validação do plano — ${findings.length} achado(s):`, ...findings]
+            : ['', 'Validação do plano: nenhum achado.']),
         ]);
       } catch (error) {
         fail(error, { json, payload: { generated: false } });
@@ -520,12 +537,19 @@ export function registerProjectCommands(program: Command): void {
     .option('--file <path>', 'Lê o bundle deste arquivo em vez do stdin')
     .option('--dry-run', 'Imprime diff e impacto sem escrever nada')
     .option('--allow-completed', 'Permite uma operação atingir um incremento concluído')
+    .option('--strict', 'Recusa uma re-decomposição que perde a cobertura de um documento-fonte')
     .option('--expect-revision <n>', 'Falha se a revisão no disco diferir')
     .option('--json', 'Saída em JSON')
     .action(async function (
       this: Command,
       planId: string | undefined,
-      options: { file?: string; dryRun?: boolean; allowCompleted?: boolean; expectRevision?: string }
+      options: {
+        file?: string;
+        dryRun?: boolean;
+        strict?: boolean;
+        allowCompleted?: boolean;
+        expectRevision?: string;
+      }
     ) {
       const json = wantsJson(this);
       try {
@@ -543,6 +567,7 @@ export function registerProjectCommands(program: Command): void {
         }
         const result = await applyPlanBundle(workspace, id, parsed, {
           dryRun: options.dryRun,
+          strict: options.strict,
           allowCompleted: options.allowCompleted,
           expectRevision:
             options.expectRevision !== undefined ? Number(options.expectRevision) : undefined,

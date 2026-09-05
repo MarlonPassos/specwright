@@ -120,7 +120,7 @@ export const PLANNED_CHANGE_FIELDS: BundleField[] = [
   opt('criteriosMacro', 'Array<string>'),
   opt('riscos', 'Array<string>'),
   opt('notas', 'Array<string>'),
-  opt('referencias', 'Array<string>'),
+  opt('referencias', 'Array<string>  — obrigatório quando o plano declara sourceDocuments'),
   opt('readiness', 'string'),
 ];
 
@@ -160,8 +160,16 @@ export const BUNDLE_EXAMPLE = {
       priority: 'critical' as const,
       plannedChange: {
         objetivo: 'Estabelecer a base de comandos.',
-        escopo: ['parser de argumentos', 'códigos de saída'],
+        escopo: [
+          'parser de argumentos  [fonte: §2 / 40-70]',
+          'códigos de saída  [fonte: §2 / 71-88]',
+        ],
         criteriosMacro: ['build verde', 'ajuda documentada'],
+        // The example declares a source document, so it has to model the rule
+        // it teaches: with `sourceDocuments` set, a brief that points nowhere
+        // is an ERROR, and an example that fails its own validation is worse
+        // than no example.
+        referencias: ['docs/PLANO-DE-MELHORIAS.md:40-88'],
       },
     },
     {

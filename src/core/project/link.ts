@@ -11,6 +11,7 @@ import { archiveNamePattern, parseArchiveIdentity } from './archive-identity.js'
 import { safeResolve } from './paths.js';
 import { assertTransition, executionOf } from './state.js';
 import { computeProjectStatus } from './status.js';
+import { reprojectRoadmap } from './roadmap.js';
 
 const KEBAB = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 const ARCHIVE_DIR_NAME = /^\d{4}-\d{2}-\d{2}-[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
@@ -127,6 +128,8 @@ export async function linkChange(
     changes: manifest.changes.map((entry) => (entry.id === changeId ? linked : entry)),
   });
 
+  await reprojectRoadmap(workspace, planId);
+
   const evidence = await readEvidence(workspace, link);
   const execution = executionOf(link, evidence);
   return {
@@ -176,6 +179,7 @@ export async function unlinkChange(
       entry.id === changeId ? { ...entry, link: null } : entry
     ),
   });
+  await reprojectRoadmap(workspace, planId);
   return { unlinked: true, id: changeId, change: name, revision: next.revision };
 }
 
@@ -305,6 +309,7 @@ export async function adoptChange(
     superseded_by: [],
     milestone: null,
     planned_change: null,
+    source_refs: [],
     link,
   };
 
@@ -312,6 +317,8 @@ export async function adoptChange(
     ...manifest,
     changes: [...manifest.changes, record],
   });
+
+  await reprojectRoadmap(workspace, planId);
 
   return {
     adopted: true,
@@ -376,6 +383,8 @@ export async function setPlanningState(
       return updated;
     }),
   });
+
+  await reprojectRoadmap(workspace, planId);
 
   const status = await computeProjectStatus(workspace, planId);
   const view = status.changes.find((entry) => entry.id === changeId)!;

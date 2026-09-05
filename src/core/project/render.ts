@@ -16,6 +16,23 @@ export interface RoadmapInput {
   rows: Map<string, RoadmapRow>;
 }
 
+/** The footer stamp `renderRoadmapBlock` writes, read back. */
+const PROJECTED_REVISION = /Projetado de plan\.yaml — revision (\d+)/;
+
+/**
+ * The revision the projection in a `plan.md` was built from, or `undefined`
+ * when the document carries no projection to read.
+ *
+ * The footer has always carried this number; nothing read it back, so a
+ * projection could sit five revisions behind and say so in plain text with
+ * nobody comparing.
+ */
+export function projectedRevision(planDoc: string | undefined): number | undefined {
+  if (planDoc === undefined) return undefined;
+  const match = PROJECTED_REVISION.exec(planDoc);
+  return match ? Number(match[1]) : undefined;
+}
+
 /** Builds the delimited roadmap block projected from the manifest. */
 export function renderRoadmapBlock(input: RoadmapInput): string {
   const { manifest, rows } = input;

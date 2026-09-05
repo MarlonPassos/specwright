@@ -6,7 +6,9 @@ import { workspaceAt } from '../../src/core/workspace.js';
 
 async function initProject(): Promise<string> {
   const dir = await makeTempDir();
-  const result = await runCli(['init', '.', '--json'], dir);
+  // Explicit: `init` now defaults to the harness in use, and these tests are
+  // about what every harness generates.
+  const result = await runCli(['init', '.', '--harnesses', 'all', '--json'], dir);
   expect(result.code).toBe(0);
   return dir;
 }
@@ -43,6 +45,7 @@ describe('spec CLI', () => {
       'spec-project-next',
       'spec-project-propose-batch',
       'spec-project-refine',
+      'spec-project-verify',
       'spec-loop',
     ]);
 
@@ -96,10 +99,12 @@ describe('spec CLI', () => {
 
   it('initialises a workspace and writes the harness files', async () => {
     const dir = await initProject();
-    const listing = parseJson((await runCli(['init', '.', '--json'], dir)).stdout);
+    const listing = parseJson(
+      (await runCli(['init', '.', '--harnesses', 'all', '--json'], dir)).stdout
+    );
 
     expect(listing.created).toBe(false);
-    expect(listing.files).toHaveLength(60);
+    expect(listing.files).toHaveLength(64);
     for (const file of listing.files) {
       await expect(fs.stat(path.join(dir, file))).resolves.toBeTruthy();
     }

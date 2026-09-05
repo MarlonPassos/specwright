@@ -35,6 +35,7 @@ describe('dashboard data', () => {
     expect(data.changes[0].tasks).toEqual({
       total: 1,
       completed: 0,
+      completedWithoutEvidence: 0,
       open: [{ number: '1.1', text: expect.any(String), group: expect.any(String) }],
     });
     expect(data.changes[0].next).toBe('/spec-implement');

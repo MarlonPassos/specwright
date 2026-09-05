@@ -4,6 +4,7 @@ import {
   renderPlannedChange,
   splitFrontmatter,
   sectionHasText,
+  sourceRefsOf,
 } from '../../src/core/project/planned-change.js';
 
 const VALID = `---
@@ -128,5 +129,82 @@ describe('renderPlannedChange — frontmatter serializado, nunca concatenado', (
     const text = renderPlannedChange({ id: 'CH-001', slug: 'x', title: 'Título simples', planRevision: 2 });
     expect(text).toContain('title: Título simples');
     expect(text.startsWith('---\nschema_version: 1\nid: CH-001\nslug: x\n')).toBe(true);
+  });
+});
+
+describe('sectionHasText — comentário não é conteúdo', () => {
+  const withScope = (scope: string): string => VALID.replace('- início de sessão', scope);
+
+  it('lê uma seção que só tem comentário como vazia', () => {
+    const parsed = parsePlannedChange(withScope('<!-- TODO: preencher -->'));
+    expect(sectionHasText(parsed.sections, 'Escopo')).toBe(false);
+  });
+
+  it('lê conteúdo real ao lado de um comentário como preenchida', () => {
+    const parsed = parsePlannedChange(withScope('<!-- guia -->\n- entrega  [fonte: §1 / 1-9]'));
+    expect(sectionHasText(parsed.sections, 'Escopo')).toBe(true);
+  });
+
+  it('o esqueleto do §7.5 continua inválido apesar da orientação que ele carrega', () => {
+    const skeleton = renderPlannedChange({
+      id: 'CH-001',
+      slug: 'x',
+      title: 'X',
+      planRevision: 0,
+    });
+    const parsed = parsePlannedChange(skeleton);
+    expect(skeleton).toContain('[fonte: §N / linhas]');
+    expect(sectionHasText(parsed.sections, 'Escopo')).toBe(false);
+    expect(sectionHasText(parsed.sections, 'Critérios macro')).toBe(false);
+    expect(sectionHasText(parsed.sections, 'Referências da fonte')).toBe(false);
+  });
+});
+
+describe('source refs', () => {
+  const brief = (referencias: string): string =>
+    VALID.replace('# Critérios macro', `# Referências da fonte\n\n${referencias}\n\n# Critérios macro`);
+
+  it('reads path and line range off each list item', () => {
+    expect(sourceRefsOf(brief('- docs/plano.md:371-573\n- docs/plano.md:819-928'))).toEqual([
+      { path: 'docs/plano.md', lines: '371-573' },
+      { path: 'docs/plano.md', lines: '819-928' },
+    ]);
+  });
+
+  it('keeps a bare path with no range, and a § citation as written', () => {
+    expect(sourceRefsOf(brief('- docs/plano.md\n- docs/plano.md:§10'))).toEqual([
+      { path: 'docs/plano.md' },
+      { path: 'docs/plano.md', lines: '§10' },
+    ]);
+  });
+
+  it('strips backticks, bold and a trailing em-dash comment', () => {
+    expect(sourceRefsOf(brief('- **`docs/plano.md:12-20`** — a numeração segura'))).toEqual([
+      { path: 'docs/plano.md', lines: '12-20' },
+    ]);
+  });
+
+  it('de-duplicates identical pointers and skips lines that are not list items', () => {
+    expect(sourceRefsOf(brief('Ver também:\n- docs/plano.md:1-2\n- docs/plano.md:1-2\n'))).toEqual([
+      { path: 'docs/plano.md', lines: '1-2' },
+    ]);
+  });
+
+  it('marca como divergente a referência que o brief assinala', () => {
+    expect(sourceRefsOf(brief('- docs/plano.md:1008-1035 · divergente'))).toEqual([
+      { path: 'docs/plano.md', lines: '1008-1035', supersedes: true },
+    ]);
+    expect(sourceRefsOf(brief('- docs/plano.md:12 (divergente)'))).toEqual([
+      { path: 'docs/plano.md', lines: '12', supersedes: true },
+    ]);
+  });
+
+  it('não marca a referência comum', () => {
+    expect(sourceRefsOf(brief('- docs/plano.md:1-9'))[0].supersedes).toBeUndefined();
+  });
+
+  it('is empty when the section is absent, and never throws on one', () => {
+    expect(sourceRefsOf(VALID)).toEqual([]);
+    expect(sourceRefsOf(brief('- '))).toEqual([]);
   });
 });
