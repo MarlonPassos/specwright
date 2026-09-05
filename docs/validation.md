@@ -103,8 +103,21 @@ plano em `draft` com briefs já materializados.
 | ERROR | Frontmatter ausente, inválido, ou com `id`/`slug` divergentes do manifesto |
 | ERROR | Nome do arquivo diferente de `<id>-<slug>.md` |
 | ERROR | Seção `Objetivo`, `Escopo` ou `Critérios macro` ausente ou vazia |
+| ERROR | Seção `Referências da fonte` ausente ou vazia **quando o plano declara `source_documents`** |
 | ERROR | Cabeçalho de delta (`## ADDED/MODIFIED/REMOVED/RENAMED Requirements`) |
 | WARNING | Seção recomendada (`Motivação`, `Riscos`, `Fora do escopo`, …) ausente ou vazia |
+
+`Referências da fonte` é a única seção cuja obrigatoriedade depende do plano.
+Com `source_documents` declarado, um brief que não aponta para lugar nenhum não
+tem rastreabilidade — ninguém consegue conferir o escopo contra nada — e isso é
+ERROR. Sem documento-fonte não há para onde apontar, e a seção volta a ser
+apenas recomendada, exatamente como era.
+
+Os warnings de seção recomendada são coletados **sempre**, no disco e em
+memória. `--strict` decide o veredito (um warning deixa de ser tolerado), nunca
+quais achados existem: as duas validações de brief precisam enxergar o mesmo
+documento do mesmo jeito, senão `apply --dry-run` e o `validate` seguinte
+discordam sobre os mesmos bytes.
 | WARNING | Conteúdo editado à mão (`modified`) ou fonte alterada (`outdated`) num incremento `planned` |
 
 ## Vínculo (Project Planning)

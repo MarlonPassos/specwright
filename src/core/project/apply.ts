@@ -207,7 +207,9 @@ export async function applyPlanBundle(
       continue;
     }
     proposedIssues.push(
-      ...validatePlannedChangeContent(content, { id: record.id, slug: record.slug }, ref.path).map(
+      ...validatePlannedChangeContent(content, { id: record.id, slug: record.slug }, ref.path, {
+        hasSourceDocuments: result.manifest.source_documents.length > 0,
+      }).map(
         (issue) => ({ ...issue, changeId: record.id })
       )
     );

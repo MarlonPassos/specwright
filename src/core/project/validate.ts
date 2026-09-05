@@ -11,9 +11,9 @@ import { validateLinkEvidence } from './evidence.js';
 import { sha256, sourceHash, type HashableSource } from './hashes.js';
 import { renderManifest, type PlanManifest, type ProjectChange } from './model.js';
 import {
-  REQUIRED_PLANNED_CHANGE_SECTIONS,
   PLANNED_CHANGE_SECTIONS,
   parsePlannedChange,
+  requiredPlannedChangeSections,
   sectionHasText,
 } from './planned-change.js';
 import { parseManifest } from './repository.js';
@@ -27,7 +27,7 @@ import {
   type PlanPaths,
 } from './paths.js';
 
-const OPTIONAL_STRICT_SECTIONS: Array<(typeof PLANNED_CHANGE_SECTIONS)[number]> = [
+const RECOMMENDED_SECTIONS: Array<(typeof PLANNED_CHANGE_SECTIONS)[number]> = [
   'Motivação',
   'Fora do escopo',
   'Riscos',
@@ -35,6 +35,19 @@ const OPTIONAL_STRICT_SECTIONS: Array<(typeof PLANNED_CHANGE_SECTIONS)[number]> 
   'Referências da fonte',
   'Readiness e handoff',
 ];
+
+/**
+ * The recommended headings, minus any the plan promotes to required.
+ *
+ * Without this subtraction a plan with source documents would report
+ * `Referências da fonte` twice for the same brief — once as ERROR, once as
+ * WARNING — which reads as two problems where there is one.
+ */
+function recommendedSections(
+  required: readonly string[]
+): Array<(typeof PLANNED_CHANGE_SECTIONS)[number]> {
+  return RECOMMENDED_SECTIONS.filter((heading) => !required.includes(heading));
+}
 
 interface Ctx {
   projectRoot: string;
@@ -505,8 +518,9 @@ export function validatePlannedChangeContent(
   content: string,
   record: { id: string; slug: string },
   relative: string,
-  options: { strict?: boolean } = {}
+  options: { hasSourceDocuments?: boolean } = {}
 ): ValidationIssue[] {
+  const required = requiredPlannedChangeSections(options.hasSourceDocuments === true);
   const issues: ValidationIssue[] = [];
   const parsed = parsePlannedChange(content);
 
@@ -533,7 +547,7 @@ export function validatePlannedChangeContent(
     }
   }
 
-  for (const heading of REQUIRED_PLANNED_CHANGE_SECTIONS) {
+  for (const heading of required) {
     if (!sectionHasText(parsed.sections, heading)) {
       issues.push({
         level: 'ERROR',
@@ -551,15 +565,19 @@ export function validatePlannedChangeContent(
     });
   }
 
-  if (options.strict) {
-    for (const heading of OPTIONAL_STRICT_SECTIONS) {
-      if (!sectionHasText(parsed.sections, heading)) {
-        issues.push({
-          level: 'WARNING',
-          path: `${relative}:${heading}`,
-          message: `a seção "# ${heading}" está ausente ou vazia`,
-        });
-      }
+  // Emitted unconditionally, like the on-disk validator does. These used to be
+  // gated on `strict` here and not there, so the same brief produced different
+  // findings depending on which function asked — and `apply --dry-run`
+  // disagreed with the `validate` that ran right after it. `--strict` decides
+  // the VERDICT (`buildReport` refuses to tolerate warnings), never which
+  // issues are collected.
+  for (const heading of recommendedSections(required)) {
+    if (!sectionHasText(parsed.sections, heading)) {
+      issues.push({
+        level: 'WARNING',
+        path: `${relative}:${heading}`,
+        message: `a seção "# ${heading}" está ausente ou vazia`,
+      });
     }
   }
 
@@ -614,7 +632,8 @@ async function validatePlannedChange(
     });
   }
 
-  for (const heading of REQUIRED_PLANNED_CHANGE_SECTIONS) {
+  const required = requiredPlannedChangeSections(manifest.source_documents.length > 0);
+  for (const heading of required) {
     if (!sectionHasText(parsed.sections, heading)) {
       issues.push({
         level: 'ERROR',
@@ -632,7 +651,7 @@ async function validatePlannedChange(
     });
   }
 
-  for (const heading of OPTIONAL_STRICT_SECTIONS) {
+  for (const heading of recommendedSections(required)) {
     if (!sectionHasText(parsed.sections, heading)) {
       issues.push({
         level: 'WARNING',

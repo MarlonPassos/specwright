@@ -35,8 +35,28 @@ export const PLANNED_CHANGE_SECTIONS = [
   'Readiness e handoff',
 ] as const;
 
-/** The three headings that must be present and non-empty. */
+/** The headings that must be present and non-empty in every Planned Change. */
 export const REQUIRED_PLANNED_CHANGE_SECTIONS = ['Objetivo', 'Escopo', 'Critérios macro'] as const;
+
+/**
+ * The headings a Planned Change must carry, given whether its plan was built
+ * from source documents.
+ *
+ * `Referências da fonte` used to be merely recommended, so a brief that cited
+ * nothing produced a WARNING — which, without `--strict`, reprova nothing. A
+ * plan WITH a source document and a brief WITHOUT a pointer back to it has no
+ * traceability at all, and that gap is not a matter of taste: nobody can check
+ * the scope against anything. When the plan declares no source document there
+ * is nothing to point at, and the rule stays exactly as it was — a plan built
+ * from conversation alone sees no new error.
+ */
+export function requiredPlannedChangeSections(
+  hasSourceDocuments: boolean
+): readonly (typeof PLANNED_CHANGE_SECTIONS)[number][] {
+  return hasSourceDocuments
+    ? [...REQUIRED_PLANNED_CHANGE_SECTIONS, 'Referências da fonte']
+    : [...REQUIRED_PLANNED_CHANGE_SECTIONS];
+}
 
 /** `## ADDED Requirements` and friends must never appear in a Planned Change. */
 export const DELTA_HEADER_PATTERN = /^(ADDED|MODIFIED|REMOVED|RENAMED)\s+Requirements$/i;

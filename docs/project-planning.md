@@ -66,7 +66,9 @@ saem em ordem fixa, `changes` na ordem de declaração e `milestones` por `order
 
 `planning/<plan-id>/planned-changes/<ID>-<slug>.md`: um Markdown com frontmatter
 (`schema_version`, `id`, `slug`, `title`, `plan_revision`) e as seções
-**Objetivo**, **Escopo** e **Critérios macro** obrigatórias (as demais são
+**Objetivo**, **Escopo** e **Critérios macro** obrigatórias — mais
+**Referências da fonte**, obrigatória quando o plano declara `source_documents`
+(as demais são
 recomendadas). Um Planned Change é planejamento macro — nunca contém cabeçalho de
 delta (`## ADDED/MODIFIED/REMOVED/RENAMED Requirements`) e as regras de requisito
 `SHALL`/`MUST` não se aplicam a ele.

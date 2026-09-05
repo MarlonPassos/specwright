@@ -1,7 +1,10 @@
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { validatePlan } from '../../src/core/project/validate.js';
+import {
+  validatePlan,
+  validatePlannedChangeContent,
+} from '../../src/core/project/validate.js';
 import { sha256, sourceHash } from '../../src/core/project/hashes.js';
 import { plannedChangeRelPath } from '../../src/core/project/paths.js';
 import {
@@ -274,7 +277,11 @@ describe('validatePlan — manifest rules', () => {
 });
 
 describe('validatePlan — planned change rules', () => {
-  async function planWithBrief(bodyOverride?: string, sections?: Record<string, string>) {
+  async function planWithBrief(
+    bodyOverride?: string,
+    sections?: Record<string, string>,
+    sources: Array<{ path: string; sha256: string }> = []
+  ) {
     const workspace = await makePlanWorkspace();
     const rel = plannedChangeRelPath('CH-001', 'foundation');
     const file = await seedPlannedChange(workspace, 'demo', {
@@ -286,6 +293,7 @@ describe('validatePlan — planned change rules', () => {
     });
     const content = await fs.readFile(file, 'utf8');
     const data = manifest({
+      source_documents: sources,
       changes: [
         change({
           id: 'CH-001',
@@ -303,6 +311,61 @@ describe('validatePlan — planned change rules', () => {
     await seedPlan(workspace, data);
     return { workspace, data };
   }
+
+  const SOURCES = [{ path: 'docs/fonte.md', sha256: 'deadbeef' }];
+
+  it('promotes Referências da fonte to ERROR when the plan has source documents', async () => {
+    const { workspace, data } = await planWithBrief(
+      undefined,
+      { Objetivo: 'Entregar.', Escopo: '- pastas', 'Critérios macro': '- build verde' },
+      SOURCES
+    );
+    const brief = (await validatePlan(workspace.projectRoot, data.id, {})).find(
+      (report) => report.type === 'planned-change'
+    )!;
+    expect(
+      brief.issues.filter((issue) => /Referências da fonte/.test(issue.path))
+    ).toEqual([
+      {
+        level: 'ERROR',
+        path: 'planned-changes/CH-001-foundation.md:Referências da fonte',
+        message: 'a seção "# Referências da fonte" está ausente ou vazia',
+      },
+    ]);
+    expect(brief.valid).toBe(false);
+  });
+
+  it('leaves it a WARNING when the plan declares no source document', async () => {
+    const { workspace, data } = await planWithBrief(undefined, {
+      Objetivo: 'Entregar.',
+      Escopo: '- pastas',
+      'Critérios macro': '- build verde',
+    });
+    const brief = (await validatePlan(workspace.projectRoot, data.id, {})).find(
+      (report) => report.type === 'planned-change'
+    )!;
+    const found = brief.issues.filter((issue) => /Referências da fonte/.test(issue.path));
+    expect(found.map((issue) => issue.level)).toEqual(['WARNING']);
+    expect(brief.valid).toBe(true);
+  });
+
+  it('accepts a brief that carries the section, with no duplicate warning', async () => {
+    const { workspace, data } = await planWithBrief(
+      undefined,
+      {
+        Objetivo: 'Entregar.',
+        Escopo: '- pastas',
+        'Critérios macro': '- build verde',
+        'Referências da fonte': '- docs/fonte.md:1-10',
+      },
+      SOURCES
+    );
+    const brief = (await validatePlan(workspace.projectRoot, data.id, {})).find(
+      (report) => report.type === 'planned-change'
+    )!;
+    expect(brief.issues.filter((issue) => /Referências da fonte/.test(issue.path))).toEqual([]);
+    expect(brief.valid).toBe(true);
+  });
 
   it('errors on an empty Critérios macro and warns on a missing Riscos', async () => {
     const { workspace, data } = await planWithBrief(undefined, {
@@ -327,6 +390,32 @@ describe('validatePlan — planned change rules', () => {
     const strict = await validatePlan(workspace.projectRoot, data.id, { strict: true });
     expect(lenient.every((report) => report.valid)).toBe(true);
     expect(strict.every((report) => report.valid)).toBe(false);
+  });
+
+  it('collects the same issues in-memory as on disk, strict or not', async () => {
+    // The two validators used to disagree: the in-memory one gated the
+    // recommended-section warnings on `strict` and the on-disk one did not, so
+    // `apply --dry-run` and the `validate` right after it reported different
+    // counts for the same bytes. `--strict` decides the verdict, never the set.
+    const sections = {
+      Objetivo: 'Entregar.',
+      Escopo: '- pastas',
+      'Critérios macro': '- build verde',
+    };
+    const { workspace, data } = await planWithBrief(undefined, sections);
+    const rel = plannedChangeRelPath('CH-001', 'foundation');
+    const content = await fs.readFile(
+      path.join(workspace.projectRoot, 'planning', data.id, rel),
+      'utf8'
+    );
+
+    const onDisk = (await validatePlan(workspace.projectRoot, data.id, {})).find(
+      (report) => report.type === 'planned-change'
+    )!.issues;
+    const inMemory = validatePlannedChangeContent(content, { id: 'CH-001', slug: 'foundation' }, rel);
+
+    expect(inMemory).toEqual(onDisk);
+    expect(inMemory.filter((issue) => issue.level === 'WARNING').length).toBeGreaterThan(0);
   });
 
   it('errors on a delta header in the brief', async () => {

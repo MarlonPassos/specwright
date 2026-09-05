@@ -9,6 +9,7 @@ import { computeProjectStatus } from '../../src/core/project/status.js';
 import { recommendNext } from '../../src/core/project/next.js';
 import { linkChange } from '../../src/core/project/link.js';
 import { syncPlan } from '../../src/core/project/sync.js';
+import { loadPlan } from '../../src/core/project/repository.js';
 import { BUNDLE_VERSION } from '../../src/core/project/bundle.js';
 import { archiveChange } from '../../src/core/archive/archive.js';
 import { withStaging } from '../../src/util/fs.js';
@@ -95,6 +96,10 @@ describe('project lifecycle', () => {
             objetivo: 'Permitir que alguém se identifique.',
             escopo: ['início de sessão'],
             criteriosMacro: ['uma sessão pode ser encerrada'],
+            // The plan declares a source document, so a brief that points at
+            // nothing is an ERROR: nobody could check the scope against
+            // anything.
+            referencias: ['docs/vision.md:1-3'],
           },
         },
         {
@@ -107,6 +112,7 @@ describe('project lifecycle', () => {
             objetivo: 'Listar produtos.',
             escopo: ['grade'],
             criteriosMacro: ['filtra por categoria'],
+            referencias: ['docs/vision.md:3'],
           },
         },
         {
@@ -121,6 +127,13 @@ describe('project lifecycle', () => {
     // 3. validate — a plan built from a complete bundle is clean
     const reports = await validatePlan(root, 'shop', {});
     expect(reports.every((report) => report.valid)).toBe(true);
+
+    // …and the pointers each brief declared reached the manifest.
+    const withRefs = (await loadPlan(root, 'shop')).manifest;
+    expect(withRefs.changes.map((entry) => entry.source_refs)).toEqual([
+      [{ path: 'docs/vision.md', lines: '1-3' }],
+      [{ path: 'docs/vision.md', lines: '3' }],
+    ]);
 
     // 4. generate is idempotent over what apply already materialised
     const regenerated = await generatePlannedChanges(workspace, 'shop', {});

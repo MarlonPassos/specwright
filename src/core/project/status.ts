@@ -179,7 +179,8 @@ export async function computeProjectStatus(
       const issues = validatePlannedChangeContent(
         briefContent,
         { id: change.id, slug: change.slug },
-        ref.path
+        ref.path,
+        { hasSourceDocuments: manifest.source_documents.length > 0 }
       ).filter((issue) => issue.level === 'ERROR');
       if (issues.length > 0) invalidBrief.set(change.id, issues.map((issue) => issue.message));
     }
