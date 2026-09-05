@@ -25,7 +25,14 @@ ${RESOLVE_CHANGE}
    valer, pare e diga o que está pendente. Tarefas não marcadas significam que o trabalho não
    acabou - não arquive por cima delas.
 
-   Se a change ainda não foi verificada, rode \`${commandRef('verify')}\` antes.
+   Se a change ainda não foi verificada, rode \`${commandRef('verify')}\` antes. O
+   \`specs archive\` devolve \`verification\` sempre: ausente, com achados em aberto, ou
+   limpo com a data. Ele **avisa** nos dois primeiros casos e arquiva mesmo assim - arquivar
+   não falha por estado a jusante do trabalho, e um veredito descreve trabalho que já
+   terminou. Um projeto que quer a regra mais dura passa \`--require-verify\`, e aí o
+   comando recusa.
+
+   Reporte o que vier em \`verification\` ao usuário, em qualquer um dos três casos.
 
 2. **Leia o que o arquivamento vai mudar**
 

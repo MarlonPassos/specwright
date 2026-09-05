@@ -177,6 +177,14 @@ respondida. Só um `nenhum` explícito fecha.
 
 `specs instructions verify --change <change> --json` traz a instrução e o template.
 
+O `specs archive` devolve `verification` sempre — ausente, com achados, ou limpo — e
+**avisa** nos dois primeiros casos sem impedir nada. Dois motivos para não ser bloqueio por
+padrão: arquivar nunca falha por estado a jusante do trabalho, e um veredito descreve
+trabalho já terminado; e o `/spec-loop` roda propose → implement → verify → archive sem
+ninguém no meio, então um portão cuja única saída é decisão humana ou trava o loop, ou é
+decidido pelo próprio agente — e aí não protege nada enquanto parece proteger. Quem quer a
+regra dura passa `--require-verify`.
+
 ## /spec-archive
 
 Aplica a change nas specs e a encerra.

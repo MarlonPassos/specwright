@@ -13,6 +13,7 @@ import { linkChange } from '../project/link.js';
 import { syncPlan } from '../project/sync.js';
 import { mergeCapability } from './merge.js';
 import { reportUnversionedWork } from './versioning.js';
+import { readVerification, type VerificationVerdict } from '../change/verification.js';
 
 export interface ArchiveOptions {
   /** Skip the spec merge entirely. For changes that carry no spec deltas. */
@@ -21,6 +22,11 @@ export interface ArchiveOptions {
   validate?: boolean;
   /** Proceed even with unchecked tasks. */
   force?: boolean;
+  /**
+   * Refuse to archive without a `verification.md` whose open findings are
+   * empty. Off by default — see `assertVerified`.
+   */
+  requireVerify?: boolean;
   now?: Date;
 }
 
@@ -65,6 +71,8 @@ export interface ArchiveResult {
    * the archive itself succeeded.
    */
   unversioned?: true;
+  /** The verdict `/spec-verify` left, or its absence. Always reported. */
+  verification: VerificationVerdict;
 }
 
 export async function archiveChange(
@@ -102,6 +110,8 @@ export async function archiveChange(
       { code: 'tasks_incomplete', fix: `specs archive ${changeId} --force` }
     );
   }
+
+  const verification = await assertVerified(dir, options.requireVerify === true);
 
   const metadata = await readChangeMetadata(dir);
   const specsSkipped = options.skipSpecs === true || metadata.skipSpecs;
@@ -193,6 +203,7 @@ export async function archiveChange(
   const versioning = await reportUnversionedWork(workspace.projectRoot, dir);
 
   return {
+    verification,
     change: changeId,
     archivedAs,
     archivePath: destination,
@@ -363,4 +374,48 @@ async function pruneEmptyDirs(start: string, boundary: string): Promise<void> {
     await fs.rmdir(current).catch(() => undefined);
     current = path.dirname(current);
   }
+}
+
+/**
+ * The verification verdict, and the gate over it — which is off by default.
+ *
+ * Requiring a verdict to archive is tempting: `/spec-verify` is the step that
+ * finds what everything else misses, and twenty-four changes were archived
+ * without one in the project that motivated this. Two reasons it is not the
+ * default anyway.
+ *
+ * The first is the invariant this file already states about the plan (I-4):
+ * archiving must never fail because of state downstream of the work. A verdict
+ * is downstream — it describes work that is already finished.
+ *
+ * The second is that `/spec-loop` and `specs project loop` run propose →
+ * implement → verify → archive with nobody in the middle. A gate whose only
+ * exit is a human decision either deadlocks that loop, or gets decided by the
+ * agent itself — and then it protects nothing while looking like it does.
+ *
+ * So: always reported, never enforced, unless the project asks for enforcement
+ * with `--require-verify`. A project that wants the harder rule can have it;
+ * one that does not still sees the finding.
+ */
+async function assertVerified(dir: string, required: boolean): Promise<VerificationVerdict> {
+  const verification = await readVerification(dir);
+  if (!required) return verification;
+
+  if (!verification.present) {
+    throw new SpecError(
+      'Esta change não tem verification.md e --require-verify foi pedido.',
+      { code: 'verification_missing', fix: 'Rode a verificação e grave o veredito antes de arquivar.' }
+    );
+  }
+  if (!verification.clean) {
+    const detail =
+      verification.openFindings.length > 0
+        ? `:\n${verification.openFindings.map((finding) => `  - ${finding}`).join('\n')}`
+        : ' (a seção "Achados em aberto" não respondeu nada)';
+    throw new SpecError(`O veredito da verificação tem achados em aberto${detail}`, {
+      code: 'verification_open_findings',
+      fix: 'Resolva os achados, ou registre "nenhum" com a justificativa de cada um.',
+    });
+  }
+  return verification;
 }

@@ -289,8 +289,9 @@ export function registerWorkflowCommands(program: Command): void {
     .option('--skip-specs', 'Não aplica os deltas de spec')
     .option('--no-validate', 'Arquiva sem validar antes')
     .option('--force', 'Arquiva mesmo com tarefas não marcadas')
+    .option('--require-verify', 'Recusa arquivar sem um verification.md sem achados em aberto')
     .option('--json', 'Saída em JSON')
-    .action(async (change: string | undefined, options: { skipSpecs?: boolean; validate?: boolean; force?: boolean; json?: boolean }) => {
+    .action(async (change: string | undefined, options: { skipSpecs?: boolean; validate?: boolean; force?: boolean; requireVerify?: boolean; json?: boolean }) => {
       try {
         const workspace = await requireWorkspace();
         const changeId = await resolveChangeId(workspace, change);
@@ -298,6 +299,7 @@ export function registerWorkflowCommands(program: Command): void {
           skipSpecs: options.skipSpecs,
           validate: options.validate,
           force: options.force,
+          requireVerify: options.requireVerify,
         });
 
         if (options.json) {
@@ -328,6 +330,19 @@ export function registerWorkflowCommands(program: Command): void {
                 ),
               ]
             : []),
+          ...(result.verification.present
+            ? result.verification.clean
+              ? [`  Verificada em ${result.verification.date ?? 'data não registrada'}.`]
+              : [
+                  result.verification.openFindings.length > 0
+                    ? `  AVISO: o veredito da verificação tem ${result.verification.openFindings.length} achado(s) em aberto:`
+                    : '  AVISO: o veredito da verificação não respondeu "Achados em aberto".',
+                  ...result.verification.openFindings.map((finding) => `    - ${finding}`),
+                ]
+            : [
+                '  AVISO: esta change não tem verification.md — nada prova que ela foi',
+                '  verificada contra o que prometeu.',
+              ]),
           ...(result.unversioned
             ? [
                 '',

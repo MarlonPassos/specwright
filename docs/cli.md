@@ -170,6 +170,7 @@ Aplica os deltas da change nas specs do workspace e a move para o arquivo.
 | `--skip-specs` | Não aplicar os deltas |
 | `--no-validate` | Arquivar sem validar antes |
 | `--force` | Arquivar apesar de tarefas não marcadas |
+| `--require-verify` | Recusar sem um `verification.md` cujos achados em aberto estejam zerados |
 
 Num projeto com [plano](project-planning.md), o arquivamento fecha o vínculo já
 previsto — o único incremento não cancelado e sem vínculo cujo `slug` é igual ao
