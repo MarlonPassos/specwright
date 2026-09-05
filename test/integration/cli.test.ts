@@ -43,6 +43,7 @@ describe('spec CLI', () => {
       'spec-project-next',
       'spec-project-propose-batch',
       'spec-project-refine',
+      'spec-project-verify',
       'spec-loop',
     ]);
 
@@ -99,7 +100,7 @@ describe('spec CLI', () => {
     const listing = parseJson((await runCli(['init', '.', '--json'], dir)).stdout);
 
     expect(listing.created).toBe(false);
-    expect(listing.files).toHaveLength(60);
+    expect(listing.files).toHaveLength(64);
     for (const file of listing.files) {
       await expect(fs.stat(path.join(dir, file))).resolves.toBeTruthy();
     }

@@ -62,6 +62,19 @@ vazia, e vazia significa "este incremento não cita fonte nenhuma", nunca
 A serialização é determinística: `load → save → load` é byte-idêntico. As chaves
 saem em ordem fixa, `changes` na ordem de declaração e `milestones` por `order`.
 
+### `/spec-project-verify` — conferir o que foi entregue
+
+`/spec-verify` confere UMA change contra os deltas dela. `/spec-project-review`
+critica o PLANO, antes de materializar. Nenhum dos dois enxerga o que some
+**entre** uma change e outra: requisito da fonte que nunca virou requirement,
+capacidade especificada e nunca exposta, spec de uma change contradizendo a de
+outra, valor que existe no código sem requisito nenhum.
+
+`/spec-project-verify` ocupa esse lugar, ao fechar um milestone. A saída vem em
+duas metades rotuladas: **cálculo** (diagnósticos, cobertura de `source_refs`,
+vereditos de verificação presentes e ausentes) e **recomendação** (os desvios
+semânticos, que são leitura do agente e precisam vir marcadas como tal).
+
 ### `generate` valida o que gravou
 
 Toda materialização — dry-run ou real — devolve `validation`: o relatório do

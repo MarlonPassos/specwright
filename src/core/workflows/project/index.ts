@@ -6,6 +6,7 @@ import { projectStatusCommand } from './status.js';
 import { projectNextCommand } from './next.js';
 import { projectProposeBatchCommand } from './propose-batch.js';
 import { projectRefineCommand } from './refine.js';
+import { projectVerifyCommand } from './verify.js';
 
 /** The plan commands, in the order a plan is walked. */
 export function projectCommands(): WorkflowCommand[] {
@@ -17,5 +18,6 @@ export function projectCommands(): WorkflowCommand[] {
     projectNextCommand(),
     projectProposeBatchCommand(),
     projectRefineCommand(),
+    projectVerifyCommand(),
   ];
 }

@@ -11,18 +11,19 @@ const PROJECT_IDS = [
   'project-next',
   'project-propose-batch',
   'project-refine',
+  'project-verify',
 ];
 
 describe('project harness commands', () => {
-  it('are the seven documented ids', () => {
+  it('are the eight documented ids', () => {
     expect(projectCommands().map((command) => command.id)).toEqual(PROJECT_IDS);
   });
 
-  it('generate 15 commands × 4 harnesses = 60 files with unique paths', () => {
+  it('generate 16 commands × 4 harnesses = 64 files with unique paths', () => {
     const files = renderHarnesses(allHarnesses());
     expect(files).toHaveLength(allCommands().length * 4);
-    expect(files).toHaveLength(60);
-    expect(new Set(files.map((file) => file.path)).size).toBe(60);
+    expect(files).toHaveLength(64);
+    expect(new Set(files.map((file) => file.path)).size).toBe(64);
   });
 
   it('never leak another harness\'s invocation syntax or a raw placeholder', () => {
