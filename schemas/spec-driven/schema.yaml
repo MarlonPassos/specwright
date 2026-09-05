@@ -298,6 +298,35 @@ artifacts:
       no domínio e no banco que requisito nenhum justifica, e que ninguém consegue remover
       com segurança porque não se sabe o que ele deveria significar.
 
+      **A change de entrega.** Quando a change é a que fecha um projeto ou um milestone e
+      produz documentação pública - README, guia de operação, referência de API - três
+      regras extras valem:
+
+      1. **As tarefas saem do que a fonte exige, não de prosa livre.** Se o documento-fonte
+         enumera o que a documentação precisa ter, gere uma tarefa por item enumerado. Num
+         projeto real a fonte listava dez itens para o README; a change de entrega escreveu
+         suas tarefas de cabeça e dois deles - arquitetura e migrations - simplesmente não
+         apareceram na lista.
+      2. **Checklist em documento shipado é preenchido ou removido.** Um "checklist de
+         aceite" com sete caixas desmarcadas foi entregue por uma tarefa marcada `[x]`.
+      3. **Voz presente e completa.** Documento público não fala na voz de uma change
+         intermediária. "A autorização chega na change de políticas" e "filas herdarão estas
+         políticas pelas próximas changes" foram shipados depois de as duas coisas já terem
+         acontecido, e "o typecheck cobre os módulos alterados desta change" vazou vocabulário
+         interno para o leitor externo. Escreva sobre o sistema como ele é agora.
+
+      Conteúdo mínimo de um README de entrega, para adaptar ao que o projeto é - cada item
+      que sobreviver à adaptação vira uma tarefa: objetivo do sistema; **arquitetura**
+      (camadas, regra de dependência, onde cada coisa mora); requisitos de ambiente;
+      inicialização em ambiente limpo; variáveis de configuração e quais são só de
+      desenvolvimento; **migrations** (como rodar, como criar, quando rodam sozinhas);
+      credenciais de desenvolvimento e como desligá-las; contrato da API; **como rodar os
+      testes, incluindo os que a suíte padrão pula e como habilitá-los**; matriz de
+      permissões; diagnóstico operacional.
+
+      O item dos testes merece destaque: uma suíte que termina verde pulando trinta e um
+      testes, documentada como "rode pytest", engana quem lê.
+
       Use as specs para o que construir e o design para como construir.
 
 apply:
