@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { generatePlannedChanges } from '../../src/core/project/generate.js';
 import { computeProjectStatus } from '../../src/core/project/status.js';
 import { sha256 } from '../../src/core/project/hashes.js';
+import { parseManifest } from '../../src/core/project/repository.js';
 import { makePlanWorkspace, seedPlan, manifest, change } from '../helpers/plan.js';
 import { writeFile } from '../helpers/workspace.js';
 import type { Workspace } from '../../src/core/workspace.js';
@@ -262,6 +263,39 @@ describe('generatePlannedChanges', () => {
       const result = await generatePlannedChanges(workspace, 'demo', { changeIds: ['CH-001'] });
       expect(result.skeletons).toEqual([]);
       expect(await fs.readFile(briefPath, 'utf8')).toContain('Já escrito.');
+    });
+
+    it('persists source_refs derived from the brief that was written', async () => {
+      const workspace = await makePlanWorkspace();
+      await seedPlan(workspace, manifest({ id: 'demo', changes: [change({ id: 'CH-001', slug: 'x' })] }));
+      await fs.mkdir(path.join(workspace.projectRoot, 'planning/demo/planned-changes'), {
+        recursive: true,
+      });
+      await fs.writeFile(
+        path.join(workspace.projectRoot, 'planning/demo/planned-changes/CH-001-x.md'),
+        '---\nschema_version: 1\nid: CH-001\nslug: x\ntitle: X\nplan_revision: 0\n---\n\n' +
+          '# Objetivo\n\nJá escrito.\n\n# Escopo\n\n- a\n\n# Critérios macro\n\n- b\n\n' +
+          '# Referências da fonte\n\n- docs/fonte.md:10-20\n'
+      );
+
+      await generatePlannedChanges(workspace, 'demo', { changeIds: ['CH-001'] });
+
+      const saved = parseManifest(
+        await fs.readFile(path.join(workspace.projectRoot, 'planning/demo/plan.yaml'), 'utf8')
+      ).manifest!;
+      expect(saved.changes[0].source_refs).toEqual([{ path: 'docs/fonte.md', lines: '10-20' }]);
+    });
+
+    it('leaves source_refs empty for the bare skeleton, which cites nothing', async () => {
+      const workspace = await makePlanWorkspace();
+      await seedPlan(workspace, manifest({ id: 'demo', changes: [change({ id: 'CH-001', slug: 'x' })] }));
+
+      await generatePlannedChanges(workspace, 'demo', { changeIds: ['CH-001'] });
+
+      const saved = parseManifest(
+        await fs.readFile(path.join(workspace.projectRoot, 'planning/demo/plan.yaml'), 'utf8')
+      ).manifest!;
+      expect(saved.changes[0].source_refs).toEqual([]);
     });
 
     it('stays empty when nothing new is written (idempotent second run)', async () => {

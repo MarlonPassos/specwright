@@ -16,6 +16,7 @@ import {
   renderBriefFromSpec,
   type Bundle,
 } from './bundle.js';
+import { sourceRefsOf } from './planned-change.js';
 
 export interface ApplyOptions {
   dryRun?: boolean;
@@ -111,6 +112,7 @@ export async function applyPlanBundle(
     );
     const relPath = record.planned_change!.path;
     briefFiles.set(relPath, body);
+    record.source_refs = sourceRefsOf(body);
     record.planned_change = {
       path: relPath,
       generated_from_plan_revision: result.manifest.revision,

@@ -7,7 +7,7 @@ import {
   parseSections,
   type MarkdownSection,
 } from '../markdown/sections.js';
-import { CHANGE_ID_PATTERN, PLANNED_CHANGE_SCHEMA_VERSION } from './model.js';
+import { CHANGE_ID_PATTERN, PLANNED_CHANGE_SCHEMA_VERSION, type SourceRef } from './model.js';
 
 const KEBAB_CASE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 
@@ -101,6 +101,54 @@ export function parsePlannedChange(text: string): ParsedPlannedChange {
   }
 
   return { frontmatter: result.data, body, sections, deltaHeaders };
+}
+
+const SOURCE_REF_LINE = /^[-*]\s+(.+?)\s*$/;
+
+/**
+ * Reads `# Referências da fonte` into structured pointers.
+ *
+ * The section is prose written by a human or an agent, so this parser is
+ * deliberately forgiving: it takes list items only, strips Markdown emphasis
+ * and backticks, and splits a trailing `:<lines>` off the path when one is
+ * there. A line it cannot read at all is skipped rather than failing the
+ * parse — losing one pointer must never make a brief unloadable.
+ */
+export function parseSourceRefs(sections: MarkdownSection[]): SourceRef[] {
+  const section = findSection(sections, 'Referências da fonte');
+  if (section === undefined) return [];
+
+  const refs: SourceRef[] = [];
+  const seen = new Set<string>();
+  for (const raw of section.content.split('\n')) {
+    const match = SOURCE_REF_LINE.exec(raw.trim());
+    if (!match) continue;
+    let text = match[1].replace(/`/g, '').replace(/\*\*/g, '').trim();
+    if (text.length === 0) continue;
+    // A trailing parenthetical or em-dash comment is commentary, not path.
+    text = text.split(/\s+[—–]\s+/)[0].trim();
+
+    let path = text;
+    let lines: string | undefined;
+    // `path:371-573` / `path:371`. A Windows drive letter (`C:`) is not a
+    // line range, so only a colon followed by a digit or `§` splits.
+    const split = /^(.*?):([0-9§][^\s:]*)$/.exec(text);
+    if (split) {
+      path = split[1].trim();
+      lines = split[2].trim();
+    }
+    if (path.length === 0) continue;
+    const key = `${path}::${lines ?? ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    refs.push(lines === undefined ? { path } : { path, lines });
+  }
+  return refs;
+}
+
+/** Reads the source pointers straight out of a Planned Change document. */
+export function sourceRefsOf(text: string): SourceRef[] {
+  return parseSourceRefs(parsePlannedChange(text).sections);
 }
 
 /** True when the section exists and has non-whitespace content. */

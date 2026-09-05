@@ -8,7 +8,7 @@ import { ProjectGraph } from './graph.js';
 import { sha256, sourceHash, recordHash, type HashableSource } from './hashes.js';
 import { renderManifest, type PlanManifest, type ProjectChange } from './model.js';
 import { plannedChangeRelPath, resolveWithinRoot, safeResolve } from './paths.js';
-import { renderPlannedChange } from './planned-change.js';
+import { renderPlannedChange, sourceRefsOf } from './planned-change.js';
 import { assertRoadmapMarkers, renderRoadmapBlock, spliceRoadmap } from './render.js';
 import { materializationState } from './state.js';
 import { computeProjectStatus, roadmapRows } from './status.js';
@@ -86,6 +86,7 @@ export async function generatePlannedChanges(
 
   const toWrite = new Map<string, { relPath: string; content: string }>();
   const nextRefs = new Map<string, ProjectChange['planned_change']>();
+  const nextSourceRefs = new Map<string, ProjectChange['source_refs']>();
   const skipped: GenerateResult['skipped'] = [];
   const skeletons: string[] = [];
   const conflicts: GenerateConflict[] = [];
@@ -150,6 +151,10 @@ export async function generatePlannedChanges(
     if (existing === undefined) skeletons.push(change.id);
 
     toWrite.set(change.id, { relPath, content: body });
+    // Derived from the body that is about to be written, never from the body
+    // that was there before: the two differ exactly when `--force` adopts a
+    // hand edit, and the manifest must describe what is on disk.
+    nextSourceRefs.set(change.id, sourceRefsOf(body));
     nextRefs.set(change.id, {
       path: relPath,
       generated_from_plan_revision: manifest.revision + 1,
@@ -216,7 +221,8 @@ export async function generatePlannedChanges(
     updated_at: localDateStamp(options.now ?? new Date()),
     changes: manifest.changes.map((change) => {
       const ref = nextRefs.get(change.id);
-      return ref ? { ...change, planned_change: ref } : change;
+      if (!ref) return change;
+      return { ...change, planned_change: ref, source_refs: nextSourceRefs.get(change.id) ?? [] };
     }),
   };
 

@@ -50,7 +50,14 @@ Cada **Project Change** carrega `id` (`^CH-\d{3,}$`, imutável e nunca
 reutilizado), `slug` (kebab-case), `title`, `planning_state`
 (`idea | planned | on_hold | cancelled` — o **único** estado persistido),
 `priority`, `depends_on` (somente IDs), `manual_blockers`, `superseded_by`,
-`milestone`, `planned_change` e `link`.
+`milestone`, `planned_change`, `source_refs` e `link`.
+
+`source_refs` é derivado: a cada materialização do brief — por `generate` ou por
+um bundle no `apply` — a seção `# Referências da fonte` é lida para
+`{path, lines?}[]` e gravada no registro. `lines` guarda a citação como o brief
+a escreveu (`371-573`, `§10`), sem interpretar. A lista sai do YAML quando está
+vazia, e vazia significa "este incremento não cita fonte nenhuma", nunca
+"não sei".
 
 A serialização é determinística: `load → save → load` é byte-idêntico. As chaves
 saem em ordem fixa, `changes` na ordem de declaração e `milestones` por `order`.

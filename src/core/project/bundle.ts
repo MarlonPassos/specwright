@@ -275,6 +275,7 @@ export function applyBundle(
     superseded_by: [],
     milestone: null,
     planned_change: null,
+    source_refs: [],
     link: null,
   });
 
