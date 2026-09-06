@@ -458,3 +458,134 @@ describe('specs project — no regression', () => {
     await expect(fs.stat(path.join(dir, 'planning'))).rejects.toThrow();
   });
 });
+
+describe('specs project set-blockers — CLI', () => {
+  /** Um plano com CH-001 → CH-002 encadeados e CH-003 solto. */
+  async function planWithThree(): Promise<string> {
+    const dir = await initProject();
+    await writeFile(path.join(dir, 'docs/fonte.md'), '# P\n\nA.\nB.\nC.\n');
+    expect((await runCli(['project', 'create', 'loja', 'docs/fonte.md', '--json'], dir)).code).toBe(0);
+
+    const brief = (linha: number) => ({
+      objetivo: 'o',
+      escopo: ['x'],
+      criteriosMacro: ['y'],
+      referencias: [`docs/fonte.md:${linha}`],
+    });
+    await writeFile(
+      path.join(dir, 'seed.json'),
+      JSON.stringify({
+        bundleVersion: 1,
+        expectRevision: 0,
+        plan: { status: 'active' },
+        operations: [
+          { op: 'addChange', ref: '$a', slug: 'base', title: 'Base', plannedChange: brief(3) },
+          { op: 'addChange', ref: '$b', slug: 'api', title: 'API', dependsOn: ['$a'], plannedChange: brief(4) },
+          { op: 'addChange', ref: '$c', slug: 'solta', title: 'Solta', plannedChange: brief(5) },
+        ],
+      })
+    );
+    expect((await runCli(['project', 'apply', '--file', 'seed.json', '--json'], dir)).code).toBe(0);
+    return dir;
+  }
+
+  it('registra o motivo, bloqueia o incremento e o devolve em JSON', async () => {
+    const dir = await planWithThree();
+
+    const result = await runCli(
+      ['project', 'set-blockers', 'CH-001', 'Aguardando decisão do jurídico', '--json'],
+      dir
+    );
+
+    expect(result.code).toBe(0);
+    expect(parseJson(result.stdout)).toMatchObject({
+      id: 'CH-001',
+      manualBlockers: ['Aguardando decisão do jurídico'],
+      readiness: 'blocked',
+    });
+  });
+
+  it('aceita o plan-id antes do change-id, distinguindo os dois pela forma', async () => {
+    const dir = await planWithThree();
+
+    const result = await runCli(
+      ['project', 'set-blockers', 'loja', 'CH-003', 'Depende de contrato externo', '--json'],
+      dir
+    );
+
+    expect(result.code).toBe(0);
+    expect(parseJson(result.stdout).manualBlockers).toEqual(['Depende de contrato externo']);
+  });
+
+  it('--clear libera o incremento', async () => {
+    const dir = await planWithThree();
+    await runCli(['project', 'set-blockers', 'CH-001', 'travado', '--json'], dir);
+
+    const result = await runCli(['project', 'set-blockers', 'CH-001', '--clear', '--json'], dir);
+
+    expect(result.code).toBe(0);
+    expect(parseJson(result.stdout)).toMatchObject({ manualBlockers: [], readiness: 'ready' });
+  });
+
+  it('exige motivo ou --clear, e recusa os dois juntos', async () => {
+    const dir = await planWithThree();
+
+    const semMotivo = await runCli(['project', 'set-blockers', 'CH-001', '--json'], dir);
+    expect(semMotivo.code).toBe(1);
+    expect(parseJson(semMotivo.stdout).error).toMatchObject({ code: 'invalid_option' });
+
+    const ambos = await runCli(
+      ['project', 'set-blockers', 'CH-001', '--clear', 'motivo', '--json'],
+      dir
+    );
+    expect(ambos.code).toBe(1);
+    expect(parseJson(ambos.stdout).error.message).toContain('--clear');
+  });
+
+  it('recusa um incremento inexistente sem tocar no plano', async () => {
+    const dir = await planWithThree();
+    const before = await fs.readFile(path.join(dir, 'planning/loja/plan.yaml'), 'utf8');
+
+    const result = await runCli(['project', 'set-blockers', 'CH-999', 'x', '--json'], dir);
+
+    expect(result.code).toBe(1);
+    expect(parseJson(result.stdout).error).toMatchObject({ code: 'change_not_found' });
+    expect(await fs.readFile(path.join(dir, 'planning/loja/plan.yaml'), 'utf8')).toBe(before);
+  });
+
+  it('a prévia do loop passa a dizer que o loop não termina, e o que cai junto', async () => {
+    const dir = await planWithThree();
+
+    const antes = parseJson((await runCli(['project', 'loop', 'loja', '--json'], dir)).stdout);
+    expect(antes.completion).toMatchObject({ willComplete: true, terminal: [] });
+
+    await runCli(['project', 'set-blockers', 'CH-001', 'Aguardando jurídico', '--json'], dir);
+    const depois = parseJson((await runCli(['project', 'loop', 'loja', '--json'], dir)).stdout);
+
+    expect(depois.completion.willComplete).toBe(false);
+    // CH-002 depende do bloqueado; CH-003 é independente e segue alcançável.
+    expect(depois.completion.reachable).toEqual(['CH-003']);
+    expect(depois.completion.terminal).toEqual([
+      {
+        id: 'CH-001',
+        reasonCodes: ['manual_blocker_present'],
+        manualBlockers: ['Aguardando jurídico'],
+        blocks: ['CH-002'],
+      },
+    ]);
+  });
+
+  it('a saída em texto do loop diz até onde ele vai', async () => {
+    const dir = await planWithThree();
+    await runCli(['project', 'set-blockers', 'CH-001', 'Aguardando jurídico', '--json'], dir);
+
+    const result = await runCli(['project', 'loop', 'loja'], dir);
+
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('Este loop vai completar 1 de 3 e parar.');
+    expect(result.stdout).toContain('CH-001  manual_blocker_present — Aguardando jurídico');
+    expect(result.stdout).toContain('e com ele: CH-002');
+    // A ressalva não é opcional: sem ela a prévia vira promessa de que termina.
+    expect(result.stdout).toContain('Piso, não garantia');
+  });
+});
