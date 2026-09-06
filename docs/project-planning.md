@@ -69,6 +69,26 @@ que repare; com isso, divergência não declarada é a diferença entre duas lis
 A serialização é determinística: `load → save → load` é byte-idêntico. As chaves
 saem em ordem fixa, `changes` na ordem de declaração e `milestones` por `order`.
 
+### Blocker manual
+
+`manual_blockers` é a lista de motivos pelos quais um incremento não pode começar
+ainda — "aguardando decisão do jurídico". Ele é o **único** motivo de bloqueio sem
+saída automática: os outros quatro (`dependency_pending`, brief ausente ou
+desatualizado, brief inválido, estado não elegível) são recalculados a cada leitura e
+somem quando a causa some. Este só sai quando alguém o tira.
+
+Por isso ele tem precedência sobre todos os outros e `blockedBy` fica vazio: não é a
+dependência que está segurando.
+
+```bash
+specs project set-blockers CH-003 "Aguardando decisão do jurídico"
+specs project set-blockers CH-003 --clear
+```
+
+Substitui a lista inteira, nunca acrescenta — igual à operação `setBlockers` do bundle,
+que continua sendo o caminho certo para um agente que já está montando um. Alterar um
+incremento concluído exige `--allow-completed`, a mesma guarda que o bundle aplica.
+
 ### O loop diz até onde chega, antes de começar
 
 `state: blocked` responde *"há algo a fazer agora?"* — pergunta diferente de *"isto vai

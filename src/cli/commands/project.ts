@@ -11,14 +11,25 @@ import { computeParallelImplementBatch } from '../../core/project/parallelImplem
 import { computeProposeBatch } from '../../core/project/proposeBatch.js';
 import { loadConfig } from '../../core/config.js';
 import { generatePlannedChanges } from '../../core/project/generate.js';
-import { linkChange, unlinkChange, adoptChange, setPlanningState } from '../../core/project/link.js';
+import {
+  linkChange,
+  unlinkChange,
+  adoptChange,
+  setManualBlockers,
+  setPlanningState,
+} from '../../core/project/link.js';
 import { syncPlan } from '../../core/project/sync.js';
 import { applyPlanBundle } from '../../core/project/apply.js';
 import { BUNDLE_VERSION } from '../../core/project/bundle.js';
 import { bundleContract, renderBundleContract } from '../../core/project/bundle-schema.js';
 import { computeImpact } from '../../core/project/impact.js';
 import { loadPlan, savePlan } from '../../core/project/repository.js';
-import { PLANNING_STATES, type PlanningState, type PlanStatusValue } from '../../core/project/model.js';
+import {
+  CHANGE_ID_PATTERN,
+  PLANNING_STATES,
+  type PlanningState,
+  type PlanStatusValue,
+} from '../../core/project/model.js';
 import type { ValidationReport } from '../../core/validate/report.js';
 import { renderProjectDashboard } from '../project-dashboard-view.js';
 import type { ViewOptions } from '../theme.js';
@@ -497,6 +508,69 @@ export function registerProjectCommands(program: Command): void {
           ]);
       } catch (error) {
         fail(error, { json, payload: { synced: false } });
+      }
+    });
+
+  project
+    // `<a> [rest...]` instead of the positional dance `set-state` does: the
+    // reason is variadic, so plan-id and change-id cannot be told apart by
+    // arity. They can be told apart by SHAPE — a change id is `CH-NNN`, a plan
+    // id is kebab — which is unambiguous and needs no flag.
+    .command('set-blockers <a> [rest...]')
+    .description('Registra ou limpa os motivos que impedem um incremento de começar')
+    .option('--clear', 'Remove todos os blockers do incremento')
+    .option('--allow-completed', 'Permite alterar um incremento já concluído')
+    .option('--json', 'Saída em JSON')
+    .action(async function (
+      this: Command,
+      a: string,
+      rest: string[],
+      options: { clear?: boolean; allowCompleted?: boolean }
+    ) {
+      const json = wantsJson(this);
+      try {
+        const looksLikeChange = CHANGE_ID_PATTERN.test(a);
+        const planId = looksLikeChange ? undefined : a;
+        const changeId = looksLikeChange ? a : rest[0];
+        const reasons = looksLikeChange ? rest : rest.slice(1);
+
+        if (!changeId) {
+          throw new SpecError(
+            'Uso: specs project set-blockers <change-id> "<motivo>" | --clear',
+            { code: 'invalid_option' }
+          );
+        }
+        if (options.clear !== true && reasons.length === 0) {
+          throw new SpecError(
+            `Informe ao menos um motivo, ou use --clear para remover os blockers de ${changeId}.`,
+            { code: 'invalid_option', fix: `specs project set-blockers ${changeId} --clear` }
+          );
+        }
+        if (options.clear === true && reasons.length > 0) {
+          throw new SpecError('--clear não aceita motivos junto.', { code: 'invalid_option' });
+        }
+
+        const workspace = await requireWorkspace();
+        const id = await resolvePlanId(workspace.projectRoot, planId);
+        const result = await setManualBlockers(
+          workspace,
+          id,
+          changeId,
+          options.clear === true ? [] : reasons,
+          { allowCompleted: options.allowCompleted }
+        );
+
+        if (json) printJson(result);
+        else
+          printLines([
+            result.manualBlockers.length === 0
+              ? `${result.id}: blockers removidos (revisão ${result.revision}).`
+              : `${result.id}: ${result.manualBlockers.length} blocker(s) registrado(s) (revisão ${result.revision}).`,
+            ...result.manualBlockers.map((entry) => `  - ${entry}`),
+            `  readiness: ${result.readiness}`,
+          ]);
+      } catch (error) {
+        fail(error, { json, payload: { id: null } });
       }
     });
 

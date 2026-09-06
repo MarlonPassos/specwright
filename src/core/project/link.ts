@@ -337,6 +337,84 @@ export async function adoptChange(
   };
 }
 
+export interface SetBlockersResult {
+  id: string;
+  manualBlockers: string[];
+  revision: number;
+  readiness: string;
+  execution: string;
+}
+
+/**
+ * Records, or clears, why an increment cannot be started yet.
+ *
+ * The operation existed only as a bundle op, which meant registering "waiting
+ * on legal" took reading the current revision, hand-writing JSON with it, and
+ * applying that — two steps and a file for one annotation. The bundle is the
+ * right shape for an agent, which is already assembling one; it is the wrong
+ * shape for the person who just wants to say why something is on hold, and that
+ * friction was enough to keep the mechanism unused.
+ *
+ * `link`, `unlink`, `adopt` and `set-state` are already direct commands: the
+ * dividing line in this codebase is not "bundle for every write", it is
+ * structure (bundle) versus one increment's lifecycle (direct). A manual
+ * blocker is squarely the second, and was the only one of its family left out.
+ *
+ * Replaces the whole list, exactly like the bundle op — never appends. And it
+ * carries the same completed-increment guard the bundle enforces: a direct
+ * command that skipped it would be the easy way around a protection that cost a
+ * bug to build (F-05).
+ */
+export async function setManualBlockers(
+  workspace: Workspace,
+  planId: string,
+  changeId: string,
+  blockers: string[],
+  options: { allowCompleted?: boolean } = {}
+): Promise<SetBlockersResult> {
+  const { manifest, paths } = await loadPlan(workspace.projectRoot, planId);
+  const change = manifest.changes.find((entry) => entry.id === changeId);
+  if (!change) {
+    throw new SpecError(`O incremento ${changeId} não existe no plano.`, {
+      code: 'change_not_found',
+      fix: 'specs project status --json',
+    });
+  }
+
+  const cleaned = blockers.map((entry) => entry.trim()).filter(Boolean);
+  if (
+    (await currentExecution(workspace, change)) === 'archived' &&
+    options.allowCompleted !== true
+  ) {
+    throw new SpecError(
+      `${changeId} está concluído; alterar seus blockers reescreve histórico arquivado.`,
+      {
+        code: 'completed_change_protected',
+        fix: `specs project set-blockers ${changeId} --allow-completed`,
+      }
+    );
+  }
+
+  const next = await savePlan(paths, {
+    ...manifest,
+    changes: manifest.changes.map((entry) =>
+      entry.id === changeId ? { ...entry, manual_blockers: cleaned } : entry
+    ),
+  });
+  await reprojectRoadmap(workspace, planId);
+
+  const status = await computeProjectStatus(workspace, planId);
+  const view = status.changes.find((entry) => entry.id === changeId)!;
+
+  return {
+    id: changeId,
+    manualBlockers: cleaned,
+    revision: next.revision,
+    readiness: view.readiness,
+    execution: view.execution,
+  };
+}
+
 export interface SetStateResult {
   id: string;
   from: PlanningState;
