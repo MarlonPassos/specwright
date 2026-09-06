@@ -5,6 +5,148 @@ Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.21.0] - 2026-09-06
+
+### Adicionado
+
+#### Execução autônoma e paralela
+
+- **feat(workflow): execução autônoma explícita com `spec-loop`** — um comando que
+  percorre o ciclo sem pedir o próximo passo a cada etapa, com condições de parada
+  declaradas em vez de implícitas.
+
+- **feat(loop): a prévia diz até onde o loop chega, antes de começar** — o alcance
+  é mostrado antes da primeira escrita, não descoberto no meio.
+
+- **feat(change): dispatch paralelo de tarefas isolado por git worktree** — tarefas
+  sem conflito de arquivo declarado (`files:`/`depends:` em `tasks.md`) rodam em lote,
+  cada uma numa worktree própria, com merge sequencial de volta, máquina de estados
+  durável e reconciliação depois de queda.
+
+- **feat(project): dispatch de já-propostas em paralelo, uma worktree por change** —
+  o mesmo mecanismo uma granularidade acima. Só entra no lote quem já tem
+  proposal/design/tasks/deltas escritos e não compartilha capability com outra
+  candidata — checagem lida dos deltas, não heurística de dependência de plano.
+
+- **feat(project): propõe em lote os incrementos que o plano libera junto** —
+  explorar e propor N incrementos em paralelo quando nenhum depende do outro.
+
+- **feat(dashboard): sinaliza as CH prontas que podem rodar em paralelo** — no painel
+  do terminal e no web, restrito às que estão de fato prontas.
+
+- **feat(config): `defaultParallel` no workspace** — padrão de criação de change, não
+  um segundo portão: a decisão real continua por change, em `.change.yaml`.
+
+#### Verificação
+
+- **feat(verify): a verificação deixa veredito no disco** — `verification.md` com
+  prova por cenário e achados em aberto, em vez de um parecer que só existia no chat.
+
+- **feat(verify): confere que todo critério macro do plano tem tarefa** — critério
+  declarado no brief e não exercido por tarefa nenhuma vira achado.
+
+- **feat(archive): reporta o veredito da verificação, e o exige só sob flag** — sempre
+  reportado, nunca imposto, a menos que o projeto peça com `--require-verify`.
+
+- **feat(workflow): `/spec-project-verify` confere o que foi entregue, no conjunto** —
+  verificação no nível do plano, não de uma change isolada.
+
+- **feat(change): tarefa pode registrar o comando que a verificou.**
+
+- **feat(change): follow-up sem destino deixa de sair em silêncio** — cada `FU-` que o
+  design declarou e ninguém despachou é levado ao usuário antes do arquivamento.
+
+#### Plano e rastreabilidade da fonte
+
+- **feat(project): `source_refs` por incremento, derivado do brief**, com
+  **Referências da fonte obrigatória** quando o plano tem fonte, e **divergência da
+  fonte declarada no manifesto** — a decisão de se afastar da fonte fica registrada
+  onde dá para auditar.
+
+- **feat(project): re-decomposição não perde a fonte em silêncio.**
+
+- **feat(project): `plan.md` acompanha toda mutação que muda a revisão** — a projeção
+  legível não fica atrás do manifesto.
+
+- **feat(project): invariantes de arquitetura nomeiam quem as carrega** — invariante
+  sem capability responsável vira achado na revisão.
+
+- **feat(project): `generate` valida o plano que acabou de materializar.**
+
+- **feat(project): o esqueleto do brief ensina a forma que cada seção precisa ter.**
+
+- **feat(project): `set-blockers`, sem precisar escrever JSON à mão.**
+
+- **feat(workflow): a suposição do planejamento vai para o brief, não só para o chat.**
+
+- **feat(workflow): `propose` lê o Planned Change antes de escrever a proposta.**
+
+#### Instrução de artefato
+
+- **feat(schema): três reforços na instrução de spec**, mais: **valores vêm da spec,
+  nunca do que já está persistido**; **teste pulado não pode ser condição de sucesso
+  de uma tarefa**; **perguntas em aberto ganham a terceira categoria**; **divergir da
+  fonte exige dizer o que se perde**; **a change de entrega escreve documentação que
+  não engana**.
+
+- **feat(change): `skip_specs` exige justificativa escrita** — abrir mão de delta de
+  spec deixa de ser um campo silencioso.
+
+#### Painel e workspace
+
+- **feat(serve): grafo que acompanha o disco e navega por relações.**
+
+- **feat(server): EM ANDAMENTO vira um mini painel operacional, não uma linha.**
+
+- **feat(harness): instalação enxuta** — o padrão é o harness em uso, e dá para remover.
+
+- **feat(config): `spec/config.yaml` sai do `specs init` com todo campo já presente** —
+  ativo com o padrão real, ou comentado com exemplo, em vez de um arquivo que só se
+  edita certo depois de ler a documentação.
+
+- **feat(archive): avisa quando a change nunca chegou ao controle de versão.**
+
+### Corrigido
+
+- **fix(workflow): aviso de validação no archive vira decisão do usuário, não parada** —
+  o passo 1 mandava rodar `validate --strict` e parar se não passasse; como `--strict`
+  reprova por aviso, um requisito longo bloqueava uma change pronta. E bloqueava só na
+  instrução: o `specs archive` recusa por erro, nunca por aviso. Agora erro para,
+  aviso é reportado com a consequência e a decisão é de quem opera. Mesma distinção
+  aplicada ao passo 4, depois do merge dos deltas.
+
+- **fix(workflow): archive não adota trabalho não planejado por conta própria** — o
+  `fix` do `unclaimed_archive` era executado direto nos dois casos. `link` reivindica
+  trabalho que um incremento já tinha declarado e segue automático; `adopt` cria um
+  incremento novo e faz o plano reivindicar trabalho que nunca planejou — agora é
+  proposto, com "manter fora do plano" como resposta válida.
+
+- **fix(workflow): resolve escolhas técnicas no `spec-loop` sem confirmação** —
+  decisão que muda escopo não passa mais despercebida dentro do loop.
+
+- **fix(change): lacunas de validação e recuperação no dispatch paralelo**, mais
+  **rollback em `create`, verificação de remoção em `cleanup` e SHA de merge correto**,
+  e **`existsOnDisk` que ignorava a resolução de symlink** (`/var` → `/private/var` no
+  macOS) — a comparação crua dava "worktree removido" para um worktree ainda presente,
+  e era esse "removido" que apagava o registro.
+
+- **fix(project): quatro problemas de integração do dispatch por change** — dispatch
+  aninhado que batia no guard da árvore principal; lote que aceitava change vinculada
+  antes de ser proposta de verdade; instrução que passava o `CH-NNN` onde o comando
+  espera o slug; e `list`/`cleanup` que mudavam de significado em silêncio (resolvido
+  com `--whole-change` explícito).
+
+- **fix(project): o esqueleto vazio do `generate` deixa de ser gravado em silêncio** —
+  os ids que nascem sem conteúdo saem em `skeletons`, e o `fix` do
+  `planned_change_invalid` aponta o remédio real em vez de mandar rodar de novo o
+  comando que achou o problema.
+
+- **fix(project): lote de propose não propõe change que já existe.**
+
+- **fix(project): cobertura da re-decomposição confere faixa, não só documento.**
+
+- **fix(archive): fecha o vínculo do incremento que já estava vinculado.**
+
 ## [0.20.0] - 2026-09-03
 
 ### Adicionado
