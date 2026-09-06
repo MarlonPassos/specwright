@@ -21,9 +21,16 @@ ${RESOLVE_CHANGE}
    specs status --change "<change>" --json
    specs validate "<change>" --strict --json
    \`\`\`
-   Toda tarefa precisa estar marcada e a validação precisa passar. Se qualquer um dos dois não
-   valer, pare e diga o que está pendente. Tarefas não marcadas significam que o trabalho não
-   acabou - não arquive por cima delas.
+   Toda tarefa precisa estar marcada: tarefa não marcada significa que o trabalho não acabou -
+   não arquive por cima dela.
+
+   Na validação, separe erro de aviso. \`--strict\` reprova por qualquer um dos dois, mas eles
+   não pesam igual. Um \`ERROR\` para de verdade: o \`specs archive\` também recusa, e não há
+   o que decidir. Um \`WARNING\` não bloqueia o comando - ele descreve algo que o passo 3 vai
+   gravar na spec do workspace e que vai continuar aparecendo em
+   \`specs validate --specs --strict\` depois do arquivamento. Reporte cada aviso ao usuário
+   com essa consequência e pergunte: corrigir agora, ou arquivar assim mesmo. Não decida
+   sozinho em nenhuma das duas direções.
 
    Se a change ainda não foi verificada, rode \`${commandRef('verify')}\` antes. O
    \`specs archive\` devolve \`verification\` sempre: ausente, com achados em aberto, ou
@@ -56,8 +63,9 @@ ${RESOLVE_CHANGE}
    specs archive "<change>" --json
    \`\`\`
    Acrescente \`--skip-specs\` apenas para uma change que não declara nenhum delta de spec. O
-   comando se recusa a rodar enquanto a validação falha ou há tarefas não marcadas; \`--force\`
-   ignora a checagem de tarefas e é para casos excepcionais que o usuário aprovou.
+   comando se recusa enquanto a validação tem **erro** ou há tarefas não marcadas; avisos não
+   o bloqueiam - o que fazer com eles já foi decidido no passo 1. \`--force\` ignora a checagem
+   de tarefas e é para casos excepcionais que o usuário aprovou.
 
 4. **Confirme o resultado**
 
