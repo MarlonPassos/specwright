@@ -78,6 +78,19 @@ ${CLI_NOTE}
    passe-o explicitamente em TODOS os comandos \`specs project\` que aceitam plan-id.
 2. Rode \`specs project loop <plan-id> --json\`, \`specs project status <plan-id> --json\`
    e \`specs project next <plan-id> --json\`. A CLI só consulta o estado; quem executa é você.
+2b. **Antes de executar qualquer coisa, reporte \`completion\` ao usuário.** Ele foi
+   embora contando que o loop vai do começo ao fim; descobrir cada obstáculo ao bater nele
+   custa uma ida e volta por obstáculo. Se \`willComplete\` for \`false\`, diga em uma
+   mensagem: quantos dos pendentes o loop alcança, quais incrementos de \`terminal\` vão
+   pará-lo, com \`reasonCodes\` e \`manualBlockers\`, e o que cai junto em \`blocks\`.
+   Diga também que é piso e não garantia — um teste que quebra ou um agente travado também
+   param o loop, e isso nenhuma prévia enxerga.
+
+   Reporte e **siga trabalhando** no que é alcançável; não peça aprovação para continuar.
+   O usuário quis autonomia, e a informação existe para ele agir quando voltar, não para
+   virar mais um portão. Um brief \`missing\`/\`outdated\` cujo escopo já está definido você
+   pode materializar sozinho (ver Conclusão e recuperação) — nesse caso diga que resolveu,
+   em vez de reportá-lo como impedimento.
 3. \`candidates\` contém TODAS as ações disponíveis. \`recommended\` é uma recomendação,
    não uma obrigação. Escolha considerando prioridade, trabalho iniciado, custo, riscos e
    dependentes desbloqueados; explique brevemente a decisão. \`blockedBy\` representa espera

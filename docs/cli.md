@@ -8,10 +8,17 @@ não habilita autonomia. Para executar, invoque `$spec-loop <plan-id>` no Codex
 ou `/spec-loop <plan-id>` nos demais harnesses.
 
 O JSON traz `loopSchemaVersion: 1`, `plan` (`id`, `revision`), `state`,
-`completed`, `cancelled`, `remaining`, `candidates`, `recommended`, `blockers`
-e `diagnostics`. `state` é `ready` quando há ações disponíveis, `completed`
-quando todo incremento não cancelado está arquivado, ou `blocked` quando não há
-ação disponível. Plano vazio não é conclusão. Um estado `blocked` é um resultado
+`completed`, `cancelled`, `remaining`, `candidates`, `recommended`, `blockers`,
+`completion` e `diagnostics`. `state` é `ready` quando há ações disponíveis,
+`completed` quando todo incremento não cancelado está arquivado, ou `blocked`
+quando não há ação disponível.
+
+`completion` responde a outra pergunta: **este loop vai até o fim?** Traz
+`willComplete`, `reachable`, `unreachable` e `terminal` — as causas-raiz, cada
+uma com `reasonCodes`, `manualBlockers` e `blocks` (o que fica inalcançável por
+causa dela). `dependency_pending` é a única razão que o loop resolve sozinho;
+qualquer outra espera uma pessoa. É piso, não garantia: reporta o que **vai**
+parar o loop, não o que pode — um teste que quebra também para. Plano vazio não é conclusão. Um estado `blocked` é um resultado
 de consulta (exit 0); falhas de leitura/validação usam o envelope `error` (exit 1).
 
 Cada candidato traz id, slug, nome da change, título, caminho do brief,

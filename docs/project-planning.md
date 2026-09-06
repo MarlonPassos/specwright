@@ -69,6 +69,35 @@ que repare; com isso, divergência não declarada é a diferença entre duas lis
 A serialização é determinística: `load → save → load` é byte-idêntico. As chaves
 saem em ordem fixa, `changes` na ordem de declaração e `milestones` por `order`.
 
+### O loop diz até onde chega, antes de começar
+
+`state: blocked` responde *"há algo a fazer agora?"* — pergunta diferente de *"isto vai
+terminar?"*. Num plano de quinze incrementos, treze estão bloqueados por dependência no
+minuto zero, e isso é o loop funcionando.
+
+O campo `completion` responde a segunda pergunta:
+
+| Campo | O que é |
+| --- | --- |
+| `willComplete` | todo incremento pendente é alcançável rodando o loop |
+| `reachable` / `unreachable` | os pendentes de cada lado |
+| `terminal` | as **causas-raiz** — o que uma pessoa precisa resolver — com `blocks` dizendo o que cai junto |
+
+A classificação é simples porque as ações do loop são poucas: `link`, `propose`,
+`continue`, `implement` e `verify`. Nenhuma materializa brief, tira um `on_hold`, remove
+bloqueio manual ou resolve archive ambíguo — então **`dependency_pending` é a única razão
+transitória**, e todas as outras esperam uma pessoa.
+
+Dois casos que a leitura ingênua erraria, e que o cálculo trata:
+
+- **Depender de um incremento cancelado.** Ele nunca chega a `archived`, então o
+  dependente reporta `dependency_pending` para sempre. Vira `dependency_cancelled`.
+- **O candidato `link` de um incremento bloqueado.** Vincular é escrituração e autoriza
+  nada; na iteração seguinte ele volta a bloquear. Ter ação agora não o torna alcançável.
+
+É **piso, não garantia**: reporta o que *vai* parar o loop, e não enxerga o que *pode* —
+um teste que quebra, um agente travado, um conflito de merge.
+
 ### Onde a incerteza do planejamento é registrada
 
 Ler um documento-fonte sempre produz suposições: o documento não responde tudo, e para

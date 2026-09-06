@@ -207,13 +207,36 @@ export function registerProjectCommands(program: Command): void {
         const id = await resolvePlanId(workspace.projectRoot, planId);
         const snapshot = await computeLoopSnapshot(workspace, id);
         if (json) printJson(snapshot);
-        else printLines([
-          `Loop do plano "${id}": ${snapshot.state}`,
-          `Concluídos: ${snapshot.completed.length}; cancelados: ${snapshot.cancelled.length}; pendentes: ${snapshot.remaining.length}`,
-          ...snapshot.candidates.map((entry) => `  ${entry.id} ${entry.change}: ${entry.action}`),
-          ...snapshot.blockers.map((entry) => `  ${entry.id ?? id}: ${entry.reasonCodes.join(', ')}`),
-          'Consulta somente leitura. Inicie spec-loop explicitamente no seu harness para executar.',
-        ]);
+        else {
+          const { completion } = snapshot;
+          const done = snapshot.completed.length;
+          const total = done + snapshot.remaining.length;
+          printLines([
+            `Loop do plano "${id}": ${snapshot.state}`,
+            `Concluídos: ${done}; cancelados: ${snapshot.cancelled.length}; pendentes: ${snapshot.remaining.length}`,
+            ...snapshot.candidates.map((entry) => `  ${entry.id} ${entry.change}: ${entry.action}`),
+            ...snapshot.blockers.map((entry) => `  ${entry.id ?? id}: ${entry.reasonCodes.join(', ')}`),
+            '',
+            ...(completion.willComplete
+              ? [`Este loop alcança os ${snapshot.remaining.length} incrementos pendentes.`]
+              : [
+                  `Este loop vai completar ${done + completion.reachable.length} de ${total} e parar.`,
+                  '',
+                  'Vão pará-lo:',
+                  ...completion.terminal.map(
+                    (entry) =>
+                      `  ${entry.id}  ${entry.reasonCodes.join(', ')}` +
+                      (entry.manualBlockers.length > 0 ? ` — ${entry.manualBlockers.join('; ')}` : '') +
+                      (entry.blocks.length > 0 ? `\n     e com ele: ${entry.blocks.join(', ')}` : '')
+                  ),
+                  '',
+                  'Resolva estes antes de sair, ou o loop para no meio.',
+                ]),
+            '',
+            'Piso, não garantia: um teste que quebra ou um agente travado também param o loop.',
+            'Consulta somente leitura. Inicie spec-loop explicitamente no seu harness para executar.',
+          ]);
+        }
       } catch (error) {
         fail(error, { json, payload: { plan: null } });
       }
