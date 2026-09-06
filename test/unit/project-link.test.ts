@@ -5,6 +5,7 @@ import {
   linkChange,
   unlinkChange,
   adoptChange,
+  setManualBlockers,
   setPlanningState,
 } from '../../src/core/project/link.js';
 import { loadPlan } from '../../src/core/project/repository.js';
@@ -16,6 +17,7 @@ import {
   seedArchivedChange,
   manifest,
   change,
+  withBrief,
 } from '../helpers/plan.js';
 import { seedChange } from '../helpers/workspace.js';
 
@@ -460,6 +462,109 @@ describe('diagnósticos de archive órfão e execução ambígua', () => {
     const found = status.diagnostics.find((d) => d.code === 'ambiguous_execution');
     expect(found).toBeDefined();
     expect(found!.message).toContain('invisível');
+  });
+});
+
+describe('setManualBlockers', () => {
+  async function seeded() {
+    const workspace = await makePlanWorkspace();
+    await seedPlan(
+      workspace,
+      manifest({ id: 'demo', revision: 2, changes: [change({ id: 'CH-002', slug: 'auth' })] })
+    );
+    return workspace;
+  }
+
+  it('registra os motivos e derruba a readiness', async () => {
+    const workspace = await seeded();
+
+    const result = await setManualBlockers(workspace, 'demo', 'CH-002', ['Aguardando jurídico']);
+
+    expect(result).toMatchObject({
+      id: 'CH-002',
+      manualBlockers: ['Aguardando jurídico'],
+      revision: 3,
+      readiness: 'blocked',
+    });
+    const { manifest: saved } = await loadPlan(workspace.projectRoot, 'demo');
+    expect(saved.changes[0].manual_blockers).toEqual(['Aguardando jurídico']);
+  });
+
+  it('substitui a lista inteira; nunca acrescenta', async () => {
+    const workspace = await seeded();
+    await setManualBlockers(workspace, 'demo', 'CH-002', ['primeiro']);
+
+    const result = await setManualBlockers(workspace, 'demo', 'CH-002', ['segundo']);
+    expect(result.manualBlockers).toEqual(['segundo']);
+  });
+
+  it('lista vazia libera o incremento', async () => {
+    // Com brief materializado, para que o único motivo de bloqueio seja o
+    // manual — senão `planned_change_missing` mascararia o resultado.
+    const workspace = await makePlanWorkspace();
+    const entry = await withBrief(workspace, 'demo', change({ id: 'CH-002', slug: 'auth' }));
+    await seedPlan(workspace, manifest({ id: 'demo', changes: [entry] }));
+
+    const blocked = await setManualBlockers(workspace, 'demo', 'CH-002', ['Aguardando jurídico']);
+    expect(blocked.readiness).toBe('blocked');
+
+    const released = await setManualBlockers(workspace, 'demo', 'CH-002', []);
+    expect(released.manualBlockers).toEqual([]);
+    expect(released.readiness).toBe('ready');
+  });
+
+  it('descarta motivo em branco em vez de gravar string vazia', async () => {
+    const workspace = await seeded();
+    const result = await setManualBlockers(workspace, 'demo', 'CH-002', ['  ', 'real', '']);
+    expect(result.manualBlockers).toEqual(['real']);
+  });
+
+  it('recusa um incremento que não existe', async () => {
+    const workspace = await seeded();
+    await expect(setManualBlockers(workspace, 'demo', 'CH-999', ['x'])).rejects.toMatchObject({
+      code: 'change_not_found',
+    });
+  });
+
+  it('protege incremento concluído, e cede com allowCompleted', async () => {
+    // Mesma guarda que o bundle já aplica: um comando direto que a pulasse
+    // seria o caminho fácil de contornar uma proteção que custou um bug (F-05).
+    const workspace = await makePlanWorkspace();
+    await seedArchivedChange(workspace, 'auth', '2026-01-01');
+    await seedPlan(
+      workspace,
+      manifest({
+        id: 'demo',
+        revision: 2,
+        changes: [
+          change({
+            id: 'CH-002',
+            slug: 'auth',
+            link: {
+              name: 'auth',
+              active_path: null,
+              archive_path: 'spec/changes/archive/2026-01-01-auth',
+              linked_at: '2026-01-01',
+            },
+          }),
+        ],
+      })
+    );
+
+    await expect(setManualBlockers(workspace, 'demo', 'CH-002', ['x'])).rejects.toMatchObject({
+      code: 'completed_change_protected',
+    });
+    await expect(
+      setManualBlockers(workspace, 'demo', 'CH-002', ['x'], { allowCompleted: true })
+    ).resolves.toMatchObject({ manualBlockers: ['x'] });
+  });
+
+  it('reprojeta o plan.md como os outros mutadores diretos', async () => {
+    const workspace = await seeded();
+    const result = await setManualBlockers(workspace, 'demo', 'CH-002', ['x']);
+
+    const doc = await fs.readFile(path.join(workspace.projectRoot, 'planning/demo/plan.md'), 'utf8');
+    expect(projectedRevision(doc)).toBe(result.revision);
   });
 });
 

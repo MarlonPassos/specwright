@@ -102,6 +102,53 @@ describe('autonomous loop frontier', () => {
     expect(await computeLoopSnapshot(workspace, 'demo')).toMatchObject({ state: 'blocked', remaining: ['CH-001', 'CH-002', 'CH-003'] });
   });
 
+  it('diz de antemão até onde o loop chega, e o que vai pará-lo', async () => {
+    const { workspace, changes } = await fixture();
+    changes[0].manual_blockers = ['Aguardando jurídico'];
+    await seedPlan(workspace, manifest({ changes }));
+
+    const { completion } = await computeLoopSnapshot(workspace, 'demo');
+
+    expect(completion.willComplete).toBe(false);
+    // CH-002 depende do bloqueado; CH-003 é independente e segue alcançável.
+    expect(completion.reachable).toEqual(['CH-003']);
+    expect(completion.unreachable).toEqual(['CH-001', 'CH-002']);
+    expect(completion.terminal).toEqual([
+      {
+        id: 'CH-001',
+        reasonCodes: ['manual_blocker_present'],
+        manualBlockers: ['Aguardando jurídico'],
+        blocks: ['CH-002'],
+      },
+    ]);
+  });
+
+  it('um plano só à espera de dependências é declarado alcançável por inteiro', async () => {
+    const { workspace, changes } = await fixture();
+    await seedPlan(workspace, manifest({ changes }));
+
+    const { completion } = await computeLoopSnapshot(workspace, 'demo');
+
+    expect(completion.willComplete).toBe(true);
+    expect(completion.terminal).toEqual([]);
+  });
+
+  it('o candidato `link` de um incremento bloqueado não conta como progresso', async () => {
+    // Vincular é escrituração: registra que o trabalho no disco pertence ao
+    // incremento e não autoriza nada. Na iteração seguinte ele volta a bloquear,
+    // então tratá-lo como alcançável faria a prévia mentir.
+    const { workspace, changes } = await fixture();
+    changes[0].manual_blockers = ['Aguardando jurídico'];
+    await seedPlan(workspace, manifest({ changes }));
+    await seedChange(workspace, 'foundation');
+
+    const snapshot = await computeLoopSnapshot(workspace, 'demo');
+
+    expect(snapshot.candidates).toContainEqual(expect.objectContaining({ id: 'CH-001', action: 'link' }));
+    expect(snapshot.completion.willComplete).toBe(false);
+    expect(snapshot.completion.terminal.map((entry) => entry.id)).toEqual(['CH-001']);
+  });
+
   it('does not declare an empty plan complete', async () => {
     const workspace = await makePlanWorkspace();
     await seedPlan(workspace, manifest());

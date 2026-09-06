@@ -8,10 +8,17 @@ não habilita autonomia. Para executar, invoque `$spec-loop <plan-id>` no Codex
 ou `/spec-loop <plan-id>` nos demais harnesses.
 
 O JSON traz `loopSchemaVersion: 1`, `plan` (`id`, `revision`), `state`,
-`completed`, `cancelled`, `remaining`, `candidates`, `recommended`, `blockers`
-e `diagnostics`. `state` é `ready` quando há ações disponíveis, `completed`
-quando todo incremento não cancelado está arquivado, ou `blocked` quando não há
-ação disponível. Plano vazio não é conclusão. Um estado `blocked` é um resultado
+`completed`, `cancelled`, `remaining`, `candidates`, `recommended`, `blockers`,
+`completion` e `diagnostics`. `state` é `ready` quando há ações disponíveis,
+`completed` quando todo incremento não cancelado está arquivado, ou `blocked`
+quando não há ação disponível.
+
+`completion` responde a outra pergunta: **este loop vai até o fim?** Traz
+`willComplete`, `reachable`, `unreachable` e `terminal` — as causas-raiz, cada
+uma com `reasonCodes`, `manualBlockers` e `blocks` (o que fica inalcançável por
+causa dela). `dependency_pending` é a única razão que o loop resolve sozinho;
+qualquer outra espera uma pessoa. É piso, não garantia: reporta o que **vai**
+parar o loop, não o que pode — um teste que quebra também para. Plano vazio não é conclusão. Um estado `blocked` é um resultado
 de consulta (exit 0); falhas de leitura/validação usam o envelope `error` (exit 1).
 
 Cada candidato traz id, slug, nome da change, título, caminho do brief,
@@ -303,7 +310,7 @@ PROBLEMA`, `CONCLUÍDAS`, `FORA DO FLUXO` — em vez de uma lista única ordenad
 id, e os códigos de razão saem traduzidos. `--no-color` desenha sem cor nem
 glifos Unicode, igual a `specs status`.
 
-### `specs project link` / `unlink` / `adopt` / `sync` / `set-state`
+### `specs project link` / `unlink` / `adopt` / `sync` / `set-state` / `set-blockers`
 
 `link <change-id> <change-name>` registra o vínculo 1:1 (o incremento não pode
 estar concluído nem cancelado; a change precisa existir, **ativa ou no archive**;
@@ -318,6 +325,12 @@ change de mesmo nome do slug exista e esteja livre — é a alternativa a repeti
 `specs project link` uma vez por incremento.
 `set-state <change-id> <state> [--reason]` aplica uma transição de
 `planning_state` (`on_hold` e `cancelled` exigem `--reason`).
+`set-blockers <change-id> "<motivo>…"` registra por que um incremento não pode
+começar ainda; `--clear` remove todos. Substitui a lista inteira, nunca
+acrescenta, e exige `--allow-completed` para tocar num incremento concluído —
+a mesma guarda que a operação `setBlockers` de um bundle aplica. Todos aceitam
+`<plan-id>` antes do `<change-id>`; no `set-blockers` os dois são distinguidos
+pela forma, porque o motivo é variádico: incremento é `CH-NNN`, plano é kebab.
 
 Códigos de erro: `link_target_missing`, `link_already_used`, `invalid_transition`,
 `missing_reason`, `completed_change_protected`, `ambiguous_archive_identity`.

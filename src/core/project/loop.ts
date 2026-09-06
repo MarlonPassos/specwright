@@ -25,6 +25,41 @@ export interface LoopBlocker {
   manualBlockers: string[];
 }
 
+/** One increment a person has to unblock before the loop can pass it. */
+export interface LoopTerminalBlocker {
+  id: string;
+  reasonCodes: string[];
+  manualBlockers: string[];
+  /** Remaining increments that stay out of reach because of this one. */
+  blocks: string[];
+}
+
+/**
+ * How far this loop can get before it needs a person.
+ *
+ * `state: 'blocked'` answers "is there anything to do RIGHT NOW", which is a
+ * different question from "will this finish". Most of a plan is blocked at any
+ * moment — `dependency_pending` is the normal condition of everything that has
+ * not had its turn — so a snapshot full of blockers says nothing about whether
+ * walking away is safe.
+ *
+ * This says it. The loop is meant to be started and left alone; discovering the
+ * obstacle by hitting it costs a round trip per obstacle.
+ *
+ * A floor, never a promise: it reports what WILL stop the loop, and cannot
+ * report what might — a failing test, a stuck agent, a merge conflict.
+ */
+export interface LoopCompletion {
+  /** True when every remaining increment is reachable by running the loop. */
+  willComplete: boolean;
+  /** Remaining increments the loop can still finish. */
+  reachable: string[];
+  /** Remaining increments it cannot, root causes included. */
+  unreachable: string[];
+  /** The root causes — what a person actually has to resolve. */
+  terminal: LoopTerminalBlocker[];
+}
+
 export interface LoopSnapshot {
   loopSchemaVersion: 1;
   plan: { id: string; revision: number };
@@ -35,7 +70,80 @@ export interface LoopSnapshot {
   candidates: LoopCandidate[];
   recommended: string | null;
   blockers: LoopBlocker[];
+  completion: LoopCompletion;
   diagnostics: DiagnosticView[];
+}
+
+/**
+ * The only blocking reason the loop clears by itself.
+ *
+ * Its actions are link, propose, continue, implement and verify. None of them
+ * materialises a brief, lifts an `on_hold`, removes a manual blocker or
+ * resolves an ambiguous archive — so every other reason waits for a person, no
+ * matter how many iterations run.
+ */
+const TRANSIENT_REASONS = new Set(['dependency_pending']);
+
+export interface CompletionInput {
+  remaining: string[];
+  /** Increment id -> why it is blocked, for every remaining increment that is. */
+  blockedReasons: Map<string, { reasonCodes: string[]; manualBlockers: string[] }>;
+  cancelledIds: Set<string>;
+  /** True when something blocks the plan as a whole, not one increment. */
+  planBlocked: boolean;
+  dependsOnOf: (id: string) => string[];
+  ancestorsOf: (id: string) => string[];
+}
+
+/**
+ * Which remaining increments the loop can reach, and which it cannot.
+ *
+ * Pure, and separated from the snapshot so the classification can be tested
+ * without building a workspace: it is the part where being wrong is expensive.
+ * Erring toward "terminal" produces false alarms, and a preflight that cries
+ * wolf gets ignored — the same failure mode as blocking too much.
+ */
+export function computeCompletion(input: CompletionInput): LoopCompletion {
+  const terminal = new Map<string, { reasonCodes: string[]; manualBlockers: string[] }>();
+
+  for (const id of input.remaining) {
+    const blocked = input.blockedReasons.get(id);
+    if (blocked && !blocked.reasonCodes.every((code) => TRANSIENT_REASONS.has(code))) {
+      terminal.set(id, blocked);
+      continue;
+    }
+    // A cancelled dependency never reaches `archived`, so an increment waiting
+    // on one waits forever while reporting the ordinary `dependency_pending`.
+    // Reading the reason alone would call this reachable.
+    const dead = input.dependsOnOf(id).filter((dep) => input.cancelledIds.has(dep));
+    if (dead.length > 0) {
+      terminal.set(id, { reasonCodes: ['dependency_cancelled'], manualBlockers: [] });
+    }
+  }
+
+  const unreachable = new Set(terminal.keys());
+  for (const id of input.remaining) {
+    if (unreachable.has(id)) continue;
+    if (input.ancestorsOf(id).some((ancestor) => terminal.has(ancestor))) unreachable.add(id);
+  }
+  if (input.planBlocked) for (const id of input.remaining) unreachable.add(id);
+
+  return {
+    willComplete: unreachable.size === 0,
+    reachable: input.remaining.filter((id) => !unreachable.has(id)),
+    unreachable: input.remaining.filter((id) => unreachable.has(id)),
+    terminal: [...terminal.entries()]
+      .map(([id, cause]) => ({
+        id,
+        reasonCodes: cause.reasonCodes,
+        manualBlockers: cause.manualBlockers,
+        blocks: input.remaining.filter(
+          (other) =>
+            other !== id && unreachable.has(other) && input.ancestorsOf(other).includes(id)
+        ),
+      }))
+      .sort((a, b) => a.id.localeCompare(b.id)),
+  };
 }
 
 /**
@@ -64,8 +172,12 @@ export async function computeLoopSnapshot(workspace: Workspace, planId: string):
     .filter((view) => view.execution === 'archived' && (diagnosticsFor(view.id).length > 0 || worktrees.has(view.id)))
     .map((view) => view.id));
 
+  // Why each remaining increment is held up, for the completion analysis. Fed
+  // from two places: every `block()` call, and the `link` candidates below.
+  const blockedReasons = new Map<string, { reasonCodes: string[]; manualBlockers: string[] }>();
   const block = (id: string | null, reasonCodes: string[], blockedBy: string[] = [], manualBlockers: string[] = []) => {
     blockers.push({ id, reasonCodes, blockedBy, manualBlockers });
+    if (id !== null) blockedReasons.set(id, { reasonCodes, manualBlockers });
   };
 
   const runnablePlan = status.plan.status === 'active' || status.plan.status === 'completed';
@@ -115,6 +227,16 @@ export async function computeLoopSnapshot(workspace: Workspace, planId: string):
     // pending. Linking does not authorize implementing before readiness.
     if (!view.link && (active || archived)) {
       action = 'link';
+      // Linking is bookkeeping: it records that work on disk belongs to this
+      // increment, and authorises nothing. An increment that is blocked for its
+      // own reasons goes right back to blocked on the next iteration, so it must
+      // not count as reachable just because there is an action for it now.
+      if (view.readiness !== 'ready' && !archived) {
+        blockedReasons.set(view.id, {
+          reasonCodes: view.readinessReasons,
+          manualBlockers: view.manualBlockers,
+        });
+      }
     } else if (view.readiness !== 'ready') {
       block(view.id, view.readinessReasons, view.blockedBy, view.manualBlockers);
       continue;
@@ -154,6 +276,15 @@ export async function computeLoopSnapshot(workspace: Workspace, planId: string):
   }
 
   // Ranking remains advisory. All eligible choices are exposed to the agent.
+  const completion = computeCompletion({
+    remaining,
+    blockedReasons,
+    cancelledIds: new Set(cancelled),
+    planBlocked: blockers.some((entry) => entry.id === null),
+    dependsOnOf: (id) => status.changes.find((view) => view.id === id)?.dependsOn ?? [],
+    ancestorsOf: (id) => status.graph.ancestors(id),
+  });
+
   const ranked = recommendNext(status).parallelReady;
   const recommended = ranked.find((id) => candidates.some((entry) => entry.id === id)) ?? candidates[0]?.id ?? null;
   return {
@@ -168,6 +299,7 @@ export async function computeLoopSnapshot(workspace: Workspace, planId: string):
     candidates,
     recommended,
     blockers,
+    completion,
     diagnostics: status.diagnostics,
   };
 }

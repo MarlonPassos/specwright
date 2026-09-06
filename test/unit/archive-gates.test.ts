@@ -39,6 +39,55 @@ describe('archive avisa quando o trabalho nunca chegou ao git', () => {
   });
 });
 
+describe('archive e a diferença entre erro e aviso na validação', () => {
+  // O passo 1 do spec-archive manda reportar avisos e perguntar ao usuário, em
+  // vez de parar sozinho. Isso só é honesto porque o comando de fato não
+  // recusa por aviso - se um dia recusar, a skill passa a mandar o agente
+  // perguntar algo que o comando vai negar de qualquer jeito.
+  const longRequirement = `## Purpose
+
+Lets a signed-in user take their own data out of the product in a portable format.
+
+## ADDED Requirements
+
+### Requirement: Self-service export
+The system SHALL let a signed-in user export their own data as a CSV file, ${'e '.repeat(
+    260
+  )}sempre.
+
+#### Scenario: Export succeeds
+- **WHEN** a signed-in user requests an export
+- **THEN** the system returns a CSV file with that user's data
+`;
+
+  const doneTasks = '## 1. Export\n\n- [x] 1.1 Implement the writer and verify its unit test passes\n';
+
+  it('arquiva com a validação real ligada quando só há aviso, sem --force', async () => {
+    const workspace = await makeWorkspace();
+    await seedChange(workspace, 'so-aviso', { delta: longRequirement, tasks: doneTasks });
+
+    const { validateChange } = await import('../../src/core/validate/change-validator.js');
+    const report = await validateChange(workspace, 'so-aviso');
+    expect(report.summary.errors).toBe(0);
+    expect(report.summary.warnings).toBeGreaterThan(0);
+
+    // validação ligada (sem `validate: false`) e sem `--force`
+    const result = await archiveChange(workspace, 'so-aviso', { now: new Date(2026, 0, 1) });
+    expect(result.archivedAs).toBe('2026-01-01-so-aviso');
+  });
+
+  it('recusa quando a validação tem erro, e diz qual', async () => {
+    const workspace = await makeWorkspace();
+    await seedChange(workspace, 'com-erro', {
+      delta: '## Purpose\n\nAlgo.\n\n## ADDED Requirements\n\n### Requirement: Sem cenário\nThe system SHALL fazer algo.\n',
+    });
+
+    await expect(
+      archiveChange(workspace, 'com-erro', { now: new Date(2026, 0, 1) })
+    ).rejects.toMatchObject({ code: 'change_invalid' });
+  });
+});
+
 describe('archive e o veredito da verificação', () => {
   const clean =
     '# Verificação — c\n\ndata: 2026-09-05T15:10Z\n\n## Achados em aberto\n\nnenhum\n';

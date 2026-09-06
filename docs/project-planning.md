@@ -69,6 +69,55 @@ que repare; com isso, divergência não declarada é a diferença entre duas lis
 A serialização é determinística: `load → save → load` é byte-idêntico. As chaves
 saem em ordem fixa, `changes` na ordem de declaração e `milestones` por `order`.
 
+### Blocker manual
+
+`manual_blockers` é a lista de motivos pelos quais um incremento não pode começar
+ainda — "aguardando decisão do jurídico". Ele é o **único** motivo de bloqueio sem
+saída automática: os outros quatro (`dependency_pending`, brief ausente ou
+desatualizado, brief inválido, estado não elegível) são recalculados a cada leitura e
+somem quando a causa some. Este só sai quando alguém o tira.
+
+Por isso ele tem precedência sobre todos os outros e `blockedBy` fica vazio: não é a
+dependência que está segurando.
+
+```bash
+specs project set-blockers CH-003 "Aguardando decisão do jurídico"
+specs project set-blockers CH-003 --clear
+```
+
+Substitui a lista inteira, nunca acrescenta — igual à operação `setBlockers` do bundle,
+que continua sendo o caminho certo para um agente que já está montando um. Alterar um
+incremento concluído exige `--allow-completed`, a mesma guarda que o bundle aplica.
+
+### O loop diz até onde chega, antes de começar
+
+`state: blocked` responde *"há algo a fazer agora?"* — pergunta diferente de *"isto vai
+terminar?"*. Num plano de quinze incrementos, treze estão bloqueados por dependência no
+minuto zero, e isso é o loop funcionando.
+
+O campo `completion` responde a segunda pergunta:
+
+| Campo | O que é |
+| --- | --- |
+| `willComplete` | todo incremento pendente é alcançável rodando o loop |
+| `reachable` / `unreachable` | os pendentes de cada lado |
+| `terminal` | as **causas-raiz** — o que uma pessoa precisa resolver — com `blocks` dizendo o que cai junto |
+
+A classificação é simples porque as ações do loop são poucas: `link`, `propose`,
+`continue`, `implement` e `verify`. Nenhuma materializa brief, tira um `on_hold`, remove
+bloqueio manual ou resolve archive ambíguo — então **`dependency_pending` é a única razão
+transitória**, e todas as outras esperam uma pessoa.
+
+Dois casos que a leitura ingênua erraria, e que o cálculo trata:
+
+- **Depender de um incremento cancelado.** Ele nunca chega a `archived`, então o
+  dependente reporta `dependency_pending` para sempre. Vira `dependency_cancelled`.
+- **O candidato `link` de um incremento bloqueado.** Vincular é escrituração e autoriza
+  nada; na iteração seguinte ele volta a bloquear. Ter ação agora não o torna alcançável.
+
+É **piso, não garantia**: reporta o que *vai* parar o loop, e não enxerga o que *pode* —
+um teste que quebra, um agente travado, um conflito de merge.
+
 ### Onde a incerteza do planejamento é registrada
 
 Ler um documento-fonte sempre produz suposições: o documento não responde tudo, e para
