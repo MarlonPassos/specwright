@@ -72,8 +72,14 @@ ${RESOLVE_CHANGE}
    \`\`\`bash
    specs validate --specs --strict --json
    \`\`\`
-   As specs resultantes precisam continuar válidas. Se uma spec de capacidade recém-criada
-   ficou com um propósito placeholder, substitua agora editando a spec do workspace direto.
+   Mesma distinção do passo 1, agora do outro lado do merge. **Erro** aqui é grave de um jeito
+   que erro nenhum antes era: o merge dos deltas produziu spec quebrada no workspace, e isso
+   já está gravado - diga ao usuário exatamente o que quebrou. **Aviso** não é isso; um
+   requisito longo que já vinha do delta continua longo depois do merge, e você já tratou dele
+   no passo 1. Reporte os avisos e siga.
+
+   Se uma spec de capacidade recém-criada ficou com um propósito placeholder, substitua agora
+   editando a spec do workspace direto.
 
 5. **Feche o plano, se houver um**
 
@@ -96,14 +102,27 @@ ${RESOLVE_CHANGE}
    specs project status --json
    \`\`\`
    \`plan_not_found\` significa que não há plano: pare aqui, está tudo certo. Um
-   \`unclaimed_archive\` apontando a change que você acabou de arquivar significa que nenhum
-   incremento planejava aquele slug, ou que o plano recusou a escrita - rode o \`fix\` que o
-   diagnóstico traz (\`specs project adopt\` quando ninguém planejava, \`specs project link\`
-   quando alguém planejava). Depois confirme que o incremento aparece com
+   \`unclaimed_archive\` apontando a change que você acabou de arquivar traz um \`fix\`, e
+   qual dos dois ele traz decide se você roda ou pergunta:
+
+   - \`specs project link <CH-NNN> <slug>\` - **rode**. Existe um incremento que planejava
+     exatamente este slug e ficou sem vínculo (o plano estava ilegível ou recusou a escrita na
+     hora do archive). Vincular só reivindica trabalho que alguém já tinha declarado; é o
+     mesmo que o \`specs archive\` faz sozinho quando consegue.
+   - \`specs project adopt <archive-dir>\` - **proponha e pergunte**. Ninguém planejava este
+     slug, e adotar não é reparo: cria um incremento **novo** (próximo ID livre,
+     \`planning_state: planned\`, sem milestone e sem brief) e faz o plano passar a reivindicar
+     um trabalho que ele nunca planejou. Mostre o comando, o que ele vai criar, e ofereça
+     manter fora do plano como resposta válida - dizendo que nesse caso o
+     \`unclaimed_archive\` continua aparecendo no \`specs project status\`, porque não há como
+     silenciá-lo. Só rode depois do sim.
+
+   Depois de qualquer um dos dois, confirme que o incremento aparece com
    \`execution: "archived"\`.
 
-   Sem isso o trabalho fica concluído no workspace e invisível no plano: o painel do projeto
-   segue mostrando o incremento como pendente.
+   Sem vínculo nenhum, o trabalho fica concluído no workspace e invisível no plano: o painel
+   do projeto segue mostrando o incremento como pendente. Isso é uma consequência legítima de
+   escolher manter a change fora do plano - não é motivo para adotar por conta própria.
 
 **Saída**
 
