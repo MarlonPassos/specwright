@@ -22,7 +22,7 @@ describe('dashboard data', () => {
     expect(data.changes).toHaveLength(1);
     expect(data.changes[0].phase).toBe('planning');
     expect(data.changes[0].blockedBy).toContain('tasks');
-    expect(data.changes[0].next).toBe('/spec-continue');
+    expect(data.changes[0].next).toBe('/spec-continue c');
   });
 
   it('places a planned change with open tasks in implementing', async () => {
@@ -38,7 +38,7 @@ describe('dashboard data', () => {
       completedWithoutEvidence: 0,
       open: [{ number: '1.1', text: expect.any(String), group: expect.any(String) }],
     });
-    expect(data.changes[0].next).toBe('/spec-implement');
+    expect(data.changes[0].next).toBe('/spec-implement c');
   });
 
   it('places a change with every task checked in ready-to-archive', async () => {
@@ -49,7 +49,7 @@ describe('dashboard data', () => {
 
     const data = await buildDashboard(workspace, CLAUDE_ENV);
     expect(data.changes[0].phase).toBe('ready-to-archive');
-    expect(data.changes[0].next).toBe('/spec-archive');
+    expect(data.changes[0].next).toBe('/spec-archive c');
   });
 
   it('reports an unreadable change instead of failing the whole dashboard', async () => {
@@ -133,8 +133,24 @@ describe('dashboard view', () => {
 
     const data = await buildDashboard(workspace, CODEX_ENV);
     expect(data.harness).toBe('codex');
-    expect(data.changes[0].next).toBe('$spec-implement');
+    expect(data.changes[0].next).toBe('$spec-implement c');
     expect(data.changes[0].next).not.toContain('/spec-');
+  });
+
+  it('names the change in every next command, so pasting it never asks "which one?"', async () => {
+    // Com duas changes ativas, um comando sem argumento obriga quem colar (ou o
+    // agente) a escolher entre elas - a pergunta que o painel existe para evitar.
+    const workspace = await makeWorkspace();
+    await seedChange(workspace, 'alpha');
+    await seedChange(workspace, 'beta', {
+      tasks: '## 1. Export\n\n- [x] 1.1 Escrever o writer e confirmar o teste\n',
+    });
+
+    const data = await buildDashboard(workspace, CLAUDE_ENV);
+    for (const change of data.changes) {
+      expect(change.next.endsWith(` ${change.id}`)).toBe(true);
+    }
+    expect(data.changes.find((change) => change.id === 'beta')!.next).toBe('/spec-archive beta');
   });
 
   it('spells the idle hint for the running harness too', async () => {

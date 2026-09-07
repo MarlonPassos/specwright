@@ -69,17 +69,24 @@ function phaseOf(
 /**
  * The command that moves a change forward, typed the way the running harness
  * accepts it - never a slash command in a harness that has no slash commands.
+ *
+ * Always spelled with the change it acts on. A bare `/spec-archive` forces
+ * whoever pastes it to answer "which change?" - and with more than one active
+ * change the agent cannot answer that either, so it stops and asks, which is
+ * exactly the round trip this panel exists to spare. Every workflow command
+ * used here takes `[nome-da-change]`; `specs validate` takes the same
+ * positional argument.
  */
-function nextCommand(phase: ChangePhase, harness: HarnessAdapter): string {
+function nextCommand(phase: ChangePhase, harness: HarnessAdapter, id: string): string {
   switch (phase) {
     case 'planning':
-      return harness.invocation('continue');
+      return `${harness.invocation('continue')} ${id}`;
     case 'implementing':
-      return harness.invocation('implement');
+      return `${harness.invocation('implement')} ${id}`;
     case 'ready-to-archive':
-      return harness.invocation('archive');
+      return `${harness.invocation('archive')} ${id}`;
     default:
-      return 'specs validate';
+      return `specs validate ${id}`;
   }
 }
 
@@ -99,7 +106,7 @@ async function readChange(
       artifacts: status.artifacts.map((artifact) => ({ id: artifact.id, state: artifact.state })),
       blockedBy: status.applyBlockedBy,
       ...(status.tasks ? { tasks: status.tasks } : {}),
-      next: nextCommand(phase, harness),
+      next: nextCommand(phase, harness, id),
     };
   } catch (error) {
     // One unreadable change must not blank the whole dashboard, which in watch
@@ -109,7 +116,7 @@ async function readChange(
       phase: 'broken',
       artifacts: [],
       blockedBy: [],
-      next: nextCommand('broken', harness),
+      next: nextCommand('broken', harness, id),
       error: error instanceof Error ? error.message : String(error),
     };
   }
